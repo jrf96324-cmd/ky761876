@@ -1,6 +1,7 @@
 import http from "node:http";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync, createReadStream } from "node:fs";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
@@ -9,9 +10,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
 const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
 const dataFile = path.join(dataDir, "arrangements.json");
+const authFile = path.join(dataDir, "auth.json");
 const port = Number(process.env.PORT || 3000);
-const password = process.env.DAO_CAR_PASSWORD || "change-me";
+const envPassword = process.env.DAO_CAR_PASSWORD || "";
 const sessions = new Set();
+let storedAuth = null;
 
 const defaultData = {
   updatedAt: null,
@@ -45,6 +48,9 @@ async function ensureDataFile() {
   await mkdir(dataDir, { recursive: true });
   if (!existsSync(dataFile)) {
     await writeFile(dataFile, JSON.stringify(defaultData, null, 2), "utf8");
+  }
+  if (!envPassword && existsSync(authFile)) {
+    storedAuth = JSON.parse(await readFile(authFile, "utf8"));
   }
 }
 
@@ -91,6 +97,23 @@ function clearSessionCookie(res) {
   res.setHeader("Set-Cookie", "dao_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
 }
 
+function needsPasswordSetup() {
+  return !envPassword && !storedAuth;
+}
+
+function hashPassword(password, salt = randomBytes(16).toString("hex")) {
+  const hash = scryptSync(String(password), salt, 64).toString("hex");
+  return { salt, hash };
+}
+
+function verifyPassword(input) {
+  if (envPassword) return String(input || "") === envPassword;
+  if (!storedAuth) return false;
+  const attempt = Buffer.from(hashPassword(input, storedAuth.salt).hash, "hex");
+  const expected = Buffer.from(storedAuth.hash, "hex");
+  return attempt.length === expected.length && timingSafeEqual(attempt, expected);
+}
+
 function getLanAddresses() {
   return Object.values(os.networkInterfaces())
     .flat()
@@ -131,9 +154,37 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (url.pathname === "/api/auth-status" && req.method === "GET") {
+      sendJson(res, 200, { setupRequired: needsPasswordSetup() });
+      return;
+    }
+
+    if (url.pathname === "/api/setup" && req.method === "POST") {
+      if (!needsPasswordSetup()) {
+        sendJson(res, 409, { ok: false, error: "已經設定密碼" });
+        return;
+      }
+      const body = JSON.parse(await readBody(req) || "{}");
+      if (String(body.password || "").length < 4) {
+        sendJson(res, 400, { ok: false, error: "密碼至少 4 碼" });
+        return;
+      }
+      storedAuth = hashPassword(body.password);
+      await writeFile(authFile, JSON.stringify(storedAuth, null, 2), "utf8");
+      const token = crypto.randomUUID();
+      sessions.add(token);
+      setSessionCookie(res, token);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
     if (url.pathname === "/api/login" && req.method === "POST") {
       const body = JSON.parse(await readBody(req) || "{}");
-      if (String(body.password || "") !== password) {
+      if (needsPasswordSetup()) {
+        sendJson(res, 409, { ok: false, setupRequired: true });
+        return;
+      }
+      if (!verifyPassword(body.password)) {
         sendJson(res, 401, { ok: false, error: "密碼錯誤" });
         return;
       }
