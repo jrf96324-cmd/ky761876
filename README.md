@@ -8,6 +8,12 @@
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/jrf96324-cmd/ky761876)
 
+## 不用卡號的版本
+
+這個一鍵部署版本不掛付費硬碟，通常可先不用卡號建立網站。
+
+免費版資料存在暫存檔案中，重新部署或重啟後可能消失。若要長期正式保存資料，需要改用付費持久硬碟或外部資料庫。
+
 ## 部署時不用找密碼欄位
 
 如果 Render 畫面沒有 `DAO_CAR_PASSWORD`，這是正常的。
