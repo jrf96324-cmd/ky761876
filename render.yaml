@@ -6,8 +6,6 @@ services:
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
-      - key: DAO_CAR_PASSWORD
-        sync: false
       - key: DATA_DIR
         value: /opt/render/project/src/storage
     disk:
