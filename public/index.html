@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>全道親車輛安排系統</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">共編排車</p>
+          <h1>全道親車輛安排系統</h1>
+        </div>
+        <div class="top-actions">
+          <span id="syncState" class="sync-state">讀取中</span>
+          <button id="copyLineBtn" class="ghost-button" type="button">複製 LINE 公布</button>
+          <button id="exportBtn" class="ghost-button" type="button">匯出 CSV</button>
+          <button id="refreshBtn" class="primary-button" type="button">重新整理</button>
+          <button id="logoutBtn" class="ghost-button" type="button">登出</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="summary-grid" aria-label="排車摘要">
+          <article><span>今日趟次</span><strong id="todayCount">0</strong></article>
+          <article><span>待確認</span><strong id="pendingCount">0</strong></article>
+          <article><span>可用車輛</span><strong id="vehicleCount">0</strong></article>
+          <article><span>座位總數</span><strong id="seatCount">0</strong></article>
+        </section>
+
+        <section class="workspace">
+          <aside class="panel">
+            <div class="panel-heading">
+              <h2>車輛資料</h2>
+              <button id="addVehicleBtn" class="icon-button" type="button" title="新增車輛">＋</button>
+            </div>
+            <div id="vehicleList" class="vehicle-list"></div>
+          </aside>
+
+          <section class="panel schedule-panel">
+            <div class="panel-heading schedule-heading">
+              <div>
+                <h2>行程安排</h2>
+                <p id="lastUpdated">尚未同步</p>
+              </div>
+              <div class="filter-row">
+                <input id="activityFilter" type="search" placeholder="篩選活動" />
+                <input id="dateFilter" type="date" aria-label="日期篩選" />
+                <input id="searchInput" type="search" placeholder="搜尋路線、道親、司機" />
+                <select id="statusFilter" aria-label="狀態篩選">
+                  <option value="">全部狀態</option>
+                  <option>待確認</option>
+                  <option>已確認</option>
+                  <option>已完成</option>
+                  <option>取消</option>
+                </select>
+                <button id="addTripBtn" class="primary-button" type="button">新增趟次</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>活動</th><th>日期</th><th>時間</th><th>路線</th><th>車輛 / 司機</th><th>乘車道親</th><th>狀態</th><th>備註</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="tripTable"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="editorDialog">
+      <form id="editorForm" method="dialog">
+        <div class="dialog-heading">
+          <h2 id="dialogTitle">編輯</h2>
+          <button class="icon-button" type="button" id="closeDialogBtn" title="關閉">×</button>
+        </div>
+        <div id="formFields" class="form-grid"></div>
+        <menu>
+          <button id="deleteBtn" class="danger-button" type="button">刪除</button>
+          <span></span>
+          <button class="ghost-button" value="cancel" type="button" id="cancelBtn">取消</button>
+          <button class="primary-button" value="default" type="submit">儲存</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="lineDialog">
+      <form method="dialog" class="line-copy-form">
+        <div class="dialog-heading">
+          <h2>LINE 公布內容</h2>
+          <button class="icon-button" type="button" id="closeLineDialogBtn" title="關閉">×</button>
+        </div>
+        <textarea id="lineText" readonly></textarea>
+        <menu>
+          <span></span>
+          <button class="ghost-button" value="cancel" type="button" id="closeLineBtn">關閉</button>
+          <button class="primary-button" value="default" type="button" id="copyLineTextBtn">再次複製</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
