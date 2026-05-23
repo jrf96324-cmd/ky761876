@@ -1,0 +1,5 @@
+data/
+*.log
+cloudflared.exe
+node_modules/
+.env
