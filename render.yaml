@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: dao-car-scheduler
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: DAO_CAR_PASSWORD
+        sync: false
+      - key: DATA_DIR
+        value: /opt/render/project/src/storage
+    disk:
+      name: dao-car-scheduler-data
+      mountPath: /opt/render/project/src/storage
+      sizeGB: 1
