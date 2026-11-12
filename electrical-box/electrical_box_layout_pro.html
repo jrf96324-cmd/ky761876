@@ -88,6 +88,20 @@
   .range-row{display:grid;grid-template-columns:1fr 62px;gap:8px;align-items:center}
   input[type="range"]{width:100%}
   .view-hint{font-size:.72rem;color:var(--slate-500);padding:4px 1rem;background:#fff;border-bottom:1px solid var(--border)}
+  [hidden]{display:none!important}
+  .modal-back{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px}
+  .modal{background:#fff;color:var(--slate-900);border-radius:12px;padding:18px;max-width:380px;width:100%;box-shadow:var(--shadow)}
+  .modal p{font-weight:800;line-height:1.6;margin-bottom:14px;white-space:pre-line}
+  .modal-btns{display:flex;justify-content:flex-end;gap:8px}.modal-btns button{padding:8px 16px}
+  .pdf-panel{background:#fff;color:var(--slate-900);border-radius:12px;width:min(1200px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow)}
+  .pdf-bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)}
+  .pdf-info{font-size:.8rem;color:var(--slate-500);font-variant-numeric:tabular-nums}
+  .pdf-actions{margin-left:auto;display:flex;gap:6px}
+  .pdf-note{font-size:.74rem;color:var(--slate-500);padding:6px 14px;background:var(--slate-50);border-bottom:1px solid var(--border)}
+  .pdf-pages{overflow:auto;padding:14px;background:#cbd5e1;display:flex;flex-direction:column;gap:14px}
+  .pdf-pages figure{margin:0;display:flex;flex-direction:column;gap:4px;align-items:center}
+  .pdf-sheet{width:100%;height:auto;border-radius:2px;box-shadow:0 4px 14px rgba(0,0,0,.25);background:#fff}
+  .pdf-pages figcaption{font-size:.75rem;color:var(--slate-700);font-weight:800}
   @media (max-width:900px){
     header{padding:.7rem}.mobile-menu{display:block}.badge{display:none}
     .main-layout{height:auto;min-height:calc(100vh - 52px);display:block}
@@ -224,7 +238,7 @@
     <div class="stat-group"><div class="stat-label">門件干涉</div><div class="stat-value status-ok" id="resInterference">未檢查</div></div>
     <div class="toolbar-actions">
       <button class="btn-secondary btn-small btn-purple" onclick="toggleViewMode()">切換視角</button>
-      <button class="btn-secondary btn-small btn-pdf" onclick="exportPDF()">📄 PDF 尺寸圖</button>
+      <button class="btn-secondary btn-small btn-pdf" onclick="exportPDF()">📄 PDF 尺寸圖預覽</button>
       <button class="btn-secondary btn-small btn-export" onclick="exportCSV()">CSV</button>
       <button class="btn-secondary btn-small btn-purple" onclick="exportPNG()">PNG</button>
       <button class="btn-secondary btn-small" onclick="downloadSelf()">下載HTML</button>
@@ -235,6 +249,12 @@
 </main>
 </div>
 <div class="toast" id="toast"></div>
+<div class="modal-back" id="modal" hidden><div class="modal" role="dialog" aria-modal="true"><p id="modalMsg"></p><div class="modal-btns"><button id="modalCancel" class="btn-ghost">取消</button><button id="modalOk" class="btn-secondary">確定</button></div></div></div>
+<div class="modal-back" id="pdfPreview" hidden><div class="pdf-panel" role="dialog" aria-modal="true" aria-label="PDF 尺寸圖預覽">
+  <div class="pdf-bar"><b>📄 PDF 尺寸圖預覽</b><span id="pdfInfo" class="pdf-info"></span><span class="pdf-actions"><button class="btn-secondary btn-small btn-pdf" onclick="downloadPDF()">下載 PDF</button><button class="btn-ghost btn-small" onclick="closePdfPreview()">關閉</button></span></div>
+  <div class="pdf-note">若「下載 PDF」沒有反應，是線上預覽環境禁止下載；請把 HTML 檔存到電腦，用瀏覽器開啟後再下載。</div>
+  <div id="pdfPages" class="pdf-pages"></div>
+</div></div>
 
 <script>
 /* =========================================================================
@@ -676,7 +696,7 @@ function legendGroups(){const m=new Map();appState.items.forEach(it=>{const k=it
 function renderLegend(){const el=$('colorLegend');if(!el)return;const gs=legendGroups();el.innerHTML=gs.length?gs.map(g=>`<div style="display:flex;align-items:center;gap:6px;font-size:.76rem;padding:2px 0"><span style="width:18px;height:12px;border:1px solid #475569;border-radius:3px;background:${esc(g.color)};flex-shrink:0"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</span><span style="color:#64748b">×${g.qty}</span></div>`).join(''):'<div class="small-note" style="margin:0">尚無元件</div>'}
 function addItem(type){const n=appState.items.length;appState.items.push({id:Date.now(),type,name:type==='square'?`正方元件${n+1}`:`矩形元件${n+1}`,color:PALETTE[n%PALETTE.length],w:100,h:type==='square'?100:80,count:1,depth:80});renderItems();toast('已新增元件規格，按「自動最佳排列」更新')}
 function removeItem(i){const id=appState.items[i].id;appState.items.splice(i,1);globalBlocks=globalBlocks.filter(b=>b.id!==id);renderItems();redraw()}
-function clearItems(){if(confirm('確定清空所有箱內元件？')){appState.items=[];globalBlocks=[];renderItems();redraw()}}
+function clearItems(){askConfirm('確定清空所有箱內元件？',()=>{appState.items=[];globalBlocks=[];renderItems();redraw()})}
 function updateItem(i,f,val){
   const it=appState.items[i];
   if(f==='name'){it.name=val;renderLegend();redraw();return}
@@ -705,7 +725,7 @@ function addDuct(orient){
   appState.ducts.push(normDuct({id:Date.now(),name:orient==='h'?'水平配線槽':'垂直配線槽',orient,x:0,y:orient==='h'?Math.round(H):0,len:orient==='h'?Math.round(W):Math.round(Math.max(200,H)),width:40,depth:60,color:'#94a3b8'}));
   renderDucts();redraw();toast('已新增配線槽，可拖曳或輸入座標，按「自動最佳排列」避開')}
 function removeDuct(i){appState.ducts.splice(i,1);renderDucts();redraw()}
-function clearDucts(){if(!appState.ducts.length||confirm('確定清空所有配線槽？')){appState.ducts=[];renderDucts();redraw()}}
+function clearDucts(){if(!appState.ducts.length)return;askConfirm('確定清空所有配線槽？',()=>{appState.ducts=[];renderDucts();redraw()})}
 function updateDuct(i,f,v){
   const d=appState.ducts[i];
   if(f==='name'||f==='orient')d[f]=v;
@@ -717,7 +737,7 @@ function updateDuct(i,f,v){
 }
 function generateDuctFrame(){
   updateStateFromInputs();
-  if(appState.ducts.length&&!confirm('將取代現有配線槽，確定？'))return;
+  if(appState.ducts.length&&!generateDuctFrame._ok){askConfirm('將取代現有配線槽，確定？',()=>{generateDuctFrame._ok=true;try{generateDuctFrame()}finally{generateDuctFrame._ok=false}});return}
   const rows=Math.max(1,Math.round(+$('genRows').value||3)),rowH=Math.max(10,+$('genRowH').value||150),dw=Math.max(5,+$('genDuctW').value||40),dd=Math.max(5,+$('genDuctD').value||60),sides=$('genSides').checked;
   const L=isFinite(usableW())?usableW():1000,pitch=rowH+dw,totalH=rows*pitch+dw,ducts=[];
   const hx=sides?dw:0,hl=sides?L-2*dw:L;
@@ -995,15 +1015,25 @@ function exportPDF(){
   canvases.push(sheetBackplate({title:'背板配置圖',page:page++,total}));
   if(hasDoor)canvases.push(sheetDoor({title:'門板開孔圖',page:page++,total}));
   bomPages.forEach(ch=>canvases.push(sheetBom(ch,{title:'材料表',page:page++,total})));
-  const blob=buildPdf(canvases.map(canvasToJpeg),SHEET.W/25.4*72,SHEET.H/25.4*72);
-  const name=`${(appState.cabinet.name||'電箱').replace(/[\\/:*?"<>|]/g,'_')}_尺寸圖.pdf`;
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  toast(`PDF 已產生（A3 橫式 ${total} 頁）`);
+  pdfState.blob=buildPdf(canvases.map(canvasToJpeg),SHEET.W/25.4*72,SHEET.H/25.4*72);
+  pdfState.name=`${(appState.cabinet.name||'電箱').replace(/[\\/:*?"<>|]/g,'_')}_尺寸圖.pdf`;
+  const box=$('pdfPages');box.innerHTML='';
+  canvases.forEach((c,i)=>{const fig=document.createElement('figure');c.className='pdf-sheet';c.setAttribute('aria-label',`第 ${i+1} 頁`);fig.appendChild(c);const cap=document.createElement('figcaption');cap.textContent=`第 ${i+1} / ${total} 頁`;fig.appendChild(cap);box.appendChild(fig)});
+  $('pdfInfo').textContent=`A3 橫式｜共 ${total} 頁｜${(pdfState.blob.size/1048576).toFixed(1)} MB`;
+  $('pdfPreview').hidden=false;
+}
+const pdfState={blob:null,name:''};
+function downloadPDF(){if(!pdfState.blob)return;const a=document.createElement('a');a.href=URL.createObjectURL(pdfState.blob);a.download=pdfState.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('PDF 已下載')}
+function closePdfPreview(){$('pdfPreview').hidden=true;$('pdfPages').innerHTML=''
 }
 
 /* =========================================================================
    存檔 / 匯出
    ========================================================================= */
+/* 頁內對話框（取代瀏覽器 alert / confirm，嵌入式預覽環境也可用） */
+function askConfirm(msg,onOk){const m=$('modal');$('modalMsg').textContent=msg;$('modalCancel').hidden=false;$('modalOk').textContent='確定';m.hidden=false;$('modalOk').focus();$('modalOk').onclick=()=>{m.hidden=true;onOk&&onOk()};$('modalCancel').onclick=()=>{m.hidden=true}}
+function alert(msg){const m=$('modal');$('modalMsg').textContent=msg;$('modalCancel').hidden=true;$('modalOk').textContent='知道了';m.hidden=false;$('modalOk').onclick=()=>{m.hidden=true}}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('modal').hidden=true;if(!$('pdfPreview').hidden)closePdfPreview()}});
 function getSaves(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){return []}}
 function setSaves(v){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(v));return true}catch(e){alert('瀏覽器無法存檔（可能為無痕模式或儲存空間已滿）');return false}}
 function renderSavedList(){
@@ -1012,8 +1042,9 @@ function renderSavedList(){
   saves.forEach(s=>{const div=document.createElement('div');div.className='saved-item';div.innerHTML=`<div class="saved-info" onclick="loadProject(${s.id})"><div style="font-weight:800;color:#334155">${esc(s.name)}</div><div class="saved-date">${esc(s.date)} • ${s.itemCount}種規格</div></div><button class="del-save" onclick="deleteProject(${s.id})">刪除</button>`;list.appendChild(div)});
 }
 function saveProject(){updateStateFromInputs();const name=$('saveName').value.trim();if(!name)return alert('請輸入方案名稱');const saves=getSaves();saves.unshift({id:Date.now(),name,date:new Date().toLocaleString(),itemCount:appState.items.length,state:JSON.parse(JSON.stringify(appState)),layout:JSON.parse(JSON.stringify(globalBlocks))});if(setSaves(saves)){$('saveName').value='';renderSavedList();toast('方案已儲存')}}
-function loadProject(id){if(!confirm('載入此方案？當前未儲存進度會被覆蓋。'))return;const t=getSaves().find(s=>s.id===id);if(t){appState=normalizeState(JSON.parse(JSON.stringify(t.state)));globalBlocks=JSON.parse(JSON.stringify(t.layout||[]));selected=null;renderInputs();$('emptyState').style.display=globalBlocks.length?'none':'block';globalBlocks.length?redraw():runAutoLayout();toast('方案已載入')}}
-function deleteProject(id){if(!confirm('確定刪除此存檔？'))return;setSaves(getSaves().filter(s=>s.id!==id));renderSavedList();toast('已刪除')}
+function loadProject(id){askConfirm('載入此方案？目前未儲存的進度會被覆蓋。',()=>doLoadProject(id))}
+function doLoadProject(id){const t=getSaves().find(s=>s.id===id);if(t){appState=normalizeState(JSON.parse(JSON.stringify(t.state)));globalBlocks=JSON.parse(JSON.stringify(t.layout||[]));selected=null;renderInputs();$('emptyState').style.display=globalBlocks.length?'none':'block';globalBlocks.length?redraw():runAutoLayout();toast('方案已載入')}}
+function deleteProject(id){askConfirm('確定刪除此存檔？',()=>{setSaves(getSaves().filter(s=>s.id!==id));renderSavedList();toast('已刪除')})}
 function downloadBlob(content,name,type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}
 function exportCSV(){
