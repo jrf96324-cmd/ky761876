@@ -252,7 +252,7 @@
 <div class="modal-back" id="modal" hidden><div class="modal" role="dialog" aria-modal="true"><p id="modalMsg"></p><div class="modal-btns"><button id="modalCancel" class="btn-ghost">取消</button><button id="modalOk" class="btn-secondary">確定</button></div></div></div>
 <div class="modal-back" id="pdfPreview" hidden><div class="pdf-panel" role="dialog" aria-modal="true" aria-label="PDF 尺寸圖預覽">
   <div class="pdf-bar"><b>📄 PDF 尺寸圖預覽</b><span id="pdfInfo" class="pdf-info"></span><span class="pdf-actions"><button class="btn-secondary btn-small btn-pdf" onclick="downloadPDF()">下載 PDF</button><button class="btn-ghost btn-small" onclick="closePdfPreview()">關閉</button></span></div>
-  <div class="pdf-note">若「下載 PDF」沒有反應，是線上預覽環境禁止下載；請把 HTML 檔存到電腦，用瀏覽器開啟後再下載。</div>
+  <div class="pdf-note">下載後請以 A3、「實際大小 / 100%」列印，圖面比例才正確。</div>
   <div id="pdfPages" class="pdf-pages"></div>
 </div></div>
 
@@ -1023,7 +1023,7 @@ function exportPDF(){
   $('pdfPreview').hidden=false;
 }
 const pdfState={blob:null,name:''};
-function downloadPDF(){if(!pdfState.blob)return;const a=document.createElement('a');a.href=URL.createObjectURL(pdfState.blob);a.download=pdfState.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('PDF 已下載')}
+function downloadPDF(){if(pdfState.blob)saveFile(pdfState.name,pdfState.blob)}
 function closePdfPreview(){$('pdfPreview').hidden=true;$('pdfPages').innerHTML=''
 }
 
@@ -1045,7 +1045,15 @@ function saveProject(){updateStateFromInputs();const name=$('saveName').value.tr
 function loadProject(id){askConfirm('載入此方案？目前未儲存的進度會被覆蓋。',()=>doLoadProject(id))}
 function doLoadProject(id){const t=getSaves().find(s=>s.id===id);if(t){appState=normalizeState(JSON.parse(JSON.stringify(t.state)));globalBlocks=JSON.parse(JSON.stringify(t.layout||[]));selected=null;renderInputs();$('emptyState').style.display=globalBlocks.length?'none':'block';globalBlocks.length?redraw():runAutoLayout();toast('方案已載入')}}
 function deleteProject(id){askConfirm('確定刪除此存檔？',()=>{setSaves(getSaves().filter(s=>s.id!==id));renderSavedList();toast('已刪除')})}
-function downloadBlob(content,name,type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+/* 下載：在 claude.ai 預覽中走 downloads 能力（會跳出確認），一般瀏覽器用 <a download> */
+let _dlCap=null;
+function getDownloadsCap(){if(!(window.claude&&typeof window.claude.use==='function'))return Promise.resolve(null);return _dlCap||(_dlCap=window.claude.use('downloads').catch(()=>null))}
+async function saveFile(name,blob){
+  const d=await getDownloadsCap();
+  if(d){try{await d.save({filename:name,data:blob});toast('已下載 '+name)}catch(e){toast(e&&e.code==='declined'?'已取消下載':e&&e.code==='rate_limited'?'下載確認視窗已開啟，請稍候':'此環境無法下載檔案')}return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('已下載 '+name);
+}
+function downloadBlob(content,name,type){saveFile(name,new Blob([content],{type}))}
 function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v}
 function exportCSV(){
   if(!globalBlocks.length&&!appState.ducts.length)return alert('尚無排版資料');
@@ -1053,10 +1061,10 @@ function exportCSV(){
   globalBlocks.forEach((b,i)=>{const inf=blockInfo(b);rows.push(['箱內元件',`P${i+1}`,inf.name,inf.color,b.origW,b.origH,b.w,b.h,inf.depth,b.x+mg.l,b.y+mg.t,b.rotated?'Y':'N'])});
   appState.ducts.forEach((d,i)=>{const r=ductRect(d);rows.push(['配線槽',`W${i+1}`,d.name,d.color,d.width,d.depth,d.len,'',d.depth,r.x+mg.l,r.y+mg.t,d.orient==='v'?'垂直':'水平'])});
   appState.doorParts.forEach((p,i)=>rows.push(['門件(中心)',`D${i+1}`,p.name,p.color,p.w,p.h,p.cutW,p.cutH,p.insideLength,p.x,p.y,KIND_LABEL[p.kind]||p.kind]));
-  downloadBlob('﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\n'),'電箱排版座標.csv','text/csv;charset=utf-8');toast('CSV 已匯出（座標以背板/門板左上角為原點）');
+  downloadBlob('﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\n'),'電箱排版座標.csv','text/csv;charset=utf-8');
 }
-function exportPNG(){if(!canvas.width)return alert('尚無排版資料');canvas.toBlob(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='電箱排版圖.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)},'image/png');toast('PNG 已匯出')}
-function downloadSelf(){downloadBlob('<!DOCTYPE html>\n'+document.documentElement.outerHTML,'電箱智慧排版Pro.html','text/html;charset=utf-8');toast('HTML 已下載')}
+function exportPNG(){if(!canvas.width)return alert('尚無排版資料');canvas.toBlob(blob=>saveFile('電箱排版圖.png',blob),'image/png')}
+function downloadSelf(){downloadBlob('<!DOCTYPE html>\n'+document.documentElement.outerHTML,'電箱智慧排版Pro.html','text/html;charset=utf-8');}
 
 /* =========================================================================
    事件 & 初始化
