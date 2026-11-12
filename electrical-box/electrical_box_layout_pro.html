@@ -89,6 +89,15 @@
   input[type="range"]{width:100%}
   .view-hint{font-size:.72rem;color:var(--slate-500);padding:4px 1rem;background:#fff;border-bottom:1px solid var(--border)}
   [hidden]{display:none!important}
+  .health{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:7px 1rem;background:#f8fafc;border-bottom:1px solid var(--border);font-size:.76rem}
+  .health .h-title{font-weight:900;color:var(--slate-700);margin-right:2px}
+  .hchip{display:inline-flex;gap:6px;align-items:center;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:#fff;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--slate-700)}
+  .hchip.ok{border-color:#86efac;background:#f0fdf4;color:#166534}
+  .hchip.warn{border-color:#fdba74;background:#fff7ed;color:#9a3412}
+  .hchip.bad{border-color:#fca5a5;background:#fef2f2;color:#991b1b}
+  .hchip.info{border-color:#a7f3d0;background:#ecfdf5;color:#065f46}
+  .hchip button{border:none;border-radius:999px;padding:2px 8px;font-size:.72rem;font-weight:900;cursor:pointer;background:var(--slate-800);color:#fff}
+  .reserve-box{background:#ecfdf5;border:1px solid #a7f3d0;padding:10px;border-radius:10px;margin-top:10px}
   .modal-back{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px}
   .modal{background:#fff;color:var(--slate-900);border-radius:12px;padding:18px;max-width:380px;width:100%;box-shadow:var(--shadow)}
   .modal p{font-weight:800;line-height:1.6;margin-bottom:14px;white-space:pre-line}
@@ -143,6 +152,16 @@
     </div>
     <div style="margin-top:10px"><label>元件間距 Gap X / Y (mm)（含與配線槽間距）</label><div class="form-grid"><input type="number" id="gapX"><input type="number" id="gapY"></div></div>
     <div style="margin-top:10px"><label>四週邊框 上/下/左/右 (mm)</label><div class="form-grid-4"><input type="number" id="marginTop"><input type="number" id="marginBottom"><input type="number" id="marginLeft"><input type="number" id="marginRight"></div></div>
+    <div class="reserve-box">
+      <label style="color:#065f46">預留空間 / 建議尺寸</label>
+      <div class="form-grid">
+        <div><label for="reservePct">預留擴充空間 (% 元件面積)</label><input type="number" id="reservePct" min="0" max="300" step="5"></div>
+        <div><label for="encDiff">箱體 − 背板 差值 (mm)</label><input type="number" id="encDiff" min="0" step="5"></div>
+      </div>
+      <div class="check-row"><input type="checkbox" id="showReserve"><span>顯示建議外框與預留空間</span></div>
+      <div class="check-row"><input type="checkbox" id="showGhost"><span>顯示最佳排版虛影（綠色虛線）</span></div>
+      <div class="small-note">畫面上方「排版健檢」會即時比較目前手動排版、依目前順序緊縮、全自動最佳三種結果，並給出建議最小背板與標準箱體。</div>
+    </div>
   </div>
 
   <div class="sidebar-section">
@@ -245,6 +264,7 @@
     </div>
   </div>
   <div class="view-hint" id="viewHint"></div>
+  <div class="health" id="healthPanel" aria-live="polite"></div>
   <div class="canvas-container" id="canvasScrollArea"><div class="empty-state" id="emptyState">請輸入規格並點擊自動排列<br>支援滑鼠/觸控拖曳微調</div><canvas id="layoutCanvas"></canvas></div>
 </main>
 </div>
@@ -301,7 +321,8 @@ const COMP_LIB=[
   {cat:'電源',name:'雜訊濾波器',w:100,h:60,depth:50,color:'#a5f3fc'},
   {cat:'配線',name:'端子台',w:300,h:50,depth:60,color:'#e5e7eb'},
   {cat:'配線',name:'接地銅排',w:200,h:30,depth:30,color:'#fb923c'},
-  {cat:'其他',name:'散熱風扇',w:120,h:120,depth:40,color:'#cbd5e1'}
+  {cat:'其他',name:'散熱風扇',w:120,h:120,depth:40,color:'#cbd5e1'},
+  {cat:'預留',name:'預留空間（備品）',w:100,h:130,depth:0,color:'#f1f5f9'}
 ];
 const DUCT_SIZES=[[25,25],[25,40],[25,60],[33,60],[40,40],[40,60],[40,80],[60,60],[60,80],[80,80],[80,100],[100,100]];
 
@@ -317,7 +338,7 @@ function defaultState(){
     ],
     ducts:[],
     doorParts:[],
-    settings:{maxWidth:600,useMaxWidth:true,gapX:10,gapY:10,margins:{t:20,b:20,l:20,r:20},allowRotate:true,thickness:1.6,density:7.85,priceKg:0,processCost:0,viewMode:'2d',viewDepth:26,viewAngle:.22,cabinetDepth:300,doorClearance:10,doorWidth:0,doorHeight:0,hingeSide:'left',doorAngle:0,showDoor:true}
+    settings:{maxWidth:600,useMaxWidth:true,gapX:10,gapY:10,margins:{t:20,b:20,l:20,r:20},allowRotate:true,thickness:1.6,density:7.85,priceKg:0,processCost:0,viewMode:'2d',viewDepth:26,viewAngle:.22,cabinetDepth:300,doorClearance:10,doorWidth:0,doorHeight:0,hingeSide:'left',doorAngle:0,showDoor:true,reservePct:20,encDiff:50,showReserve:true,showGhost:false}
   };
 }
 let appState=defaultState();
@@ -380,18 +401,19 @@ function updateStateFromInputs(){
   s.cabinetDepth=+$('cabinetDepth').value||300;s.doorClearance=+$('doorClearance').value||0;
   s.doorWidth=Math.max(0,+$('doorWidth').value||0);s.doorHeight=Math.max(0,+$('doorHeight').value||0);
   s.hingeSide=$('hingeSide').value;s.doorAngle=Math.max(0,Math.min(110,+$('doorAngleNum').value||0));s.showDoor=$('showDoor').checked;
+  s.reservePct=Math.max(0,+$('reservePct').value||0);s.encDiff=Math.max(0,+$('encDiff').value||0);s.showReserve=$('showReserve').checked;s.showGhost=$('showGhost').checked;
 }
 function validateItems(){for(const it of appState.items){if(it.w<=0||it.h<=0||it.count<=0){alert(`元件「${it.name}」尺寸與數量必須大於 0`);return false}}return true}
 
 /* =========================================================================
    排版：Bottom-Left 候選點法，配線槽視為障礙物
    ========================================================================= */
-function packItems(items,s,ducts){
+function packItems(items,s,ducts,quiet){
   const blocks=[];
   items.forEach(it=>{for(let i=0;i<Math.floor(it.count);i++)blocks.push({w:+it.w,h:+it.h,origW:+it.w,origH:+it.h,id:it.id,type:it.type,name:it.name,color:it.color,depth:it.depth,rotated:false})});
   if(!blocks.length)return [];
   const maxW=s.useMaxWidth?s.maxWidth-s.margins.l-s.margins.r:Math.max(2500,Math.sqrt(blocks.reduce((a,b)=>a+b.w*b.h,0))*1.4);
-  if(maxW<=0){alert('最大寬度扣除邊框後不足');return []}
+  if(maxW<=0){if(quiet)return null;alert('最大寬度扣除邊框後不足');return []}
   blocks.sort((a,b)=>(b.w*b.h-a.w*a.h)||(Math.max(b.w,b.h)-Math.max(a.w,a.h)));
   const gx=s.gapX,gy=s.gapY,obs=ducts.map(ductRect),placed=[];
   const hits=(x,y,w,h)=>{for(const o of obs){if(x<o.x+o.w+gx&&x+w+gx>o.x&&y<o.y+o.h+gy&&y+h+gy>o.y)return true}for(const o of placed){if(x<o.x+o.w+gx&&x+w+gx>o.x&&y<o.y+o.h+gy&&y+h+gy>o.y)return true}return false};
@@ -408,7 +430,7 @@ function packItems(items,s,ducts){
       for(const rot of rots){const bw=rot?block.h:block.w,bh=rot?block.w:block.h;if(x+bw>maxW+1e-6)continue;if(hits(x,y,bw,bh))continue;best={x,y,bw,bh,rot};break}
       if(best)break;
     }
-    if(!best){alert(`排版失敗：「${block.name}」${block.w}×${block.h} 無法放入（寬度限制太小？）`);return []}
+    if(!best){if(quiet)return null;alert(`排版失敗：「${block.name}」${block.w}×${block.h} 無法放入（寬度限制太小？）`);return []}
     block.x=best.x;block.y=best.y;block.w=best.bw;block.h=best.bh;block.rotated=best.rot;placed.push(block);
   }
   return placed;
@@ -418,8 +440,13 @@ function runAutoLayout(silent){updateStateFromInputs();if(!validateItems())retur
 function optimizeManualGaps(){
   updateStateFromInputs();
   if(!globalBlocks.length)return alert('尚無排版資料');
+  globalBlocks=compactBlocks(globalBlocks);
+  $('emptyState').style.display='none';redraw();toast('已依手動位置重整間隙');
+}
+/* 依目前視覺列順序緊縮（不改變相對順序，避開配線槽），回傳新陣列 */
+function compactBlocks(src){
   const s=appState.settings,maxW=usableW(),gx=s.gapX||0,gy=s.gapY||0,obs=appState.ducts.map(ductRect);
-  const blocks=globalBlocks.map(b=>({...b,_cy:b.y+b.h/2}));
+  const blocks=src.map(b=>({...b,_cy:b.y+b.h/2}));
   blocks.sort((a,b)=>(a._cy-b._cy)||(a.x-b.x));
   const rows=[];
   for(const b of blocks){
@@ -453,9 +480,73 @@ function optimizeManualGaps(){
     }
     if(rowCount)y+=rowH+gy;
   }
-  globalBlocks=placed.map(({_cy,...b})=>b);
-  $('emptyState').style.display='none';redraw();toast('已依手動位置重整間隙');
+  return placed.map(({_cy,...b})=>b);
 }
+
+/* =========================================================================
+   排版健檢：碰撞 / 緊縮 / 全自動最佳 / 建議最小尺寸 / 標準箱體
+   ========================================================================= */
+const ENC_STD=[[300,400],[400,400],[400,500],[400,600],[500,600],[500,700],[600,600],[600,800],[600,1000],[800,1000],[800,1200],[1000,1000],[1000,1200],[1000,1400],[600,1800],[800,1800],[800,2000],[1000,2000],[1200,2000]].sort((a,b)=>a[0]*a[1]-b[0]*b[1]);
+const ENC_DEPTHS=[150,200,250,300,350,400,500,600];
+const ceil10=v=>Math.ceil(v/10-1e-9)*10;
+let bestCache={key:'',blocks:null},lastAnalysis=null;
+function extentsOf(blocks){const mg=appState.settings.margins;let maxX=0,maxY=0;blocks.forEach(b=>{maxX=Math.max(maxX,b.x+b.w);maxY=Math.max(maxY,b.y+b.h)});appState.ducts.forEach(d=>{const r=ductRect(d);maxX=Math.max(maxX,r.x+r.w);maxY=Math.max(maxY,r.y+r.h)});return {maxX,maxY,totalW:maxX+mg.l+mg.r,totalH:maxY+mg.t+mg.b}}
+function bestLayout(){
+  const s=appState.settings,key=JSON.stringify([appState.items.map(i=>[i.id,i.type,i.w,i.h,i.count]),appState.ducts.map(d=>[d.orient,d.x,d.y,d.len,d.width]),s.maxWidth,s.useMaxWidth,s.gapX,s.gapY,s.margins,s.allowRotate]);
+  if(bestCache.key!==key){let r=null;try{r=packItems(appState.items,s,appState.ducts,true)}catch(e){r=null}bestCache={key,blocks:r}}
+  return bestCache.blocks;
+}
+function isReserve(name){return /^預留/.test(name||'')}
+function analyzeLayout(){
+  const s=appState.settings,mg=s.margins,gx=s.gapX||0,gy=s.gapY||0,maxW=usableW(),obs=appState.ducts.map(ductRect);
+  const conflicts=new Map(),rank={gap:1,out:2,hard:3},mark=(i,k)=>{if(!conflicts.has(i)||rank[k]>rank[conflicts.get(i)])conflicts.set(i,k)};
+  let nHard=0,nGap=0,nOut=0;
+  globalBlocks.forEach((a,i)=>{
+    if(isFinite(maxW)&&a.x+a.w>maxW+.5){mark(i,'out');nOut++}
+    const near=(o)=>a.x<o.x+o.w+gx-.5&&a.x+a.w+gx-.5>o.x&&a.y<o.y+o.h+gy-.5&&a.y+a.h+gy-.5>o.y;
+    for(let j=i+1;j<globalBlocks.length;j++){const b=globalBlocks[j];if(rectOverlap(a,b)){mark(i,'hard');mark(j,'hard');nHard++}else if(near(b)){mark(i,'gap');mark(j,'gap');nGap++}}
+    obs.forEach(o=>{if(rectOverlap(a,o)){mark(i,'hard');nHard++}else if(near(o)){mark(i,'gap');nGap++}});
+  });
+  const cur=extentsOf(globalBlocks),best=bestLayout(),bestExt=best?extentsOf(best):null;
+  const compact=globalBlocks.length?compactBlocks(globalBlocks):[],compExt=extentsOf(compact);
+  const usedArea=globalBlocks.reduce((a,b)=>a+b.w*b.h,0),ductArea=obs.reduce((a,o)=>a+o.w*o.h,0);
+  // 最小背板：取可行方案中最小的高度（目前排版有碰撞時不列入）
+  const cands=[compExt];if(bestExt)cands.push(bestExt);if(!nHard&&!nOut)cands.push(cur);
+  const minExt=cands.reduce((m,e)=>(e.totalH<m.totalH||(e.totalH===m.totalH&&e.totalW<m.totalW))?e:m);
+  const minW=ceil10(minExt.totalW),minH=ceil10(minExt.totalH),uW=Math.max(1,minW-mg.l-mg.r),uH=Math.max(0,minH-mg.t-mg.b);
+  const r=(s.reservePct||0)/100,need=usedArea*r,free=Math.max(0,uW*uH-usedArea-ductArea);
+  const extra=need>free?ceil10((need-free)/uW):0,recW=minW,recH=minH+extra;
+  const recFree=Math.max(0,uW*(recH-mg.t-mg.b)-usedArea-ductArea),recFreePct=usedArea?recFree/usedArea*100:0;
+  // 深度需求
+  const inside=[];globalBlocks.forEach(b=>{const inf=blockInfo(b);inside.push({rect:{x:b.x+mg.l,y:b.y+mg.t,w:b.w,h:b.h},depth:isReserve(inf.name)?0:inf.depth})});
+  appState.ducts.forEach(d=>{const rr=ductRect(d);inside.push({rect:{x:rr.x+mg.l,y:rr.y+mg.t,w:rr.w,h:rr.h},depth:+d.depth})});
+  let dReq=inside.reduce((m,o)=>Math.max(m,o.depth),0),dBy='箱內元件最大深度';
+  appState.doorParts.forEach(p=>{const body=partBody(p),under=inside.filter(o=>rectOverlap(body,o.rect)).reduce((m,o)=>Math.max(m,o.depth),0),need=under+(+p.insideLength||0);if(need>dReq){dReq=need;dBy=`${p.name} 伸入 + 下方元件`}});
+  dReq+= +s.doorClearance||0;
+  const diff=+s.encDiff||0,enc=ENC_STD.find(([w,h])=>w-diff>=recW&&h-diff>=recH)||null,encD=ENC_DEPTHS.find(d=>d>=dReq)||null;
+  return {conflicts,nHard,nGap,nOut,cur,best,bestExt,compact,compExt,minW,minH,recW,recH,extra,recFreePct,dReq:Math.ceil(dReq),dBy,enc,encD,usedArea};
+}
+function renderHealth(a){
+  const el=$('healthPanel');if(!el)return;
+  if(!a||(!globalBlocks.length&&!appState.ducts.length)){el.innerHTML='<span class="h-title">排版健檢</span><span class="hchip">尚無排版資料</span>';return}
+  const s=appState.settings,h=[];
+  h.push('<span class="h-title">排版健檢</span>');
+  if(a.nHard||a.nOut)h.push(`<span class="hchip bad">⛔ ${a.nHard?`重疊 ${a.nHard} 處`:''}${a.nHard&&a.nOut?'｜':''}${a.nOut?`超出寬度 ${a.nOut} 件`:''}</span>`);
+  if(a.nGap)h.push(`<span class="hchip warn">⚠ 間距不足 ${a.nGap} 處（需 ${s.gapX}/${s.gapY} mm）</span>`);
+  if(!a.nHard&&!a.nOut&&!a.nGap)h.push('<span class="hchip ok">✓ 無碰撞、間距符合</span>');
+  const curH=Math.ceil(a.cur.totalH),compH=Math.ceil(a.compExt.totalH),bestH=a.bestExt?Math.ceil(a.bestExt.totalH):null;
+  h.push(`<span class="hchip">目前 ${Math.ceil(a.cur.totalW)}×${curH}</span>`);
+  const valid=!a.nHard&&!a.nOut;
+  if(compH<curH||!valid)h.push(`<span class="hchip info">依目前順序緊縮 → 高 ${compH}${valid&&compH<curH?`（−${curH-compH}）`:''}<button onclick="optimizeManualGaps()">套用</button></span>`);
+  if(bestH!==null&&(bestH<Math.min(curH,compH)||!valid))h.push(`<span class="hchip info">全自動最佳 → 高 ${bestH}${valid&&bestH<curH?`（−${curH-bestH}）`:''}<button onclick="applyBestLayout()">套用</button></span>`);
+  if(valid&&curH<=compH&&(bestH===null||curH<=bestH))h.push('<span class="hchip ok">★ 目前即為最佳狀況</span>');
+  h.push(`<span class="hchip">建議最小背板 ${a.minW}×${a.minH}</span>`);
+  h.push(`<span class="hchip ${a.extra?'warn':'ok'}">含預留 ${s.reservePct}% → ${a.recW}×${a.recH}（可用餘裕 ${a.recFreePct.toFixed(0)}%）</span>`);
+  h.push(`<span class="hchip ${a.dReq>s.cabinetDepth?'bad':'ok'}" title="${esc(a.dBy)}">需求深度 ≥ ${a.dReq}（設定 ${s.cabinetDepth}）</span>`);
+  h.push(a.enc&&a.encD?`<span class="hchip info">建議標準箱體 ${a.enc[0]}×${a.enc[1]}×${a.encD}</span>`:'<span class="hchip warn">超出常用標準箱，需訂製</span>');
+  el.innerHTML=h.join('');
+}
+function applyBestLayout(){const b=bestLayout();if(!b)return alert('全自動排版無法放入所有元件（寬度限制太小？）');globalBlocks=JSON.parse(JSON.stringify(b));selected=null;redraw();toast('已套用全自動最佳排版')}
 
 /* =========================================================================
    視角
@@ -510,9 +601,10 @@ function redraw(){
   const ext=layoutExtents();lastLayout=ext;
   const has=globalBlocks.length||appState.ducts.length;
   if(!has&&m.viewMode!=='door'){
-    canvas.width=0;canvas.height=0;['resW','resH'].forEach(id=>$(id).textContent='0 mm');$('resEff').textContent='0%';$('resWeight').textContent='0 kg';$('resCost').textContent='0';updateInterferenceDisplay(checkDoorInterference());return;
+    renderHealth(null);canvas.width=0;canvas.height=0;['resW','resH'].forEach(id=>$(id).textContent='0 mm');$('resEff').textContent='0%';$('resWeight').textContent='0 kg';$('resCost').textContent='0';updateInterferenceDisplay(checkDoorInterference());return;
   }
   const {maxX,maxY,totalW,totalH}=ext;
+  const an=analyzeLayout();lastAnalysis=an;renderHealth(an);
   const usedArea=globalBlocks.reduce((a,b)=>a+b.w*b.h,0),ductArea=appState.ducts.reduce((a,d)=>{const r=ductRect(d);return a+r.w*r.h},0),totalArea=totalW*totalH,eff=totalArea?(usedArea+ductArea)/totalArea*100:0;
   const weightKg=usedArea*m.thickness/1000*m.density/1000,cost=weightKg*m.priceKg+globalBlocks.length*m.processCost;
   $('resW').textContent=Math.ceil(totalW)+' mm';$('resH').textContent=Math.ceil(totalH)+' mm';$('resEff').textContent=eff.toFixed(1)+'%';$('resWeight').textContent=weightKg.toFixed(3)+' kg';$('resCost').textContent=Math.round(cost).toLocaleString();
@@ -521,7 +613,11 @@ function redraw(){
   let worldW,worldH;
   if(mode==='door'){const ds=doorSize();worldW=Math.max(ds.w,totalW)+VIEW_PAD*2;worldH=Math.max(ds.h,totalH)+VIEW_PAD*2}
   else if(mode==='3d'){worldW=totalW+Math.max(60,totalH*angle+depth*1.2)+VIEW_PAD*2+40;worldH=totalH+Math.max(70,depth*1.1)+VIEW_PAD*2}
-  else{worldW=totalW+VIEW_PAD*2;worldH=totalH+VIEW_PAD*2}
+  else{
+    let ew=totalW,eh=totalH;
+    if(m.showReserve){ew=Math.max(ew,an.recW);eh=Math.max(eh,an.recH);if(an.enc){ew=Math.max(ew,an.enc[0]-(+m.encDiff||0)/2);eh=Math.max(eh,an.enc[1]-(+m.encDiff||0)/2)}}
+    worldW=ew+VIEW_PAD*2;worldH=eh+VIEW_PAD*2+20;
+  }
   canvasScale=Math.min(1.5,Math.max(.3,containerW/worldW));
   canvas.width=Math.ceil(worldW*canvasScale);canvas.height=Math.ceil(worldH*canvasScale);
   ctx.setTransform(canvasScale,0,0,canvasScale,0,0);ctx.clearRect(0,0,worldW,worldH);
@@ -529,25 +625,45 @@ function redraw(){
   if(mode==='3d'){draw3D(totalW,totalH,maxX,maxY,depth,angle);if(m.showDoor)drawDoor3DOverlay(totalW,totalH,depth,angle,check);return}
   ctx.translate(VIEW_PAD,VIEW_PAD);
   if(mode==='door')drawDoorView(totalW,totalH,check);
-  else{draw2D(totalW,totalH,maxX,maxY);if(m.showDoor)drawDoorOverlay2D(totalW,totalH,check)}
+  else{draw2D(totalW,totalH,maxX,maxY,an);if(m.showDoor)drawDoorOverlay2D(totalW,totalH,check)}
 }
 function fitText(text,maxW,maxSize,minSize){let size=maxSize;ctx.font=`bold ${size}px ${FONT}`;while(size>minSize&&ctx.measureText(text).width>maxW){size-=.5;ctx.font=`bold ${size}px ${FONT}`}return ctx.measureText(text).width<=maxW}
-function draw2D(totalW,totalH,maxX,maxY){
-  const s=appState.settings,mg=s.margins;
-  ctx.fillStyle=appState.cabinet.backColor||'#fffbeb';ctx.fillRect(0,0,totalW,totalH);
+function hatch(x,y,w,h,col,step,lw){if(w<=0||h<=0)return;ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.strokeStyle=col;ctx.lineWidth=lw||1;ctx.beginPath();for(let t=-h;t<w;t+=step){ctx.moveTo(x+t,y+h);ctx.lineTo(x+t+h,y)}ctx.stroke();ctx.restore()}
+function draw2D(totalW,totalH,maxX,maxY,an){
+  const s=appState.settings,mg=s.margins,showR=s.showReserve&&an;
+  if(showR&&an.enc){ // 標準箱體外框（背板置於箱內，差值平均分配）
+    const d2=(+s.encDiff||0)/2;ctx.save();ctx.strokeStyle='#64748b';ctx.lineWidth=1.5;ctx.setLineDash([3,4]);ctx.strokeRect(-d2,-d2,an.enc[0],an.enc[1]);ctx.setLineDash([]);
+    ctx.fillStyle='#475569';ctx.font=`bold 11px ${FONT}`;ctx.textAlign='left';ctx.textBaseline='bottom';ctx.fillText(`建議標準箱體 ${an.enc[0]}×${an.enc[1]}${an.encD?'×'+an.encD:''}`,-d2+4,-d2-3);ctx.restore();
+  }
+  const bgW=showR?Math.max(totalW,an.recW):totalW,bgH=showR?Math.max(totalH,an.recH):totalH;
+  ctx.fillStyle=appState.cabinet.backColor||'#fffbeb';ctx.fillRect(0,0,bgW,bgH);
+  if(showR){ // 可用空間（綠色斜線）＝目前尚可放置元件的預留空間
+    hatch(mg.l,mg.t,bgW-mg.l-mg.r,bgH-mg.t-mg.b,'rgba(16,185,129,.28)',14,1);
+    if(an.recH>totalH){hatch(0,totalH,bgW,an.recH-totalH,'rgba(16,185,129,.45)',10,1.4);
+      if(an.recH-totalH>=22)ctx.fillStyle='#047857';ctx.font=`bold 13px ${FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';if(an.recH-totalH>=22)ctx.fillText(`預留擴充區 +${fmt(an.recH-totalH)} mm`,bgW/2,totalH+(an.recH-totalH)/2)}
+    ctx.save();ctx.strokeStyle='#059669';ctx.lineWidth=2;ctx.setLineDash([12,5]);ctx.strokeRect(0,0,an.recW,an.recH);ctx.setLineDash([]);
+    ctx.fillStyle='#047857';ctx.font=`bold 12px ${FONT}`;ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText(`建議背板 ${an.recW}×${an.recH}（預留 ${s.reservePct}%）`,an.recW,-4);ctx.restore();
+  }
   ctx.strokeStyle='#3b82f6';ctx.lineWidth=2;ctx.setLineDash([7,4]);ctx.strokeRect(0,0,totalW,totalH);
   ctx.strokeStyle='#cbd5e1';ctx.lineWidth=1;ctx.strokeRect(mg.l,mg.t,maxX,maxY);ctx.setLineDash([]);
+  if(isFinite(usableW())){ctx.save();ctx.strokeStyle='rgba(220,38,38,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);const xw=mg.l+usableW();ctx.beginPath();ctx.moveTo(xw,0);ctx.lineTo(xw,bgH);ctx.stroke();ctx.restore()}
   appState.ducts.forEach((d,i)=>drawDuctFlat(ctx,d,i,mg.l,mg.t,1,selected&&selected.kind==='duct'&&selected.index===i));
-  globalBlocks.forEach((b,i)=>drawFlatBlock(b,i,b.x+mg.l,b.y+mg.t));
+  globalBlocks.forEach((b,i)=>drawFlatBlock(b,i,b.x+mg.l,b.y+mg.t,an&&an.conflicts.get(i)));
+  if(s.showGhost&&an&&an.best){ctx.save();ctx.strokeStyle='#059669';ctx.lineWidth=1.6;ctx.setLineDash([5,3]);an.best.forEach(b=>{ctx.strokeRect(b.x+mg.l+1,b.y+mg.t+1,b.w-2,b.h-2)});ctx.setLineDash([]);
+    ctx.fillStyle='#047857';ctx.font=`bold 11px ${FONT}`;ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(`綠色虛線＝全自動最佳排版（高 ${Math.ceil(an.bestExt.totalH)} mm）`,mg.l,Math.max(totalH,showR?an.recH:0)+(showR?20:4));ctx.restore()}
   ctx.fillStyle='#1d4ed8';ctx.font=`bold 16px ${FONT}`;ctx.textAlign='center';ctx.textBaseline='alphabetic';
   ctx.fillText(`${Math.ceil(totalW)} mm`,totalW/2,-10);
   ctx.save();ctx.translate(-12,totalH/2);ctx.rotate(-Math.PI/2);ctx.fillText(`${Math.ceil(totalH)} mm`,0,0);ctx.restore();
 }
-function drawFlatBlock(b,i,x,y){
+function drawFlatBlock(b,i,x,y,conf){
   const info=blockInfo(b),sel=selected&&selected.kind==='block'&&selected.index===i;
   ctx.shadowColor=sel?'rgba(0,0,0,.35)':'transparent';ctx.shadowBlur=sel?10:0;
   ctx.fillStyle=info.color;ctx.strokeStyle=sel?'#111827':shade(info.color,-90);ctx.lineWidth=sel?2.5:1.5;
-  ctx.fillRect(x,y,b.w,b.h);ctx.strokeRect(x,y,b.w,b.h);ctx.shadowBlur=0;
+  ctx.fillRect(x,y,b.w,b.h);ctx.shadowBlur=0;
+  if(isReserve(info.name))hatch(x,y,b.w,b.h,'rgba(71,85,105,.45)',9,1);
+  if(conf==='hard'||conf==='out'){ctx.fillStyle='rgba(239,68,68,.28)';ctx.fillRect(x,y,b.w,b.h);ctx.strokeStyle='#dc2626';ctx.lineWidth=3;if(conf==='out')ctx.setLineDash([6,3])}
+  else if(conf==='gap'){ctx.strokeStyle='#f97316';ctx.lineWidth=3;ctx.setLineDash([6,3])}
+  ctx.strokeRect(x,y,b.w,b.h);ctx.setLineDash([]);
   if(b.w>24&&b.h>16){
     ctx.fillStyle=textOn(info.color);ctx.textAlign='center';ctx.textBaseline='middle';
     const big=Math.min(14,Math.max(8,b.w/7));
@@ -672,7 +788,7 @@ function renderInputs(){
   $('cabName').value=c.name;$('cabDrawingNo').value=c.drawingNo;$('cabDesigner').value=c.designer;$('cabBackColor').value=c.backColor;$('cabDoorColor').value=c.doorColor;
   $('maxWidth').value=s.maxWidth;$('useMaxWidth').checked=s.useMaxWidth;$('gapX').value=s.gapX;$('gapY').value=s.gapY;
   $('marginTop').value=s.margins.t;$('marginBottom').value=s.margins.b;$('marginLeft').value=s.margins.l;$('marginRight').value=s.margins.r;
-  $('allowRotate').checked=s.allowRotate;$('thickness').value=s.thickness;$('material').value=String(s.density);$('priceKg').value=s.priceKg;$('processCost').value=s.processCost;
+  $('allowRotate').checked=s.allowRotate;$('reservePct').value=s.reservePct;$('encDiff').value=s.encDiff;$('showReserve').checked=s.showReserve!==false;$('showGhost').checked=!!s.showGhost;$('thickness').value=s.thickness;$('material').value=String(s.density);$('priceKg').value=s.priceKg;$('processCost').value=s.processCost;
   $('viewDepth').value=s.viewDepth;$('viewAngle').value=s.viewAngle;$('cabinetDepth').value=s.cabinetDepth;$('doorClearance').value=s.doorClearance;
   $('doorWidth').value=s.doorWidth;$('doorHeight').value=s.doorHeight;$('hingeSide').value=s.hingeSide;$('doorAngle').value=s.doorAngle;$('doorAngleNum').value=s.doorAngle;$('showDoor').checked=s.showDoor!==false;
   syncViewButtons();toggleMaxWidth();renderItems();renderDucts();renderDoorParts();
@@ -938,6 +1054,10 @@ function bomSections(){
     ['門板尺寸 W×H',`${fmt(ds.w)} × ${fmt(ds.h)} mm，${s.hingeSide==='left'?'左':'右'}側鉸鏈`],
     ['箱體可用深度 / 門內安全間隙',`${fmt(s.cabinetDepth)} mm / ${fmt(s.doorClearance)} mm`],
     ['元件 / 配線槽 / 門件數量',`${globalBlocks.length} 件 / ${appState.ducts.length} 條 / ${appState.doorParts.length} 件`],
+    ...(()=>{const a=analyzeLayout();return [
+      ['建議最小背板 / 含預留',`${a.minW} × ${a.minH} mm ／ 預留 ${s.reservePct}% → ${a.recW} × ${a.recH} mm（可用餘裕 ${a.recFreePct.toFixed(0)}%）`],
+      ['需求深度 / 建議標準箱體',`≥ ${a.dReq} mm（${a.dBy}＋間隙）／ ${a.enc&&a.encD?`${a.enc[0]} × ${a.enc[1]} × ${a.encD} mm（箱體−背板差值 ${s.encDiff} mm，常用規格參考）`:'超出常用標準箱，需訂製'}`],
+      ['排版健檢',(a.nHard||a.nOut||a.nGap)?`重疊 ${a.nHard}、超寬 ${a.nOut}、間距不足 ${a.nGap}`:`無碰撞；目前高 ${Math.ceil(a.cur.totalH)}，全自動最佳 ${a.bestExt?Math.ceil(a.bestExt.totalH):'-'}`]]})(),
     ['門件深度干涉檢查',chk.ok?'OK，無干涉':`${chk.issues.length} 處干涉：`+chk.issues.slice(0,4).map(x=>`D${x.pi+1}↔${x.target} 超出${x.overlap.toFixed(1)}mm`).join('；')]
   ]});
   secs.push({title:'箱內元件明細（座標為元件左上角，基準點：背板左上角）',cols:[{t:'編號',w:16},{t:'名稱',w:92},{t:'顏色',w:16},{t:'規格 W×H',w:38},{t:'安裝 W×H',w:38},{t:'深度',w:22},{t:'X',w:26},{t:'Y',w:26},{t:'旋轉',w:16},{t:'規格編號',w:100}],
@@ -1069,7 +1189,7 @@ function downloadSelf(){downloadBlob('<!DOCTYPE html>\n'+document.documentElemen
 /* =========================================================================
    事件 & 初始化
    ========================================================================= */
-const LIVE_IDS=['cabName','cabDrawingNo','cabDesigner','cabBackColor','cabDoorColor','thickness','material','priceKg','processCost','allowRotate','viewDepth','viewAngle','cabinetDepth','doorClearance','doorWidth','doorHeight','hingeSide','showDoor','gapX','gapY','marginTop','marginBottom','marginLeft','marginRight'];
+const LIVE_IDS=['reservePct','encDiff','showReserve','showGhost','cabName','cabDrawingNo','cabDesigner','cabBackColor','cabDoorColor','thickness','material','priceKg','processCost','allowRotate','viewDepth','viewAngle','cabinetDepth','doorClearance','doorWidth','doorHeight','hingeSide','showDoor','gapX','gapY','marginTop','marginBottom','marginLeft','marginRight'];
 document.addEventListener('change',e=>{if(e.target&&LIVE_IDS.includes(e.target.id)){updateStateFromInputs();redraw()}});
 ['cabBackColor','cabDoorColor'].forEach(id=>$(id).addEventListener('input',()=>{updateStateFromInputs();redraw()}));
 window.addEventListener('resize',()=>redraw());
