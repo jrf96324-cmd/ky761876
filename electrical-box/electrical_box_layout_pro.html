@@ -204,6 +204,7 @@
     <button class="btn-calc" onclick="runAutoLayout()">🔄 自動最佳排列（避開配線槽）</button>
     <button class="btn-calc" style="background:var(--purple);margin-top:8px" onclick="optimizeManualGaps()">✨ 手動後重整間隙</button>
     <div class="small-note">拖曳微調後按「重整間隙」：依目前視覺列順序重新貼齊 X/Y 間隙，並避開配線槽。</div>
+    <div class="interference-panel" style="margin-top:10px"><b>🎨 元件顏色定義（圖例）</b><div class="small-note" style="margin:2px 0 6px">每個元件卡片右上角色塊可自訂顏色；此圖例同步印在 PDF 背板圖。</div><div id="colorLegend"></div></div>
   </div>
 
   <div class="save-section">
@@ -262,6 +263,26 @@ const DOOR_PRESETS={
 };
 const ROUND_KINDS=['button','estop','lamp','selector'];
 const KIND_LABEL={hmi:'HMI',button:'按鈕',estop:'緊急停止',lamp:'指示燈',selector:'選擇開關',rect:'矩形開孔'};
+/* 常用箱內元件庫（外形尺寸為常見規格參考值，請依型錄確認） */
+const COMP_LIB=[
+  {cat:'保護',name:'無熔絲開關 3P',w:75,h:130,depth:80,color:'#fde68a'},
+  {cat:'保護',name:'漏電斷路器 2P',w:36,h:90,depth:75,color:'#fcd34d'},
+  {cat:'保護',name:'微型斷路器 1P',w:18,h:90,depth:75,color:'#fef08a'},
+  {cat:'動力',name:'電磁接觸器',w:45,h:78,depth:90,color:'#fed7aa'},
+  {cat:'動力',name:'積熱電驛',w:45,h:75,depth:80,color:'#fdba74'},
+  {cat:'動力',name:'變頻器 2.2kW',w:140,h:260,depth:170,color:'#c4b5fd'},
+  {cat:'動力',name:'伺服驅動器',w:55,h:170,depth:180,color:'#ddd6fe'},
+  {cat:'控制',name:'PLC 主機',w:200,h:120,depth:90,color:'#bfdbfe'},
+  {cat:'控制',name:'PLC 擴充模組',w:40,h:100,depth:90,color:'#93c5fd'},
+  {cat:'控制',name:'中間繼電器(含座)',w:16,h:80,depth:70,color:'#fecaca'},
+  {cat:'控制',name:'計時器',w:48,h:48,depth:70,color:'#f9a8d4'},
+  {cat:'電源',name:'電源供應器 24V',w:120,h:125,depth:120,color:'#bbf7d0'},
+  {cat:'電源',name:'控制變壓器',w:120,h:100,depth:110,color:'#d6d3d1'},
+  {cat:'電源',name:'雜訊濾波器',w:100,h:60,depth:50,color:'#a5f3fc'},
+  {cat:'配線',name:'端子台',w:300,h:50,depth:60,color:'#e5e7eb'},
+  {cat:'配線',name:'接地銅排',w:200,h:30,depth:30,color:'#fb923c'},
+  {cat:'其他',name:'散熱風扇',w:120,h:120,depth:40,color:'#cbd5e1'}
+];
 const DUCT_SIZES=[[25,25],[25,40],[25,60],[33,60],[40,40],[40,60],[40,80],[60,60],[60,80],[80,80],[80,100],[100,100]];
 
 function defaultState(){
@@ -641,21 +662,28 @@ function renderItems(){
   appState.items.forEach((it,idx)=>{
     const sq=it.type==='square',div=document.createElement('div');
     div.className='card';div.style.borderLeftColor=it.color;
-    div.innerHTML=`<div class="card-head"><span class="tag">#${idx+1} ${sq?'正方':'矩形'}</span><input type="text" value="${esc(it.name)}" onchange="updateItem(${idx},'name',this.value)" placeholder="元件名稱"><input type="color" value="${esc(it.color)}" oninput="updateItem(${idx},'color',this.value)" title="顯示顏色"><button class="btn-remove" onclick="removeItem(${idx})">×</button></div>`+
+    const libOpts='<option value="">— 套用元件庫（名稱/尺寸/深度/顏色）—</option>'+COMP_LIB.map((c,ci)=>`<option value="${ci}">[${c.cat}] ${esc(c.name)} ${c.w}×${c.h} D${c.depth}</option>`).join('');
+    div.innerHTML=`<select style="margin-bottom:6px;font-size:.78rem" onchange="applyCompLib(${idx},this.value)">${libOpts}</select><div class="card-head"><span class="tag">#${idx+1} ${sq?'正方':'矩形'}</span><input type="text" value="${esc(it.name)}" onchange="updateItem(${idx},'name',this.value)" placeholder="元件名稱"><input type="color" value="${esc(it.color)}" oninput="updateItem(${idx},'color',this.value)" title="顯示顏色"><button class="btn-remove" onclick="removeItem(${idx})">×</button></div>`+
       (sq?`<div class="form-grid-3"><div><label style="color:var(--orange)">邊長</label><input type="number" value="${it.w}" onchange="updateItem(${idx},'side',this.value)"></div><div><label>數量</label><input type="number" value="${it.count}" onchange="updateItem(${idx},'count',this.value)"></div><div><label>深度</label><input type="number" value="${it.depth}" onchange="updateItem(${idx},'depth',this.value)"></div></div>`
           :`<div class="form-grid-4"><div><label>寬 W</label><input type="number" value="${it.w}" onchange="updateItem(${idx},'w',this.value)"></div><div><label>高 H</label><input type="number" value="${it.h}" onchange="updateItem(${idx},'h',this.value)"></div><div><label>數量</label><input type="number" value="${it.count}" onchange="updateItem(${idx},'count',this.value)"></div><div><label>深度</label><input type="number" value="${it.depth}" onchange="updateItem(${idx},'depth',this.value)"></div></div>`);
     list.appendChild(div);
   });
+  renderLegend();
 }
+function applyCompLib(i,v){if(v==='')return;const c=COMP_LIB[+v],it=appState.items[i];Object.assign(it,{name:c.name,w:c.w,h:c.h,depth:c.depth,color:c.color,type:c.w===c.h?'square':'rect'});renderItems();redraw();toast(`已套用「${c.name}」，按「自動最佳排列」更新尺寸`)}
+/* 顏色圖例：依 顏色+名稱 分組統計 */
+function legendGroups(){const m=new Map();appState.items.forEach(it=>{const k=it.color+'|'+it.name;const g=m.get(k)||{color:it.color,name:it.name,qty:0,placed:0};g.qty+=Math.floor(+it.count||0);m.set(k,g)});globalBlocks.forEach(b=>{const inf=blockInfo(b),g=m.get(inf.color+'|'+inf.name);if(g)g.placed++});return [...m.values()]}
+function renderLegend(){const el=$('colorLegend');if(!el)return;const gs=legendGroups();el.innerHTML=gs.length?gs.map(g=>`<div style="display:flex;align-items:center;gap:6px;font-size:.76rem;padding:2px 0"><span style="width:18px;height:12px;border:1px solid #475569;border-radius:3px;background:${esc(g.color)};flex-shrink:0"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</span><span style="color:#64748b">×${g.qty}</span></div>`).join(''):'<div class="small-note" style="margin:0">尚無元件</div>'}
 function addItem(type){const n=appState.items.length;appState.items.push({id:Date.now(),type,name:type==='square'?`正方元件${n+1}`:`矩形元件${n+1}`,color:PALETTE[n%PALETTE.length],w:100,h:type==='square'?100:80,count:1,depth:80});renderItems();toast('已新增元件規格，按「自動最佳排列」更新')}
 function removeItem(i){const id=appState.items[i].id;appState.items.splice(i,1);globalBlocks=globalBlocks.filter(b=>b.id!==id);renderItems();redraw()}
 function clearItems(){if(confirm('確定清空所有箱內元件？')){appState.items=[];globalBlocks=[];renderItems();redraw()}}
 function updateItem(i,f,val){
   const it=appState.items[i];
-  if(f==='name'){it.name=val;redraw();return}
-  if(f==='color'){it.color=val;const card=$('itemList').children[i];if(card)card.style.borderLeftColor=val;redraw();return}
+  if(f==='name'){it.name=val;renderLegend();redraw();return}
+  if(f==='color'){it.color=val;const card=$('itemList').children[i];if(card)card.style.borderLeftColor=val;renderLegend();redraw();return}
   const v=+val||0;
   if(f==='side'){it.w=v;it.h=v}else it[f]=v;
+  if(f==='count')renderLegend();
   if(f==='depth')redraw();
 }
 
@@ -839,8 +867,20 @@ function sheetBackplate(info){
   xv.push(0,W);yv.push(0,H);
   ordinateTop(g,Y(0),xv,X);ordinateLeft(g,X(0),yv,Y);
   dimH(g,X(0),X(W),Y(H),Y(H)+9,`${fmt(W)}`);dimV(g,Y(0),Y(H),X(W),X(W)+9,`${fmt(H)}`);
+  pdfLegend(g,14,249,222,31);
   sheetFrame(g,Object.assign({},info,{scale:sc}));
   return c;
+}
+function pdfLegend(g,x,y,w,h){
+  const gs=legendGroups();if(!gs.length)return;
+  const items=gs.concat(appState.ducts.length?[{color:'#e5e7eb',name:'配線槽 (W)',qty:appState.ducts.length,duct:true}]:[]);
+  const cols=3,cw=w/cols,rh=4.6,maxRows=Math.floor((h-6)/rh);
+  g.strokeStyle='#000';g.lineWidth=.3;g.strokeRect(x,y,w,h);
+  sFont(g,2.8,true);g.fillStyle='#000';g.textAlign='left';g.textBaseline='middle';g.fillText('元件顏色定義（圖例）',x+2,y+3);
+  items.slice(0,cols*maxRows).forEach((it,i)=>{const cx=x+2+Math.floor(i/maxRows)*cw,cy=y+6+(i%maxRows)*rh+rh/2;
+    g.fillStyle=it.color;g.fillRect(cx,cy-1.6,6,3.2);g.strokeStyle='#000';g.lineWidth=.15;g.strokeRect(cx,cy-1.6,6,3.2);
+    let t=`${it.name} ×${it.qty}`;sFont(g,2.4);while(t.length>1&&g.measureText(t).width>cw-10)t=t.slice(0,-1);g.fillStyle='#000';g.fillText(t,cx+7.5,cy)});
+  if(items.length>cols*maxRows){sFont(g,2.2);g.fillStyle='#64748b';g.textAlign='right';g.fillText(`…其餘 ${items.length-cols*maxRows} 項見材料表`,x+w-2,y+3)}
 }
 function sheetDoor(info){
   const {c,g}=newSheet(),s=appState.settings,ds=doorSize(),W=ds.w,H=ds.h;
