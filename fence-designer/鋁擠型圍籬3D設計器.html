@@ -1310,6 +1310,7 @@ window.onerror=function(m,src,l,c){ window.__errs.push(m+' (行 '+l+')'); var b=
 } )();
 </script>
 <script>
+(function(){
 "use strict";
 /* ================= 資料庫：型材 / 顏色 / 板材 / 底座 ================= */
 const PROFILES = {
@@ -1647,7 +1648,7 @@ function aluMat(c){
 const edgeDark=new THREE.LineBasicMaterial({color:0x0b1220,transparent:true,opacity:.32});
 const edgeLight=new THREE.LineBasicMaterial({color:0xcbd5e1,transparent:true,opacity:.28});
 const steel=new THREE.MeshStandardMaterial({color:lin('#3b3f46'),metalness:.7,roughness:.35});
-const chrome=new THREE.MeshStandardMaterial({color:lin('#e5e7eb'),metalness:1,roughness:.15});
+const chromeMat=new THREE.MeshStandardMaterial({color:lin('#e5e7eb'),metalness:1,roughness:.15});
 const rubber=new THREE.MeshStandardMaterial({color:lin('#1a1a1a'),metalness:0,roughness:.85});
 const texCache={};
 function patternTex(kind){
@@ -1704,10 +1705,10 @@ function build3D(){
   if(GEO.door){
     const d=GEO.door, s=d.sgn, n=d.Lh>1800?3:2;
     const hy=n===3?[d.y0+180,(d.y0+d.y1)/2,d.y1-180]:[d.y0+180,d.y1-180];
-    hy.forEach(y=>{ pivot.add(box(22,90,d.dp*0.9,steel,-s*4,y,-d.dp/2)); pivot.add(cyl(5,96,chrome,-s*8,y,2)); });
+    hy.forEach(y=>{ pivot.add(box(22,90,d.dp*0.9,steel,-s*4,y,-d.dp/2)); pivot.add(cyl(5,96,chromeMat,-s*8,y,2)); });
     const hx=s*(d.Lw-d.dp/2), hyy=Math.min(Math.max(1050,d.y0+250),d.y1-250);
-    pivot.add(cyl(9,200,chrome,hx,hyy,42));
-    [-80,80].forEach(o=>pivot.add(cyl(6,42,chrome,hx,hyy+o,21,[Math.PI/2,0,0])));
+    pivot.add(cyl(9,200,chromeMat,hx,hyy,42));
+    [-80,80].forEach(o=>pivot.add(cyl(6,42,chromeMat,hx,hyy+o,21,[Math.PI/2,0,0])));
     // 開門軌跡
     const pts=[]; for(let a=0;a<=90;a+=3){ const r=a*Math.PI/180; pts.push(new THREE.Vector3(d.pv.x+s*Math.cos(r)*d.Lw,2,d.pv.z+Math.sin(r)*d.Lw)); }
     const arc=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineDashedMaterial({color:0xfb923c,dashSize:40,gapSize:30,transparent:true,opacity:.8}));
@@ -1718,14 +1719,14 @@ function build3D(){
     const {cx,cz}=p.box, P=P_();
     if(S.base==='foot'){
       extras.add(box(P,6,P,steel,cx,bh-3,cz));
-      extras.add(cyl(P*0.12+3,bh-14,chrome,cx,(bh-14)/2+8,cz));
+      extras.add(cyl(P*0.12+3,bh-14,chromeMat,cx,(bh-14)/2+8,cz));
       extras.add(cyl(30,10,rubber,cx,5,cz));
       extras.add(cyl(P*0.3,8,steel,cx,22,cz,[0,Math.PI/6,0]));
     } else {
       extras.add(box(Math.max(P*1.6,70),6,Math.max(P*1.6,70),steel,cx,bh-3,cz));
       extras.add(box(46,40,10,steel,cx,bh-26,cz-16)); extras.add(box(46,40,10,steel,cx,bh-26,cz+16));
       extras.add(cyl(36,22,rubber,cx,36,cz,[Math.PI/2,0,0]));
-      extras.add(cyl(14,24,chrome,cx,36,cz,[Math.PI/2,0,0]));
+      extras.add(cyl(14,24,chromeMat,cx,36,cz,[Math.PI/2,0,0]));
     }
   });
   // 地面 / 燈光
@@ -2175,6 +2176,8 @@ function init(){
   if(HAS3D) fitView('iso'); else { switchView('2d'); no3DMsg(); }
 }
 init();
+window.__fence={S:S,select:select,get view(){return view;},get HAS3D(){return HAS3D;}};
+})();
 </script>
 </body>
 </html>
