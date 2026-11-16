@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程進度管理</title>
+<style>
+:root{
+  --bg:#f3f5f9; --panel:#ffffff; --panel-2:#f8fafc; --panel-3:#eef2f7;
+  --border:#e2e8f0; --border-strong:#cbd5e1;
+  --text:#0f172a; --text-2:#475569; --text-3:#94a3b8;
+  --primary:#2563eb; --primary-weak:#dbeafe; --primary-text:#ffffff;
+  --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+  --weekend:rgba(148,163,184,.13); --grid:#edf1f6; --today:#ef4444; --today-bg:rgba(239,68,68,.07);
+  --shadow:0 1px 2px rgba(15,23,42,.05),0 2px 6px rgba(15,23,42,.06);
+  --shadow-lg:0 12px 32px rgba(15,23,42,.18);
+  --lw:310px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b1120; --panel:#111827; --panel-2:#0f172a; --panel-3:#1e293b;
+    --border:#1f2a3a; --border-strong:#334155;
+    --text:#e5e7eb; --text-2:#9ca3af; --text-3:#64748b;
+    --primary:#3b82f6; --primary-weak:rgba(59,130,246,.18);
+    --weekend:rgba(148,163,184,.06); --grid:#172131; --today-bg:rgba(239,68,68,.10);
+    --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 12px 32px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b1120; --panel:#111827; --panel-2:#0f172a; --panel-3:#1e293b;
+  --border:#1f2a3a; --border-strong:#334155;
+  --text:#e5e7eb; --text-2:#9ca3af; --text-3:#64748b;
+  --primary:#3b82f6; --primary-weak:rgba(59,130,246,.18);
+  --weekend:rgba(148,163,184,.06); --grid:#172131; --today-bg:rgba(239,68,68,.10);
+  --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 12px 32px rgba(0,0,0,.6);
+}
+@media (max-width:760px){ :root{ --lw:180px; } }
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","Microsoft JhengHei",Roboto,Arial,sans-serif;padding:16px}
+.wrap{max-width:1600px;margin:0 auto}
+.hidden{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:6px 10px;outline:none;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-weak)}
+input[type=checkbox]{accent-color:var(--primary);width:15px;height:15px}
+input[type=range]{accent-color:var(--primary);padding:0;border:0;box-shadow:none}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow)}
+.btn{cursor:pointer;border:1px solid var(--border-strong);background:var(--panel);border-radius:6px;padding:6px 12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--panel-3)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-text)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn.ghost{border-color:transparent;background:transparent}
+.muted{color:var(--text-2)} .faint{color:var(--text-3)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spacer{flex:1}
+
+/* Header */
+.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-logo{width:38px;height:38px;border-radius:9px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800;font-size:18px}
+.brand h1{margin:0;font-size:20px;line-height:1.2}
+.proj-name{border:1px dashed transparent;background:transparent;padding:2px 6px;margin-left:-6px;font-size:13px;color:var(--text-2);width:260px}
+.proj-name:hover{border-color:var(--border-strong)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.kpi{padding:12px 14px}
+.kpi .lbl{font-size:12px;color:var(--text-2);font-weight:600}
+.kpi .val{font-size:24px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .val small{font-size:13px;font-weight:600;color:var(--text-2);margin-left:4px}
+.kpi .sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.pbar{height:8px;border-radius:5px;background:var(--panel-3);overflow:hidden;position:relative;margin-top:6px}
+.pbar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px}
+.pbar .mark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text)}
+
+/* Quick add */
+details.quick{margin-bottom:12px}
+details.quick summary{cursor:pointer;padding:10px 14px;font-weight:700;list-style:none;display:flex;align-items:center;gap:8px}
+details.quick summary::-webkit-details-marker{display:none}
+details.quick[open] summary{border-bottom:1px solid var(--border)}
+.qa-grid{display:grid;grid-template-columns:1.1fr 1.6fr 1fr .9fr .9fr auto;gap:8px;padding:12px 14px;align-items:end}
+@media (max-width:900px){.qa-grid{grid-template-columns:1fr 1fr}}
+.fld{display:flex;flex-direction:column;gap:3px}
+.fld label{font-size:12px;color:var(--text-2);font-weight:600}
+
+/* Toolbar */
+.toolbar{padding:10px 12px;margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tabs{display:inline-flex;background:var(--panel-3);border-radius:8px;padding:3px}
+.tabs button{border:0;background:transparent;padding:5px 12px;border-radius:6px;cursor:pointer;font-weight:600;color:var(--text-2)}
+.tabs button.on{background:var(--panel);color:var(--text);box-shadow:var(--shadow)}
+.toolbar select,.toolbar input[type=search]{padding:5px 8px}
+.toolbar input[type=search]{width:180px}
+.chk{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-2);cursor:pointer;user-select:none}
+
+/* Gantt */
+.gantt{overflow:auto;height:calc(100vh - 150px);min-height:460px;position:relative;border-radius:10px}
+.g-head{position:sticky;top:0;z-index:20;display:flex;background:var(--panel);border-bottom:1px solid var(--border-strong);width:max-content;min-width:100%}
+.g-corner{position:sticky;left:0;z-index:22;flex:0 0 var(--lw);width:var(--lw);background:var(--panel);border-right:1px solid var(--border-strong);display:flex;align-items:flex-end;padding:0 10px 6px;font-size:12px;font-weight:700;color:var(--text-2);gap:6px}
+.g-time{position:relative;height:54px;flex:0 0 auto}
+.th{position:absolute;top:0;height:25px;border-left:1px solid var(--border);font-size:12px;font-weight:700;padding:4px 6px;white-space:nowrap;overflow:hidden;color:var(--text)}
+.tb{position:absolute;top:25px;height:29px;border-left:1px solid var(--grid);border-top:1px solid var(--border);font-size:11px;text-align:center;color:var(--text-2);display:flex;flex-direction:column;justify-content:center;line-height:1.05;overflow:hidden;white-space:nowrap}
+.tb b{font-weight:700;color:var(--text)} .tb i{font-style:normal;font-size:10px}
+.tb.we{background:var(--weekend)} .tb.we i{color:var(--bad)}
+.tb.td{background:var(--today);color:#fff;border-radius:4px 4px 0 0} .tb.td b,.tb.td i{color:#fff}
+.tb.wk{text-align:left;padding-left:4px;align-items:flex-start}
+.g-body{position:relative;width:max-content;min-width:100%}
+.g-bg{position:absolute;top:0;bottom:0;left:var(--lw);z-index:0;pointer-events:none}
+.we-bg{position:absolute;top:0;bottom:0;background:var(--weekend)}
+.vl{position:absolute;top:0;bottom:0;border-left:1px solid var(--grid)}
+.vl.m{border-left:1px solid var(--border-strong)}
+.today-col{position:absolute;top:0;bottom:0;background:var(--today-bg)}
+.today-line{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--today);box-shadow:0 0 6px rgba(239,68,68,.45);z-index:3}
+.g-deps{position:absolute;top:0;left:var(--lw);z-index:1;pointer-events:none;overflow:visible}
+.g-deps path{fill:none;stroke:var(--text-3);stroke-width:1.4}
+.g-deps path.bad{stroke:var(--bad);stroke-dasharray:4 3}
+.g-row{display:flex;position:relative;border-bottom:1px solid var(--grid)}
+.g-row:hover .g-left{background:var(--panel-2)}
+.g-row:hover{background:rgba(37,99,235,.035)}
+.g-row.sel .g-left{box-shadow:inset 3px 0 0 var(--primary)}
+.g-left{position:sticky;left:0;z-index:6;flex:0 0 var(--lw);width:var(--lw);background:var(--panel);border-right:1px solid var(--border-strong);display:flex;align-items:center;gap:8px;padding:0 10px;cursor:pointer;overflow:hidden}
+.g-left .dot{width:4px;align-self:stretch;margin:6px 0;border-radius:3px;flex:0 0 4px}
+.gl-main{flex:1;min-width:0}
+.gl-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gl-sub{font-size:11px;color:var(--text-2);display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden}
+.gl-pct{flex:0 0 48px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+.mini{height:4px;background:var(--panel-3);border-radius:3px;overflow:hidden;margin-top:3px}
+.mini i{display:block;height:100%}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:0 6px;border-radius:9px;font-size:11px;font-weight:700;color:var(--s);background:color-mix(in srgb,var(--s) 14%,transparent);line-height:17px;white-space:nowrap}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--s)}
+.g-row.grp{background:var(--panel-2)}
+.g-row.grp .g-left{background:var(--panel-2);font-weight:700}
+.caret{display:inline-block;width:14px;color:var(--text-2);transition:transform .15s}
+.collapsed .caret{transform:rotate(-90deg)}
+.g-track{position:relative;flex:0 0 auto}
+.bp{position:absolute;top:8px;height:13px;border-radius:4px;background:color-mix(in srgb,var(--c) 22%,transparent);border:1.5px dashed var(--c);cursor:grab;z-index:2;touch-action:none}
+.bp:hover{background:color-mix(in srgb,var(--c) 35%,transparent)}
+.bp.late{border-color:var(--bad);border-style:solid;background:repeating-linear-gradient(-45deg,rgba(220,38,38,.18) 0 4px,transparent 4px 8px)}
+.bp .h{position:absolute;top:-3px;bottom:-3px;width:8px;cursor:ew-resize}
+.bp .h-l{left:-4px} .bp .h-r{right:-4px}
+.bp.dragging{cursor:grabbing;box-shadow:0 0 0 2px var(--primary);z-index:9}
+.ba{position:absolute;top:24px;height:14px;border-radius:4px;background:color-mix(in srgb,var(--c) 45%,var(--panel));z-index:2;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.ba .af{position:absolute;left:0;top:0;bottom:0;background:var(--c)}
+.ba.open{border-right:2px dashed var(--c);border-radius:4px 0 0 4px}
+.ba em{position:relative;z-index:1;font-style:normal;font-size:10px;font-weight:700;color:#fff;padding-left:5px;text-shadow:0 0 2px rgba(0,0,0,.6);line-height:14px}
+.ba:hover,.bp:hover{filter:brightness(1.05)}
+.ms{position:absolute;top:12px;width:16px;height:16px;transform:rotate(45deg);background:var(--panel);border:2.5px solid var(--c);z-index:2;cursor:grab;touch-action:none}
+.ms.done{background:var(--c)}
+.ms.late{border-color:var(--bad)}
+.gs{position:absolute;top:12px;height:10px;background:color-mix(in srgb,var(--c) 30%,transparent);border-radius:2px;z-index:2}
+.gs i{position:absolute;left:0;top:0;bottom:0;background:var(--c);border-radius:2px}
+.gs::before,.gs::after{content:"";position:absolute;bottom:-5px;border:5px solid transparent;border-top-color:var(--c)}
+.gs::before{left:0;border-left-color:var(--c)} .gs::after{right:0;border-right-color:var(--c)}
+.bl{position:absolute;top:14px;font-size:11px;white-space:nowrap;color:var(--text-2);z-index:2;pointer-events:none;font-variant-numeric:tabular-nums}
+.bl b{color:var(--text)}
+.late-t{color:var(--bad);font-weight:700}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-2);padding:8px 12px;border-top:1px solid var(--border)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{display:inline-block;width:22px;height:10px;border-radius:3px}
+.empty{padding:60px 20px;text-align:center;color:var(--text-3)}
+
+/* Table */
+.tbl-wrap{overflow:auto;max-height:calc(100vh - 150px);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel-2);z-index:2;font-size:12px;color:var(--text-2);cursor:pointer;user-select:none}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:hover{background:var(--panel-2)}
+td .lnk{cursor:pointer;font-weight:600;color:var(--text)}
+td .lnk:hover{color:var(--primary);text-decoration:underline}
+td input[type=number]{width:64px;padding:3px 6px;text-align:right}
+tfoot td{font-weight:700;background:var(--panel-2);position:sticky;bottom:0}
+
+/* Analysis */
+.an-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:12px}
+@media (max-width:520px){.an-grid{grid-template-columns:1fr}}
+.an-card{padding:14px}
+.an-card h3{margin:0 0 10px;font-size:15px}
+.scurve text{font-size:11px;fill:var(--text-2)}
+.scurve .ax{stroke:var(--border-strong)} .scurve .gl{stroke:var(--grid)}
+.list-item{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:pointer}
+.list-item:hover{background:var(--panel-2)}
+.list-item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dual{position:relative;height:10px;background:var(--panel-3);border-radius:5px;overflow:hidden;min-width:120px}
+.dual .p{position:absolute;left:0;top:0;bottom:0;background:var(--text-3);opacity:.45}
+.dual .a{position:absolute;left:0;top:2px;bottom:2px;border-radius:4px}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;justify-content:center;align-items:flex-start;z-index:1000;padding:4vh 12px;overflow-y:auto;backdrop-filter:blur(2px)}
+.modal{background:var(--panel);border-radius:12px;width:100%;max-width:820px;box-shadow:var(--shadow-lg);border:1px solid var(--border)}
+.m-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);border-radius:12px 12px 0 0;z-index:2}
+.m-head h2{margin:0;font-size:17px;flex:1}
+.m-body{padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:720px){.m-body{grid-template-columns:1fr}}
+.m-body>*,.g2>*,.g3>*{min-width:0}
+.fld input,.fld select,.fld textarea{width:100%}
+.fld input[type=checkbox]{width:15px}
+.sec{border:1px solid var(--border);border-radius:9px;padding:12px}
+.sec.full{grid-column:1/-1}
+.sec h4{margin:0 0 8px;font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:8px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.m-foot{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--panel);border-radius:0 0 12px 12px}
+.ck-item{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dashed var(--border)}
+.ck-item span{flex:1}
+.ck-item.done span{text-decoration:line-through;color:var(--text-3)}
+.dep-list{max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:4px 8px;margin-top:6px}
+.dep-list label{display:flex;gap:6px;align-items:center;font-size:13px;padding:2px 0;cursor:pointer}
+.dep-list label.dis{opacity:.4;cursor:not-allowed}
+.log{display:grid;grid-template-columns:92px 50px 1fr auto;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px dashed var(--border);align-items:center}
+.hint{font-size:12px;color:var(--text-2)}
+.big-pct{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* Tooltip & Toast */
+.tip{position:fixed;z-index:2000;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow-lg);padding:9px 11px;font-size:12px;max-width:320px;line-height:1.55}
+.tip .t{font-weight:700;font-size:13px;margin-bottom:3px}
+.tip .k{color:var(--text-2);display:inline-block;width:52px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:3000;box-shadow:var(--shadow-lg);transition:opacity .25s}
+
+@media print{
+  body{background:#fff;padding:0}
+  .no-print,details.quick,.toolbar{display:none!important}
+  .gantt,.tbl-wrap{height:auto!important;max-height:none!important;overflow:visible!important}
+  .card{box-shadow:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 頂部 -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-logo">工</div>
+      <div>
+        <h1>工程進度管理</h1>
+        <input class="proj-name" id="projName" title="點擊修改專案名稱" placeholder="專案名稱">
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="row no-print">
+      <button class="btn" onclick="undo()" title="Ctrl+Z">↶ 復原</button>
+      <button class="btn" onclick="loadSample()">範例專案</button>
+      <label class="btn">⇪ 匯入<input type="file" id="fileInput" accept=".json" class="hidden" onchange="importData(this)"></label>
+      <button class="btn" onclick="exportJSON()">⇩ 存檔 JSON</button>
+      <button class="btn" onclick="exportCSV()">⇩ Excel(CSV)</button>
+      <button class="btn" onclick="window.print()">列印</button>
+      <button class="btn ghost" onclick="toggleTheme()" title="切換深淺色">深/淺</button>
+      <button class="btn primary" onclick="openModal(null)">＋ 新增項目</button>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- 快速新增 -->
+  <details class="quick card" id="quickAdd">
+    <summary>＋ 快速新增 <span class="faint" style="font-weight:400;font-size:12px">（完整欄位請按「新增項目」）</span></summary>
+    <div class="qa-grid">
+      <div class="fld"><label>工程類別</label><input list="catList" id="qaCat" placeholder="例：機構設計"></div>
+      <div class="fld"><label>細項名稱</label><input id="qaName" placeholder="例：送料模組 3D 設計"></div>
+      <div class="fld"><label>負責人</label><input list="ownerList" id="qaOwner" placeholder="姓名/廠商"></div>
+      <div class="fld"><label>預計開始</label><input type="date" id="qaStart"></div>
+      <div class="fld"><label>預計結束</label><input type="date" id="qaEnd"></div>
+      <button class="btn primary" onclick="quickAdd()">加入</button>
+    </div>
+  </details>
+
+  <!-- 工具列 -->
+  <div class="toolbar card">
+    <div class="tabs" id="viewTabs">
+      <button data-v="gantt">甘特圖</button>
+      <button data-v="table">明細表</button>
+      <button data-v="analysis">追蹤分析</button>
+    </div>
+    <input type="search" id="fSearch" placeholder="搜尋名稱/負責人/備註">
+    <select id="fCat" title="類別"></select>
+    <select id="fStatus" title="狀態"></select>
+    <select id="fOwner" title="負責人"></select>
+    <span class="spacer"></span>
+    <span class="row" id="ganttTools">
+      <select id="fZoom" title="時間刻度">
+        <option value="day">日</option><option value="week">週</option><option value="month">月</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="optDeps">依賴線</label>
+      <label class="chk" title="拖曳或修改日期時，自動順延後續作業"><input type="checkbox" id="optCascade">連動後續</label>
+      <button class="btn sm" onclick="setCollapseAll(true)">全收合</button>
+      <button class="btn sm" onclick="setCollapseAll(false)">全展開</button>
+      <button class="btn sm" onclick="scrollToToday(true)">◎ 今天</button>
+    </span>
+  </div>
+
+  <!-- 視圖 -->
+  <div class="card" id="viewGantt">
+    <div class="gantt" id="gantt"></div>
+    <div class="legend">
+      <span><i class="lg" style="border:1.5px dashed #2563eb;background:rgba(37,99,235,.2)"></i>預計（可拖曳移動、拉邊緣改工期）</span>
+      <span><i class="lg" style="background:#2563eb"></i>實際（填色＝完成%）</span>
+      <span><i class="lg" style="border:1.5px solid #dc2626;background:repeating-linear-gradient(-45deg,rgba(220,38,38,.25) 0 3px,transparent 3px 6px)"></i>逾期</span>
+      <span><i class="lg" style="width:11px;height:11px;transform:rotate(45deg);border:2px solid #2563eb"></i>里程碑</span>
+      <span><i class="lg" style="width:2px;height:14px;background:#ef4444"></i>今日</span>
+      <span class="faint">點擊任一條或左側名稱可編輯</span>
+    </div>
+  </div>
+  <div class="card hidden" id="viewTable"><div class="tbl-wrap" id="tableWrap"></div></div>
+  <div class="hidden" id="viewAnalysis"></div>
+</div>
+
+<datalist id="catList"></datalist>
+<datalist id="ownerList"></datalist>
+
+<!-- 編輯視窗 -->
+<div class="overlay hidden" id="modal" onmousedown="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="m-head">
+      <h2 id="mTitle">編輯工程項目</h2>
+      <span id="mStatus"></span>
+      <button class="btn ghost" onclick="closeModal()" style="font-size:20px;padding:0 8px">×</button>
+    </div>
+    <div class="m-body">
+      <div class="sec">
+        <h4>基本資料</h4>
+        <div class="g2">
+          <div class="fld"><label>工程類別 *</label><input list="catList" id="eCat"></div>
+          <div class="fld"><label>負責人</label><input list="ownerList" id="eOwner"></div>
+        </div>
+        <div class="fld" style="margin-top:8px"><label>細項名稱 *</label><input id="eName"></div>
+        <div class="g3" style="margin-top:8px">
+          <div class="fld"><label>優先等級</label><select id="ePriority"><option>高</option><option>中</option><option>低</option></select></div>
+          <div class="fld"><label title="計算總進度用，可填工時或金額比重">權重 ⓘ</label><input type="number" id="eWeight" min="0.1" step="0.5"></div>
+          <div class="fld"><label>&nbsp;</label>
+            <div class="row" style="gap:12px">
+              <label class="chk"><input type="checkbox" id="eMilestone">里程碑</label>
+              <label class="chk"><input type="checkbox" id="eHold">暫停</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h4>時程 <span class="hint" id="eDur"></span></h4>
+        <div class="g2">
+          <div class="fld"><label>預計開始</label><input type="date" id="ePS"></div>
+          <div class="fld"><label>預計結束</label><input type="date" id="ePE"></div>
+          <div class="fld"><label>實際開始 <a href="#" class="hint" onclick="setToday('eAS');return false">今天</a></label><input type="date" id="eAS"></div>
+          <div class="fld"><label>實際完成 <a href="#" class="hint" onclick="setToday('eAE');return false">今天</a></label><input type="date" id="eAE"></div>
+        </div>
+        <div class="hint" style="margin-top:6px" id="eVar"></div>
+      </div>
+
+      <div class="sec">
+        <h4>進度更新</h4>
+        <div class="row">
+          <span class="big-pct"><span id="ePText">0</span>%</span>
+          <span class="hint" id="eExpect"></span>
+        </div>
+        <input type="range" id="eProg" min="0" max="100" step="5" style="width:100%">
+        <div class="row" style="margin-top:4px">
+          <button class="btn sm" onclick="nudge(-10)">−10</button>
+          <button class="btn sm" onclick="nudge(10)">+10</button>
+          <button class="btn sm" onclick="nudge(100)">完成</button>
+          <button class="btn sm" id="eFromCk" onclick="progressFromChecklist()">依檢核項目計算</button>
+        </div>
+        <div class="fld" style="margin-top:8px"><label>本次更新說明（存入進度紀錄）</label><input id="eLogNote" placeholder="例：模組 A 已出圖，待審"></div>
+        <div class="hint" style="margin-top:4px">進度 &gt; 0 自動填入實際開始；100% 自動填入實際完成。</div>
+      </div>
+
+      <div class="sec">
+        <h4>檢核項目 <span class="hint" id="ckCount"></span></h4>
+        <div id="ckList"></div>
+        <div class="row" style="margin-top:6px;flex-wrap:nowrap">
+          <input id="ckNew" placeholder="新增檢核項目，Enter 加入" style="flex:1">
+          <button class="btn sm" onclick="addCheck()">加入</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h4>前置作業（完成後才能開始）</h4>
+        <input id="depSearch" placeholder="搜尋項目..." style="width:100%">
+        <div class="dep-list" id="depList"></div>
+      </div>
+
+      <div class="sec">
+        <h4>成本控制</h4>
+        <div class="g2">
+          <div class="fld"><label>預算 (NT$)</label><input type="number" id="eBudget" min="0" step="1000"></div>
+          <div class="fld"><label>實際成本 (NT$)</label><input type="number" id="eCost" min="0" step="1000"></div>
+        </div>
+        <div class="hint" id="eCostHint" style="margin-top:6px"></div>
+        <div class="fld" style="margin-top:8px"><label>備註</label><textarea id="eNote" rows="3"></textarea></div>
+      </div>
+
+      <div class="sec full">
+        <h4>進度紀錄（S 曲線依此計算）</h4>
+        <div id="logList"></div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn danger" id="mDel" onclick="deleteCurrent()">刪除</button>
+      <button class="btn" id="mDup" onclick="duplicateCurrent()">複製</button>
+      <span class="spacer"></span>
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn primary" onclick="saveModal()">儲存 (Ctrl+Enter)</button>
+    </div>
+  </div>
+</div>
+
+<div class="tip hidden" id="tip"></div>
+<div class="toast hidden" id="toast"></div>
+
+<script>
+/* ============ 常數與工具 ============ */
+const LS_KEY='eng_gantt_v2', LS_OLD='project_gantt_interactive', LS_UI='eng_gantt_ui_v2', LS_THEME='eng_gantt_theme';
+const PALETTE=['#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#e11d48','#4f46e5','#65a30d','#ea580c','#0d9488','#9333ea'];
+const DEFAULT_CATS=['機構設計','電控設計','採購','加工製作','組立','配線','程式開發','試車調機','驗收'];
+const STATUS={
+  pending:{label:'未開始',color:'#64748b'},
+  active:{label:'進行中',color:'#2563eb'},
+  behind:{label:'落後',color:'#d97706'},
+  overdue:{label:'逾期',color:'#dc2626'},
+  hold:{label:'暫停',color:'#7c3aed'},
+  done:{label:'完成',color:'#16a34a'},
+  doneLate:{label:'逾期完成',color:'#0d9488'},
+};
+const ZOOM={day:32,week:12,month:4};
+const WD='日一二三四五六';
+const RH={grp:36,task:46};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const money=n=>'NT$ '+Math.round(n||0).toLocaleString('zh-TW');
+const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const D={
+  parse(s){if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)},
+  fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')},
+  add(s,n){const d=D.parse(s);d.setDate(d.getDate()+n);return D.fmt(d)},
+  utc(s){const[y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)},
+  diff(a,b){return Math.round((D.utc(b)-D.utc(a))/864e5)},   // b - a 天數
+  today(){return D.fmt(new Date())},
+  short(s){if(!s)return '—';const[,m,d]=s.split('-');return +m+'/'+ +d},
+};
+const maxD=(...a)=>a.filter(Boolean).reduce((x,y)=>y>x?y:x,'');
+const minD=(...a)=>a.filter(Boolean).reduce((x,y)=>(!x||y<x)?y:x,'');
+function isoWeek(dt){const d=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));const n=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-n);const y0=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil(((d-y0)/864e5+1)/7)}
+
+/* ============ 狀態 ============ */
+let state={project:{name:'自動化設備專案'},tasks:[],catColor:{},collapsed:{}};
+let ui={view:'gantt',zoom:'day',search:'',cat:'ALL',status:'ALL',owner:'ALL',showDeps:true,cascade:true,sortKey:'',sortDir:1};
+let undoStack=[];
+let G=null;            // 甘特圖目前座標資訊
+let didInitialScroll=false;
+
+function normTask(t){
+  const n=Object.assign({id:uid(),category:'未分類',name:'',owner:'',priority:'中',weight:1,milestone:false,hold:false,
+    planStart:D.today(),planEnd:D.today(),actualStart:'',actualEnd:'',progress:0,deps:[],checklist:[],logs:[],budget:0,cost:0,note:''},t||{});
+  n.id=String(n.id);
+  n.progress=clamp(parseInt(n.progress)||0,0,100);
+  n.weight=Number(n.weight)>0?Number(n.weight):1;
+  n.budget=Number(n.budget)||0; n.cost=Number(n.cost)||0;
+  n.deps=Array.isArray(n.deps)?n.deps.map(String):[];
+  n.checklist=Array.isArray(n.checklist)?n.checklist.map(c=>({text:String(c.text||''),done:!!c.done})):[];
+  n.logs=Array.isArray(n.logs)?n.logs.filter(l=>l&&l.date).map(l=>({date:l.date,progress:clamp(+l.progress||0,0,100),note:l.note||''})):[];
+  if(!n.planStart)n.planStart=n.planEnd||D.today();
+  if(!n.planEnd)n.planEnd=n.planStart;
+  if(n.planEnd<n.planStart)[n.planStart,n.planEnd]=[n.planEnd,n.planStart];
+  if(!n.logs.length&&n.progress>0){
+    if(n.actualStart)n.logs.push({date:n.actualStart,progress:0,note:''});
+    n.logs.push({date:n.actualEnd||D.today(),progress:n.progress,note:'匯入時進度'});
+  }
+  sortLogs(n);
+  return n;
+}
+function sortLogs(t){t.logs.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0)}
+function applyData(data){
+  if(Array.isArray(data))data={tasks:data};
+  data=data||{};
+  state.project=Object.assign({name:'自動化設備專案'},data.project||{});
+  state.catColor=Object.assign({},data.catColor||{});
+  state.collapsed=Object.assign({},data.collapsed||{});
+  state.tasks=(data.tasks||[]).map(normTask);
+  const ids=new Set(state.tasks.map(t=>t.id));
+  state.tasks.forEach(t=>{t.deps=t.deps.filter(d=>ids.has(d)&&d!==t.id);catColor(t.category)});
+}
+function serialize(){return{app:'eng-gantt',version:2,savedAt:new Date().toISOString(),project:state.project,catColor:state.catColor,collapsed:state.collapsed,tasks:state.tasks}}
+function persist(){LS.set(LS_KEY,JSON.stringify(serialize()))}
+function persistUI(){LS.set(LS_UI,JSON.stringify(ui))}
+function commit(){persist();renderAll()}
+function pushUndo(){undoStack.push(JSON.stringify(serialize()));if(undoStack.length>40)undoStack.shift()}
+function undo(){
+  if(!undoStack.length){toast('沒有可復原的動作');return}
+  applyData(JSON.parse(undoStack.pop()));commit();toast('已復原上一步');
+}
+function getTask(id){return state.tasks.find(t=>t.id===id)}
+
+function catColor(cat){
+  if(!(cat in state.catColor)){
+    const used=Object.values(state.catColor);
+    let i=0;while(used.includes(i)&&i<PALETTE.length)i++;
+    state.catColor[cat]=i<PALETTE.length?i:Object.keys(state.catColor).length%PALETTE.length;
+  }
+  return PALETTE[state.catColor[cat]%PALETTE.length];
+}
+function catIndex(cat){const k=Object.keys(state.catColor);const i=k.indexOf(cat);return i<0?999:i}
+
+/* ============ 計算 ============ */
+function expectedPct(t,day){
+  if(day<t.planStart)return 0;
+  if(day>=t.planEnd)return 100;
+  return Math.round((D.diff(t.planStart,day)+1)/(D.diff(t.planStart,t.planEnd)+1)*100);
+}
+function progressAt(t,day){let p=0;for(const l of t.logs){if(l.date<=day)p=l.progress;else break}return p}
+function statusOf(t,today=D.today()){
+  if(t.progress>=100)return(t.actualEnd&&t.actualEnd>t.planEnd)?'doneLate':'done';
+  if(t.hold)return'hold';
+  if(today>t.planEnd)return'overdue';
+  if(t.progress<expectedPct(t,today)-10)return'behind';
+  if(t.progress>0||t.actualStart)return'active';
+  return'pending';
+}
+function delayDays(t,today=D.today()){
+  if(t.progress>=100)return t.actualEnd?Math.max(0,D.diff(t.planEnd,t.actualEnd)):0;
+  return today>t.planEnd?D.diff(t.planEnd,today):0;
+}
+function isLate(t){const s=statusOf(t);return s==='overdue'||s==='behind'}
+function depConflict(t){return t.deps.some(id=>{const p=getTask(id);return p&&t.planStart<=p.planEnd})}
+function weighted(list,fn){const w=list.reduce((s,t)=>s+t.weight,0);return w?list.reduce((s,t)=>s+t.weight*fn(t),0)/w:0}
+function setProgress(t,val,note){
+  val=clamp(Math.round(+val||0),0,100);
+  const changed=val!==t.progress;
+  if(!changed&&!note)return;
+  const today=D.today();
+  if(!t.logs.length&&t.actualStart&&t.actualStart<today)t.logs.push({date:t.actualStart,progress:0,note:''});
+  t.progress=val;
+  const ex=t.logs.find(l=>l.date===today);
+  if(ex){ex.progress=val;if(note)ex.note=ex.note?ex.note+'；'+note:note}
+  else t.logs.push({date:today,progress:val,note:note||''});
+  sortLogs(t);
+  if(val>0&&!t.actualStart)t.actualStart=today;
+  if(val>=100&&!t.actualEnd)t.actualEnd=today;
+  if(val<100&&changed&&t.actualEnd)t.actualEnd='';
+}
+function cascade(t,seen=new Set()){
+  if(seen.has(t.id))return 0;seen.add(t.id);let n=0;
+  state.tasks.forEach(s=>{
+    if(!s.deps.includes(t.id))return;
+    const need=D.add(t.planEnd,1);
+    if(s.planStart<need){const d=D.diff(s.planStart,need);s.planStart=D.add(s.planStart,d);s.planEnd=D.add(s.planEnd,d);n++;}
+    n+=cascade(s,seen);
+  });
+  return n;
+}
+function dependsOn(a,b,seen=new Set()){ // a 是否(間接)依賴 b
+  if(a===b)return true;if(seen.has(a))return false;seen.add(a);
+  const t=getTask(a);return!!t&&t.deps.some(d=>dependsOn(d,b,seen));
+}
+
+/* ============ 篩選 ============ */
+function filtered(){
+  const q=ui.search.trim().toLowerCase();
+  return state.tasks.filter(t=>{
+    if(ui.cat!=='ALL'&&t.category!==ui.cat)return false;
+    if(ui.owner!=='ALL'&&(t.owner||'(未指派)')!==ui.owner)return false;
+    if(ui.status!=='ALL'){
+      const s=statusOf(t);
+      if(ui.status==='open'){if(t.progress>=100)return false}
+      else if(ui.status==='late'){if(!isLate(t))return false}
+      else if(ui.status==='week'){const T=D.today(),E=D.add(T,7);if(t.progress>=100||!(t.planStart<=E&&t.planEnd>=T))return false}
+      else if(s!==ui.status)return false;
+    }
+    if(q&&!(t.name+' '+t.owner+' '+t.note+' '+t.category+' '+t.checklist.map(c=>c.text).join(' ')).toLowerCase().includes(q))return false;
+    return true;
+  }).sort((a,b)=>catIndex(a.category)-catIndex(b.category)||(a.planStart<b.planStart?-1:a.planStart>b.planStart?1:0)||(a.planEnd<b.planEnd?-1:1));
+}
+
+/* ============ 渲染總控 ============ */
+function renderAll(){
+  renderFilters();
+  const list=filtered();
+  renderKPIs(list);
+  ['gantt','table','analysis'].forEach(v=>{
+    $('#view'+v[0].toUpperCase()+v.slice(1)).classList.toggle('hidden',ui.view!==v);
+  });
+  document.querySelectorAll('#viewTabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===ui.view));
+  $('#ganttTools').classList.toggle('hidden',ui.view!=='gantt');
+  if(ui.view==='gantt')renderGantt(list);
+  else if(ui.view==='table')renderTable(list);
+  else renderAnalysis(list);
+}
+
+function renderFilters(){
+  const cats=[...new Set([...Object.keys(state.catColor).filter(c=>state.tasks.some(t=>t.category===c))])];
+  const owners=[...new Set(state.tasks.map(t=>t.owner||'(未指派)'))].sort();
+  $('#catList').innerHTML=[...new Set([...cats,...DEFAULT_CATS])].map(c=>`<option value="${esc(c)}">`).join('');
+  $('#ownerList').innerHTML=owners.filter(o=>o!=='(未指派)').map(o=>`<option value="${esc(o)}">`).join('');
+  if(ui.cat!=='ALL'&&!cats.includes(ui.cat))ui.cat='ALL';
+  if(ui.owner!=='ALL'&&!owners.includes(ui.owner))ui.owner='ALL';
+  $('#fCat').innerHTML=`<option value="ALL">全部類別</option>`+cats.map(c=>`<option value="${esc(c)}">${esc(c)}（${state.tasks.filter(t=>t.category===c).length}）</option>`).join('');
+  $('#fOwner').innerHTML=`<option value="ALL">全部負責人</option>`+owners.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  const sOpts=[['ALL','全部狀態'],['open','未完成'],['late','⚠ 落後＋逾期'],['week','本週需處理'],...Object.entries(STATUS).map(([k,v])=>[k,v.label])];
+  $('#fStatus').innerHTML=sOpts.map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  $('#fCat').value=ui.cat;$('#fOwner').value=ui.owner;$('#fStatus').value=ui.status;
+  $('#fZoom').value=ui.zoom;$('#optDeps').checked=ui.showDeps;$('#optCascade').checked=ui.cascade;
+  if(document.activeElement!==$('#fSearch'))$('#fSearch').value=ui.search;
+  if(document.activeElement!==$('#projName'))$('#projName').value=state.project.name||'';
+}
+
+function renderKPIs(list){
+  const T=D.today();
+  const act=weighted(list,t=>t.progress), plan=weighted(list,t=>expectedPct(t,T));
+  const spi=plan>0?act/plan:null;
+  const cnt=k=>list.filter(t=>statusOf(t)===k).length;
+  const done=cnt('done')+cnt('doneLate'), late=list.filter(isLate).length;
+  const activeToday=list.filter(t=>t.progress<100&&!t.hold&&(t.actualStart?t.actualStart<=T:(t.planStart<=T&&t.planEnd>=T))).length;
+  const budget=list.reduce((s,t)=>s+t.budget,0), cost=list.reduce((s,t)=>s+t.cost,0);
+  const pStart=minD(...list.map(t=>t.planStart)), pEnd=maxD(...list.map(t=>t.planEnd));
+  const remain=pEnd?D.diff(T,pEnd):0;
+  const ms=list.filter(t=>t.milestone&&t.progress<100).sort((a,b)=>a.planEnd<b.planEnd?-1:1)[0];
+  const spiColor=spi===null?'var(--text)':spi>=.95?'var(--ok)':spi>=.85?'var(--warn)':'var(--bad)';
+  const diff=act-plan;
+  const filt=list.length!==state.tasks.length?`<span class="faint">（篩選 ${list.length}/${state.tasks.length}）</span>`:'';
+  $('#kpis').innerHTML=`
+    <div class="card kpi"><div class="lbl">實際進度（加權）${filt}</div>
+      <div class="val">${act.toFixed(1)}<small>%</small></div>
+      <div class="pbar"><i style="width:${act}%;background:linear-gradient(90deg,#3b82f6,#10b981)"></i><span class="mark" style="left:${plan}%" title="計畫應達"></span></div>
+      <div class="sub">計畫應達 ${plan.toFixed(1)}%（黑線）</div></div>
+    <div class="card kpi"><div class="lbl">進度績效 SPI</div>
+      <div class="val" style="color:${spiColor}">${spi===null?'—':spi.toFixed(2)}</div>
+      <div class="sub">差異 <b style="color:${diff>=0?'var(--ok)':'var(--bad)'}">${diff>=0?'+':''}${diff.toFixed(1)}%</b>　${spi===null?'尚未開始':spi>=1?'超前':'落後'}</div></div>
+    <div class="card kpi"><div class="lbl">項目完成</div>
+      <div class="val">${done}<small>/ ${list.length}</small></div>
+      <div class="sub">進行中 ${cnt('active')+cnt('behind')}　未開始 ${cnt('pending')}　暫停 ${cnt('hold')}</div></div>
+    <div class="card kpi" style="cursor:pointer" onclick="quickFilter('late')" title="點擊篩選"><div class="lbl">⚠ 落後 / 逾期</div>
+      <div class="val" style="color:${late?'var(--bad)':'var(--ok)'}">${late}<small>項</small></div>
+      <div class="sub">逾期 ${cnt('overdue')}　落後 ${cnt('behind')}　逾期完成 ${cnt('doneLate')}</div></div>
+    <div class="card kpi" style="cursor:pointer" onclick="quickFilter('week')" title="點擊篩選本週"><div class="lbl">今日（${T}）</div>
+      <div class="val">${activeToday}<small>項進行中</small></div>
+      <div class="sub">${ms?`下個里程碑：${esc(ms.name)} ${D.short(ms.planEnd)}`:'無待達成里程碑'}</div></div>
+    <div class="card kpi"><div class="lbl">專案期間</div>
+      <div class="val" style="font-size:17px;margin-top:6px">${pStart?D.short(pStart)+' ~ '+D.short(pEnd):'—'}</div>
+      <div class="sub">${pEnd?(remain>=0?`剩餘 ${remain} 天`:`已超過 ${-remain} 天`)+`　總工期 ${D.diff(pStart,pEnd)+1} 天`:''}</div></div>
+    <div class="card kpi"><div class="lbl">成本（實際 / 預算）</div>
+      <div class="val" style="font-size:17px;margin-top:6px">${budget||cost?money(cost):'—'}</div>
+      ${budget?`<div class="pbar"><i style="width:${Math.min(100,cost/budget*100)}%;background:${cost>budget?'var(--bad)':cost/budget>act/100+.1?'var(--warn)':'var(--ok)'}"></i></div>
+      <div class="sub">預算 ${money(budget)}，已用 ${(cost/budget*100).toFixed(1)}%</div>`:`<div class="sub">在項目中填入預算/成本即可追蹤</div>`}</div>`;
+}
+function quickFilter(s){ui.status=s;ui.cat='ALL';ui.owner='ALL';persistUI();renderAll()}
+
+/* ============ 甘特圖 ============ */
+function renderGantt(list){
+  const el=$('#gantt');
+  const keepScroll={x:el.scrollLeft,y:el.scrollTop};
+  if(!list.length){el.innerHTML=`<div class="empty">${state.tasks.length?'沒有符合篩選條件的項目':'尚無資料 — 按「＋ 新增項目」或「範例專案」開始'}</div>`;G=null;return}
+  const dayW=ZOOM[ui.zoom], T=D.today();
+  let mn=T,mx=T;
+  list.forEach(t=>[t.planStart,t.planEnd,t.actualStart,t.actualEnd].forEach(d=>{if(d){if(d<mn)mn=d;if(d>mx)mx=d}}));
+  let start=D.add(mn,ui.zoom==='day'?-5:-10), end=D.add(mx,ui.zoom==='day'?14:30);
+  if(ui.zoom!=='day'){const dw=(D.parse(start).getDay()+6)%7;start=D.add(start,-dw)}
+  if(ui.zoom==='month'){const s=D.parse(start),e=D.parse(end);start=D.fmt(new Date(s.getFullYear(),s.getMonth(),1));end=D.fmt(new Date(e.getFullYear(),e.getMonth()+1,0))}
+  const days=D.diff(start,end)+1, W=days*dayW;
+  const X=d=>D.diff(start,d)*dayW;
+  G={start,end,dayW,X};
+
+  // 表頭：月
+  let th='',tb='',bg='';
+  let cur=D.parse(start);
+  while(D.fmt(cur)<=end){
+    const ms=D.fmt(cur), me=D.fmt(new Date(cur.getFullYear(),cur.getMonth()+1,0));
+    const e2=me>end?end:me, w=(D.diff(ms,e2)+1)*dayW;
+    th+=`<div class="th" style="left:${X(ms)}px;width:${w}px">${cur.getFullYear()} 年 ${cur.getMonth()+1} 月</div>`;
+    if(ui.zoom!=='day')bg+=`<div class="vl m" style="left:${X(ms)}px"></div>`;
+    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  }
+  // 表頭：日/週
+  const dt=D.parse(start);
+  for(let i=0;i<days;i++){
+    const dow=dt.getDay(), ds=D.fmt(dt), we=dow===0||dow===6;
+    if(ui.zoom==='day'){
+      tb+=`<div class="tb ${we?'we':''} ${ds===T?'td':''}" style="left:${i*dayW}px;width:${dayW}px"><b>${dt.getDate()}</b><i>${WD[dow]}</i></div>`;
+      bg+=`<div class="vl" style="left:${i*dayW}px"></div>`;
+    }else if(dow===1){
+      tb+=`<div class="tb wk" style="left:${i*dayW}px;width:${7*dayW}px">${ui.zoom==='week'?`<b>${dt.getMonth()+1}/${dt.getDate()}</b><i>W${isoWeek(dt)}</i>`:`<i>W${isoWeek(dt)}</i>`}</div>`;
+      if(ui.zoom==='week')bg+=`<div class="vl" style="left:${i*dayW}px"></div>`;
+    }
+    if(we&&ui.zoom!=='month')bg+=`<div class="we-bg" style="left:${i*dayW}px;width:${dayW}px"></div>`;
+    dt.setDate(dt.getDate()+1);
+  }
+  const tx=X(T);
+  bg+=`<div class="today-col" style="left:${tx}px;width:${dayW}px"></div><div class="today-line" style="left:${tx+dayW/2}px"></div>`;
+
+  // 列
+  const groups=new Map();list.forEach(t=>{if(!groups.has(t.category))groups.set(t.category,[]);groups.get(t.category).push(t)});
+  let y=0, rows='';const pos={};
+  for(const[cat,ts] of groups){
+    const c=catColor(cat), col=!!state.collapsed[cat];
+    const gs=minD(...ts.map(t=>t.planStart)), ge=maxD(...ts.map(t=>t.planEnd));
+    const gp=weighted(ts,t=>t.progress), gl=ts.filter(isLate).length;
+    rows+=`<div class="g-row grp ${col?'collapsed':''}" style="height:${RH.grp}px">
+      <div class="g-left" data-toggle="${esc(cat)}"><span class="caret">▾</span><span class="dot" style="background:${c};margin:9px 0"></span>
+        <div class="gl-main"><div class="gl-name">${esc(cat)} <span class="faint" style="font-weight:400">(${ts.length})</span>${gl?` <span class="late-t">⚠${gl}</span>`:''}</div></div>
+        <div class="gl-pct"><b>${gp.toFixed(0)}%</b></div></div>
+      <div class="g-track" style="width:${W}px">
+        <div class="gs" style="left:${X(gs)}px;width:${(D.diff(gs,ge)+1)*dayW}px;--c:${c}"><i style="width:${gp}%"></i></div>
+        <div class="bl" style="left:${X(ge)+dayW+8}px;top:10px">${D.short(gs)} ~ ${D.short(ge)}　<b>${gp.toFixed(0)}%</b></div>
+      </div></div>`;
+    y+=RH.grp;
+    if(col)continue;
+    for(const t of ts){
+      pos[t.id]=y;
+      rows+=taskRow(t,c,X,dayW,W,T);
+      y+=RH.task;
+    }
+  }
+  // 依賴線
+  let svg='';
+  if(ui.showDeps){
+    for(const t of list){
+      if(pos[t.id]===undefined)continue;
+      for(const d of t.deps){
+        const p=getTask(d);if(!p||pos[d]===undefined)continue;
+        const x1=p.milestone?X(p.planEnd)+dayW/2+9:X(p.planEnd)+dayW, y1=pos[d]+(p.milestone?20:14);
+        const x2=t.milestone?X(t.planEnd)+dayW/2-9:X(t.planStart), y2=pos[t.id]+(t.milestone?20:14);
+        const bad=t.planStart<=p.planEnd;
+        let path;
+        if(x2-x1>=12)path=`M${x1} ${y1}H${x1+6}V${y2}H${x2-1}`;
+        else{const ym=y2>y1?pos[t.id]+1:pos[t.id]+RH.task-2;path=`M${x1} ${y1}H${x1+6}V${ym}H${x2-10}V${y2}H${x2-1}`}
+        svg+=`<path class="${bad?'bad':''}" d="${path}" marker-end="url(#${bad?'arB':'arA'})"/>`;
+      }
+    }
+  }
+  el.innerHTML=`
+    <div class="g-head"><div class="g-corner"><span style="flex:1">工程項目</span><span>進度</span></div>
+      <div class="g-time" style="width:${W}px">${th}${tb}</div></div>
+    <div class="g-body" style="height:${y}px">
+      <div class="g-bg" style="width:${W}px">${bg}</div>
+      <svg class="g-deps" width="${W}" height="${y}">
+        <defs><marker id="arA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#94a3b8"/></marker>
+        <marker id="arB" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#dc2626"/></marker></defs>${svg}</svg>
+      ${rows}
+    </div>`;
+  if(!didInitialScroll){didInitialScroll=true;scrollToToday(false)}
+  else{el.scrollLeft=keepScroll.x;el.scrollTop=keepScroll.y}
+}
+function taskRow(t,c,X,dayW,W,T){
+  const st=statusOf(t,T), sm=STATUS[st], dl=delayDays(t,T);
+  const ps=X(t.planStart), pw=(D.diff(t.planStart,t.planEnd)+1)*dayW;
+  let bars='', xr=ps+pw;
+  if(t.milestone){
+    const mx=X(t.planEnd)+dayW/2-8;
+    bars+=`<div class="ms ${t.progress>=100?'done':''} ${st==='overdue'?'late':''}" data-drag="${t.id}" data-tip="${t.id}" style="left:${mx}px;--c:${c}"></div>`;
+    xr=mx+16;
+    if(t.actualEnd&&t.actualEnd!==t.planEnd){const ax=X(t.actualEnd)+dayW/2-6;bars+=`<div class="ms done" data-open="${t.id}" data-tip="${t.id}" style="left:${ax}px;top:15px;width:11px;height:11px;--c:${c};opacity:.7"></div>`;xr=Math.max(xr,ax+12)}
+  }else{
+    bars+=`<div class="bp ${st==='overdue'?'late':''}" data-drag="${t.id}" data-tip="${t.id}" style="left:${ps}px;width:${pw}px;--c:${c}"><span class="h h-l"></span><span class="h h-r"></span></div>`;
+    if(t.actualStart){
+      const ae=t.actualEnd||maxD(T,t.actualStart), as=X(t.actualStart), aw=(D.diff(t.actualStart,ae)+1)*dayW;
+      bars+=`<div class="ba ${t.actualEnd?'':'open'}" data-open="${t.id}" data-tip="${t.id}" style="left:${as}px;width:${aw}px;--c:${c}"><span class="af" style="width:${t.progress}%"></span>${aw>=36?`<em>${t.progress}%</em>`:''}</div>`;
+      xr=Math.max(xr,as+aw);
+    }
+  }
+  const ck=t.checklist.length?`<span title="檢核項目">☑ ${t.checklist.filter(x=>x.done).length}/${t.checklist.length}</span>`:'';
+  const conf=depConflict(t)?`<span class="late-t" title="與前置作業時程衝突">⛓衝突</span>`:'';
+  return `<div class="g-row" style="height:${RH.task}px" data-row="${t.id}">
+    <div class="g-left" data-open="${t.id}" data-tip="${t.id}"><span class="dot" style="background:${c}"></span>
+      <div class="gl-main"><div class="gl-name">${t.milestone?'◆ ':''}${t.priority==='高'?'<span class="late-t">!</span> ':''}${esc(t.name)}</div>
+        <div class="gl-sub"><span class="chip" style="--s:${sm.color}">${sm.label}</span>${t.owner?`<span>${esc(t.owner)}</span>`:''}${ck}${conf}</div></div>
+      <div class="gl-pct"><b>${t.progress}%</b><div class="mini"><i style="width:${t.progress}%;background:${c}"></i></div></div></div>
+    <div class="g-track" style="width:${W}px">${bars}
+      <div class="bl" style="left:${xr+6}px">${D.short(t.planStart)}–${D.short(t.planEnd)}${dl?` <span class="late-t">+${dl}天</span>`:''}</div>
+    </div></div>`;
+}
+function scrollToToday(smooth){
+  if(!G)return;const el=$('#gantt');
+  const lw=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lw'))||300;
+  const target=G.X(D.today())-(el.clientWidth-lw)*0.3;
+  el.scrollTo({left:Math.max(0,target),behavior:smooth?'smooth':'auto'});
+}
+function setCollapseAll(v){
+  [...new Set(state.tasks.map(t=>t.category))].forEach(c=>{if(v)state.collapsed[c]=true;else delete state.collapsed[c]});
+  commit();
+}
+
+/* 甘特圖互動：點擊、拖曳、提示 */
+let drag=null;
+function initGanttEvents(){
+  const el=$('#gantt');
+  el.addEventListener('click',e=>{
+    const tg=e.target.closest('[data-toggle]');
+    if(tg){const c=tg.dataset.toggle;if(state.collapsed[c])delete state.collapsed[c];else state.collapsed[c]=true;commit();return}
+    const op=e.target.closest('[data-open]');
+    if(op)openModal(op.dataset.open);
+  });
+  el.addEventListener('pointerdown',e=>{
+    const bar=e.target.closest('[data-drag]');if(!bar||e.button!==0)return;
+    const t=getTask(bar.dataset.drag);if(!t||!G)return;
+    const mode=e.target.classList.contains('h-l')?'l':e.target.classList.contains('h-r')?'r':'m';
+    drag={t,bar,mode,x0:e.clientX,ps:t.planStart,pe:t.planEnd,left:parseFloat(bar.style.left),width:parseFloat(bar.style.width)||0,moved:false,dd:0};
+    bar.setPointerCapture(e.pointerId);e.preventDefault();
+  });
+  el.addEventListener('pointermove',e=>{
+    if(!drag)return;
+    const dx=e.clientX-drag.x0;if(Math.abs(dx)>3)drag.moved=true;if(!drag.moved)return;
+    const dw=G.dayW, dur=D.diff(drag.ps,drag.pe);let dd=Math.round(dx/dw);
+    if(drag.mode==='l')dd=Math.min(dd,dur);if(drag.mode==='r')dd=Math.max(dd,-dur);
+    drag.dd=dd;drag.bar.classList.add('dragging');
+    let ns=drag.ps,ne=drag.pe;
+    if(drag.mode==='m'){drag.bar.style.left=drag.left+dd*dw+'px';ns=D.add(ns,dd);ne=D.add(ne,dd)}
+    else if(drag.mode==='l'){drag.bar.style.left=drag.left+dd*dw+'px';drag.bar.style.width=drag.width-dd*dw+'px';ns=D.add(ns,dd)}
+    else{drag.bar.style.width=drag.width+dd*dw+'px';ne=D.add(ne,dd)}
+    showTip(e,`<div class="t">${esc(drag.t.name)}</div>${ns} ~ ${ne}<br>工期 ${D.diff(ns,ne)+1} 天　${dd>0?'延後':dd<0?'提前':''} ${dd?Math.abs(dd)+' 天':''}`);
+  });
+  const end=e=>{
+    if(!drag)return;const d=drag;drag=null;hideTip();
+    if(!d.moved){openModal(d.t.id);return}
+    if(!d.dd){renderAll();return}
+    pushUndo();
+    if(d.mode!=='r')d.t.planStart=D.add(d.ps,d.dd);
+    if(d.mode!=='l')d.t.planEnd=D.add(d.pe,d.dd);
+    if(d.t.milestone)d.t.planStart=d.t.planEnd;
+    const n=ui.cascade?cascade(d.t):0;
+    commit();
+    toast(`「${d.t.name}」${d.t.planStart} ~ ${d.t.planEnd}${n?`，連動順延 ${n} 項後續作業`:''}　(Ctrl+Z 復原)`);
+  };
+  el.addEventListener('pointerup',end);
+  el.addEventListener('pointercancel',()=>{if(drag){drag=null;hideTip();renderAll()}});
+  el.addEventListener('mousemove',e=>{
+    if(drag)return;const h=e.target.closest('[data-tip]');
+    if(!h){hideTip();return}
+    const t=getTask(h.dataset.tip);if(t)showTip(e,tipHTML(t));
+  });
+  el.addEventListener('mouseleave',()=>{if(!drag)hideTip()});
+}
+function tipHTML(t){
+  const T=D.today(), st=STATUS[statusOf(t)], dl=delayDays(t), ex=expectedPct(t,T);
+  const deps=t.deps.map(id=>getTask(id)).filter(Boolean).map(p=>esc(p.name)).join('、');
+  return `<div class="t">${t.milestone?'◆ ':''}${esc(t.name)}</div>
+    <span class="k">類別</span>${esc(t.category)}　<span class="chip" style="--s:${st.color}">${st.label}</span><br>
+    ${t.owner?`<span class="k">負責人</span>${esc(t.owner)}<br>`:''}
+    <span class="k">預計</span>${t.planStart} ~ ${t.planEnd}（${D.diff(t.planStart,t.planEnd)+1}天）<br>
+    <span class="k">實際</span>${t.actualStart||'—'} ~ ${t.actualEnd||(t.actualStart?'進行中':'—')}<br>
+    <span class="k">進度</span><b>${t.progress}%</b>　應達 ${ex}%${t.progress<ex?` <span class="late-t">(${t.progress-ex}%)</span>`:''}<br>
+    ${dl?`<span class="k">延遲</span><span class="late-t">${dl} 天</span><br>`:''}
+    ${deps?`<span class="k">前置</span>${deps}<br>`:''}
+    ${t.checklist.length?`<span class="k">檢核</span>${t.checklist.filter(c=>c.done).length}/${t.checklist.length} 完成<br>`:''}
+    ${t.budget||t.cost?`<span class="k">成本</span>${money(t.cost)} / ${money(t.budget)}<br>`:''}
+    ${t.note?`<span class="k">備註</span>${esc(t.note)}`:''}`;
+}
+function showTip(e,html){
+  const tip=$('#tip');tip.innerHTML=html;tip.classList.remove('hidden');
+  const r=tip.getBoundingClientRect();
+  let x=e.clientX+14,y=e.clientY+14;
+  if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;
+  if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;
+  tip.style.left=Math.max(4,x)+'px';tip.style.top=Math.max(4,y)+'px';
+}
+function hideTip(){$('#tip').classList.add('hidden')}
+
+/* ============ 明細表 ============ */
+const COLS=[
+  ['category','類別'],['name','細項名稱'],['owner','負責人'],['priority','優先'],['planStart','預計開始'],['planEnd','預計結束'],
+  ['dur','工期',1],['actualStart','實際開始'],['actualEnd','實際完成'],['progress','進度%',1],['expected','應達%',1],['gap','差異',1],
+  ['status','狀態'],['delay','延遲(天)',1],['budget','預算',1],['cost','實際成本',1],['note','備註']
+];
+function colVal(t,k,T){
+  switch(k){
+    case'dur':return D.diff(t.planStart,t.planEnd)+1;
+    case'expected':return expectedPct(t,T);
+    case'gap':return t.progress-expectedPct(t,T);
+    case'status':return STATUS[statusOf(t,T)].label;
+    case'delay':return delayDays(t,T);
+    default:return t[k];
+  }
+}
+function renderTable(list){
+  const T=D.today();
+  let rows=[...list];
+  if(ui.sortKey){const k=ui.sortKey;rows.sort((a,b)=>{const x=colVal(a,k,T),y=colVal(b,k,T);return(x<y?-1:x>y?1:0)*ui.sortDir})}
+  const head=COLS.map(([k,l,n])=>`<th class="${n?'num':''}" data-sort="${k}">${l}${ui.sortKey===k?(ui.sortDir>0?' ▲':' ▼'):''}</th>`).join('');
+  const body=rows.map(t=>{
+    const st=STATUS[statusOf(t,T)], gap=colVal(t,'gap',T), dl=delayDays(t,T), c=catColor(t.category);
+    return `<tr>
+      <td><span class="chip" style="--s:${c}">${esc(t.category)}</span></td>
+      <td><span class="lnk" data-open="${t.id}">${t.milestone?'◆ ':''}${esc(t.name)}</span>${depConflict(t)?' <span class="late-t" title="前置衝突">⛓</span>':''}</td>
+      <td>${esc(t.owner)}</td><td>${t.priority}</td>
+      <td>${t.planStart}</td><td>${t.planEnd}</td><td class="num">${D.diff(t.planStart,t.planEnd)+1}</td>
+      <td>${t.actualStart||''}</td><td>${t.actualEnd||''}</td>
+      <td class="num"><input type="number" min="0" max="100" step="5" value="${t.progress}" data-prog="${t.id}"></td>
+      <td class="num">${expectedPct(t,T)}</td>
+      <td class="num" style="color:${gap<-10?'var(--bad)':gap<0?'var(--warn)':'var(--ok)'}">${gap>0?'+':''}${gap}</td>
+      <td><span class="chip" style="--s:${st.color}">${st.label}</span></td>
+      <td class="num ${dl?'late-t':''}">${dl||''}</td>
+      <td class="num">${t.budget?t.budget.toLocaleString():''}</td>
+      <td class="num" style="${t.budget&&t.cost>t.budget?'color:var(--bad);font-weight:700':''}">${t.cost?t.cost.toLocaleString():''}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${esc(t.note)}">${esc(t.note)}</td></tr>`;
+  }).join('');
+  const b=list.reduce((s,t)=>s+t.budget,0),c=list.reduce((s,t)=>s+t.cost,0);
+  $('#tableWrap').innerHTML=list.length?`<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody>
+    <tfoot><tr><td colspan="9">合計 ${list.length} 項（加權）</td><td class="num">${weighted(list,t=>t.progress).toFixed(1)}</td><td class="num">${weighted(list,t=>expectedPct(t,T)).toFixed(1)}</td><td colspan="3"></td><td class="num">${b.toLocaleString()}</td><td class="num">${c.toLocaleString()}</td><td></td></tr></tfoot></table>`
+    :`<div class="empty">沒有資料</div>`;
+}
+function initTableEvents(){
+  const w=$('#tableWrap');
+  w.addEventListener('click',e=>{
+    const s=e.target.closest('[data-sort]');
+    if(s){const k=s.dataset.sort;if(ui.sortKey===k){if(ui.sortDir>0)ui.sortDir=-1;else{ui.sortKey='';ui.sortDir=1}}else{ui.sortKey=k;ui.sortDir=1}persistUI();renderAll();return}
+    const o=e.target.closest('[data-open]');if(o)openModal(o.dataset.open);
+  });
+  w.addEventListener('change',e=>{
+    const p=e.target.closest('[data-prog]');if(!p)return;
+    const t=getTask(p.dataset.prog);if(!t)return;pushUndo();setProgress(t,p.value);commit();toast(`「${t.name}」進度更新為 ${t.progress}%`);
+  });
+}
+
+/* ============ 追蹤分析 ============ */
+function renderAnalysis(list){
+  const box=$('#viewAnalysis');
+  if(!list.length){box.innerHTML=`<div class="card empty">沒有資料</div>`;return}
+  const T=D.today();
+  box.innerHTML=`<div class="an-grid">
+    <div class="card an-card" style="grid-column:1/-1"><h3>S 曲線 — 計畫 vs 實際累計進度</h3>${sCurve(list,T)}</div>
+    <div class="card an-card"><h3>各類別進度</h3>${catSummary(list,T)}</div>
+    <div class="card an-card"><h3>負責人負載</h3>${ownerSummary(list,T)}</div>
+    <div class="card an-card"><h3>⚠ 落後 / 逾期項目</h3>${itemList(list.filter(isLate).sort((a,b)=>delayDays(b)-delayDays(a)||a.planEnd.localeCompare(b.planEnd)),t=>{const dl=delayDays(t);return dl?`<span class="late-t">逾期 ${dl} 天</span>`:`<span class="late-t">${t.progress-expectedPct(t,T)}%</span>`},'目前沒有落後項目 👍')}</div>
+    <div class="card an-card"><h3>未來 14 天到期 / 開工</h3>${itemList(list.filter(t=>t.progress<100&&((t.planEnd>=T&&t.planEnd<=D.add(T,14))||(t.planStart>T&&t.planStart<=D.add(T,14)))).sort((a,b)=>minD(a.planStart>T?a.planStart:'',a.planEnd).localeCompare(minD(b.planStart>T?b.planStart:'',b.planEnd))),t=>t.planStart>T?`<span class="muted">${D.short(t.planStart)} 開工</span>`:`<span>${D.short(t.planEnd)} 到期（${D.diff(T,t.planEnd)}天）</span>`,'近期無到期項目')}</div>
+  </div>`;
+}
+function itemList(arr,right,empty){
+  if(!arr.length)return`<div class="faint" style="padding:10px 0">${empty}</div>`;
+  return arr.map(t=>{const st=STATUS[statusOf(t)];return`<div class="list-item" data-open="${t.id}"><span class="chip" style="--s:${st.color}">${st.label}</span><span class="nm"><b>${esc(t.name)}</b> <span class="faint">${esc(t.category)}${t.owner?' · '+esc(t.owner):''}</span></span><span style="font-size:12px;white-space:nowrap">${t.progress}%　${right(t)}</span></div>`}).join('');
+}
+function sCurve(list,T){
+  const ps=minD(...list.map(t=>t.planStart)), pe=maxD(...list.map(t=>t.planEnd),...list.map(t=>t.actualEnd));
+  const total=D.diff(ps,pe)+1, step=Math.max(1,Math.ceil(total/240));
+  const Wd=900,H=300,L=44,R=16,Tp=14,B=34,iw=Wd-L-R,ih=H-Tp-B;
+  const xs=i=>L+i/(Math.max(1,total-1))*iw, ys=v=>Tp+ih-(v/100)*ih;
+  let plan=[],act=[];
+  for(let i=0;i<total;i+=step){const d=D.add(ps,i);plan.push([xs(i),ys(weighted(list,t=>expectedPct(t,d)))]);if(d<T)act.push([xs(i),ys(weighted(list,t=>progressAt(t,d)))])}
+  plan.push([xs(total-1),ys(weighted(list,t=>expectedPct(t,pe)))]);
+  const ti=D.diff(ps,T);
+  if(ti>=0)act.push([xs(Math.min(ti,total-1)),ys(weighted(list,t=>t.progress))]);
+  const line=a=>a.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join('');
+  let g='';
+  [0,25,50,75,100].forEach(v=>g+=`<line class="gl" x1="${L}" x2="${Wd-R}" y1="${ys(v)}" y2="${ys(v)}"/><text x="${L-6}" y="${ys(v)+4}" text-anchor="end">${v}%</text>`);
+  const nt=Math.min(8,total);for(let k=0;k<=nt;k++){const i=Math.round(k/nt*(total-1));g+=`<text x="${xs(i)}" y="${H-12}" text-anchor="middle">${D.short(D.add(ps,i))}</text>`}
+  let today='';
+  if(ti>=0&&ti<total){const x=xs(ti);const av=weighted(list,t=>t.progress),pv=weighted(list,t=>expectedPct(t,T));
+    today=`<line x1="${x}" x2="${x}" y1="${Tp}" y2="${Tp+ih}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <circle cx="${x}" cy="${ys(av)}" r="4.5" fill="var(--primary)"/><circle cx="${x}" cy="${ys(pv)}" r="4" fill="var(--panel)" stroke="var(--text-2)" stroke-width="2"/>
+    <text x="${x+7}" y="${ys(av)+(av<pv?14:-6)}" style="font-weight:700;fill:var(--primary)">實際 ${av.toFixed(1)}%</text>
+    <text x="${x+7}" y="${ys(pv)+(av<pv?-6:14)}">計畫 ${pv.toFixed(1)}%</text>`}
+  return `<svg class="scurve" viewBox="0 0 ${Wd} ${H}" style="width:100%;height:auto;display:block">
+    ${g}<line class="ax" x1="${L}" x2="${L}" y1="${Tp}" y2="${Tp+ih}"/><line class="ax" x1="${L}" x2="${Wd-R}" y1="${Tp+ih}" y2="${Tp+ih}"/>
+    <path d="${line(plan)}" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="6 4"/>
+    ${act.length>1?`<path d="${line(act)} L${act[act.length-1][0]} ${Tp+ih} L${act[0][0]} ${Tp+ih}Z" fill="var(--primary)" opacity=".08"/>`:''}
+    <path d="${line(act)}" fill="none" stroke="var(--primary)" stroke-width="2.5"/>${today}</svg>
+    <div class="row hint" style="gap:16px;margin-top:4px"><span>┄ 計畫累計（依預計時程線性分配 × 權重）</span><span style="color:var(--primary)">━ 實際累計（依進度紀錄）</span><span style="color:#ef4444">┆ 今日</span></div>`;
+}
+function catSummary(list,T){
+  const m=new Map();list.forEach(t=>{if(!m.has(t.category))m.set(t.category,[]);m.get(t.category).push(t)});
+  return `<table><thead><tr><th>類別</th><th class="num">項</th><th>計畫 / 實際</th><th class="num">實際</th><th class="num">差異</th></tr></thead><tbody>`+
+    [...m].map(([c,ts])=>{const a=weighted(ts,t=>t.progress),p=weighted(ts,t=>expectedPct(t,T)),col=catColor(c),d=a-p;
+      return `<tr><td><span class="chip" style="--s:${col}">${esc(c)}</span></td><td class="num">${ts.length}</td>
+      <td style="width:40%"><div class="dual"><span class="p" style="width:${p}%"></span><span class="a" style="width:${a}%;background:${col}"></span></div></td>
+      <td class="num"><b>${a.toFixed(0)}%</b></td><td class="num" style="color:${d<-10?'var(--bad)':d<0?'var(--warn)':'var(--ok)'}">${d>0?'+':''}${d.toFixed(0)}%</td></tr>`}).join('')+`</tbody></table>`;
+}
+function ownerSummary(list,T){
+  const m=new Map();list.forEach(t=>{const o=t.owner||'(未指派)';if(!m.has(o))m.set(o,[]);m.get(o).push(t)});
+  return `<table><thead><tr><th>負責人</th><th class="num">項目</th><th class="num">未完成</th><th class="num">本週進行</th><th class="num">落後</th><th class="num">平均進度</th></tr></thead><tbody>`+
+    [...m].sort((a,b)=>b[1].length-a[1].length).map(([o,ts])=>{const late=ts.filter(isLate).length,E=D.add(T,6);
+      return `<tr style="cursor:pointer" onclick="ui.owner=${esc(JSON.stringify(o))};ui.view='gantt';persistUI();renderAll()"><td><b>${esc(o)}</b></td><td class="num">${ts.length}</td><td class="num">${ts.filter(t=>t.progress<100).length}</td>
+      <td class="num">${ts.filter(t=>t.progress<100&&t.planStart<=E&&t.planEnd>=T).length}</td>
+      <td class="num ${late?'late-t':''}">${late}</td><td class="num">${weighted(ts,t=>t.progress).toFixed(0)}%</td></tr>`}).join('')+`</tbody></table><div class="hint" style="margin-top:6px">點擊列可在甘特圖篩選該負責人</div>`;
+}
+
+/* ============ 編輯視窗 ============ */
+let draft=null, draftIsNew=false, origProgress=0;
+function openModal(id){
+  hideTip();
+  const src=id?getTask(id):null;
+  draftIsNew=!src;
+  const T=D.today();
+  draft=src?JSON.parse(JSON.stringify(src)):normTask({category:ui.cat!=='ALL'?ui.cat:'',planStart:T,planEnd:D.add(T,6),owner:ui.owner!=='ALL'&&ui.owner!=='(未指派)'?ui.owner:''});
+  origProgress=draft.progress;
+  $('#mTitle').textContent=draftIsNew?'新增工程項目':'編輯工程項目';
+  $('#mDel').classList.toggle('hidden',draftIsNew);$('#mDup').classList.toggle('hidden',draftIsNew);
+  const set=(k,v)=>{$(k).value=v??''};
+  set('#eCat',draft.category);set('#eName',draft.name);set('#eOwner',draft.owner);set('#ePriority',draft.priority);set('#eWeight',draft.weight);
+  $('#eMilestone').checked=draft.milestone;$('#eHold').checked=draft.hold;
+  set('#ePS',draft.planStart);set('#ePE',draft.planEnd);set('#eAS',draft.actualStart);set('#eAE',draft.actualEnd);
+  set('#eProg',draft.progress);set('#eLogNote','');set('#eBudget',draft.budget||'');set('#eCost',draft.cost||'');set('#eNote',draft.note);
+  set('#depSearch','');set('#ckNew','');
+  renderModalParts();
+  $('#modal').classList.remove('hidden');
+  setTimeout(()=>$(draftIsNew?'#eCat':'#eProg').focus(),30);
+}
+function readTimeFields(){draft.planStart=$('#ePS').value;draft.planEnd=$('#ePE').value;draft.actualStart=$('#eAS').value;draft.actualEnd=$('#eAE').value}
+function renderModalParts(){
+  const T=D.today();
+  const ps=$('#ePS').value,pe=$('#ePE').value,as=$('#eAS').value,ae=$('#eAE').value,p=+$('#eProg').value;
+  $('#ePText').textContent=p;
+  if(ps&&pe){
+    const tmp={...draft,planStart:ps,planEnd:pe,progress:p,actualStart:as,actualEnd:ae,hold:$('#eHold').checked};
+    $('#eDur').textContent=pe>=ps?`工期 ${D.diff(ps,pe)+1} 天`:'⚠ 結束早於開始';
+    const ex=expectedPct(tmp,T);
+    $('#eExpect').innerHTML=`今日應達 ${ex}%　${p<ex?`<span class="late-t">落後 ${ex-p}%</span>`:`<span style="color:var(--ok)">✔ 符合</span>`}`;
+    const st=STATUS[statusOf(tmp,T)];$('#mStatus').innerHTML=`<span class="chip" style="--s:${st.color}">${st.label}</span>`;
+    let v='';
+    if(as)v+=`開始差異 ${fmtVar(D.diff(ps,as))}`;
+    if(ae)v+=`　完成差異 ${fmtVar(D.diff(pe,ae))}　實際工期 ${D.diff(as||ae,ae)+1} 天`;
+    else if(T>pe&&p<100)v+=`　<span class="late-t">已逾期 ${D.diff(pe,T)} 天</span>`;
+    $('#eVar').innerHTML=v;
+  }
+  const b=+$('#eBudget').value||0,c=+$('#eCost').value||0;
+  $('#eCostHint').innerHTML=b?`已用 ${(c/b*100).toFixed(1)}%　${c>b?`<span class="late-t">超支 ${money(c-b)}</span>`:`剩餘 ${money(b-c)}`}`:'';
+  // 檢核
+  const ck=draft.checklist;
+  $('#ckCount').textContent=ck.length?`${ck.filter(x=>x.done).length}/${ck.length}`:'';
+  $('#eFromCk').classList.toggle('hidden',!ck.length);
+  $('#ckList').innerHTML=ck.length?ck.map((x,i)=>`<div class="ck-item ${x.done?'done':''}"><input type="checkbox" ${x.done?'checked':''} onchange="draft.checklist[${i}].done=this.checked;renderModalParts()"><span>${esc(x.text)}</span><button class="btn ghost sm" onclick="draft.checklist.splice(${i},1);renderModalParts()">✕</button></div>`).join(''):`<div class="hint">例：圖面審查、材料到貨、首件檢驗…</div>`;
+  renderDeps();
+  // 紀錄
+  const logs=[...draft.logs].reverse();
+  $('#logList').innerHTML=logs.length?logs.map(l=>{const i=draft.logs.indexOf(l);return`<div class="log"><span>${l.date}</span><b>${l.progress}%</b><span>${esc(l.note)}</span><button class="btn ghost sm" title="刪除紀錄" onclick="draft.logs.splice(${i},1);renderModalParts()">✕</button></div>`}).join(''):`<div class="hint">尚無紀錄，儲存進度變更時會自動新增。</div>`;
+}
+function fmtVar(d){return d===0?'<b>準時</b>':d>0?`<span class="late-t">晚 ${d} 天</span>`:`<span style="color:var(--ok);font-weight:700">早 ${-d} 天</span>`}
+function renderDeps(){
+  const q=$('#depSearch').value.trim().toLowerCase();
+  const others=state.tasks.filter(t=>t.id!==draft.id&&(!q||(t.name+t.category).toLowerCase().includes(q)||draft.deps.includes(t.id)))
+    .sort((a,b)=>catIndex(a.category)-catIndex(b.category)||a.planStart.localeCompare(b.planStart));
+  $('#depList').innerHTML=others.length?others.map(t=>{
+    const on=draft.deps.includes(t.id), cyc=!draftIsNew&&dependsOn(t.id,draft.id);
+    return`<label class="${cyc?'dis':''}" title="${cyc?'會形成循環依賴':''}"><input type="checkbox" ${on?'checked':''} ${cyc?'disabled':''} onchange="toggleDep('${t.id}',this.checked)"><span class="chip" style="--s:${catColor(t.category)}">${esc(t.category)}</span>${esc(t.name)} <span class="faint">至 ${D.short(t.planEnd)}</span></label>`}).join('')
+    :`<div class="hint">無其他項目</div>`;
+}
+function toggleDep(id,on){draft.deps=draft.deps.filter(d=>d!==id);if(on)draft.deps.push(id)}
+function addCheck(){const v=$('#ckNew').value.trim();if(!v)return;draft.checklist.push({text:v,done:false});$('#ckNew').value='';renderModalParts();$('#ckNew').focus()}
+function progressFromChecklist(){const ck=draft.checklist;if(!ck.length)return;$('#eProg').value=Math.round(ck.filter(x=>x.done).length/ck.length*100);renderModalParts()}
+function nudge(n){const e=$('#eProg');e.value=n===100?100:clamp(+e.value+n,0,100);renderModalParts()}
+function setToday(id){$('#'+id).value=D.today();renderModalParts()}
+function closeModal(){$('#modal').classList.add('hidden');draft=null}
+function saveModal(){
+  if(!draft)return;
+  const cat=$('#eCat').value.trim(), name=$('#eName').value.trim();
+  if(!cat||!name){alert('請填寫「工程類別」與「細項名稱」');return}
+  readTimeFields();
+  if(!draft.planStart||!draft.planEnd){alert('請填寫預計開始/結束日期');return}
+  if(draft.planEnd<draft.planStart){alert('預計結束日不可早於開始日');return}
+  if(draft.actualStart&&draft.actualEnd&&draft.actualEnd<draft.actualStart){alert('實際完成日不可早於實際開始日');return}
+  Object.assign(draft,{category:cat,name,owner:$('#eOwner').value.trim(),priority:$('#ePriority').value,weight:+$('#eWeight').value>0?+$('#eWeight').value:1,
+    milestone:$('#eMilestone').checked,hold:$('#eHold').checked,budget:+$('#eBudget').value||0,cost:+$('#eCost').value||0,note:$('#eNote').value.trim()});
+  if(draft.milestone)draft.planStart=draft.planEnd;
+  draft.progress=origProgress;
+  setProgress(draft,$('#eProg').value,$('#eLogNote').value.trim());
+  pushUndo();
+  catColor(draft.category);
+  let t, moved=true;
+  if(draftIsNew){t=normTask(draft);state.tasks.push(t)}
+  else{t=getTask(draft.id);if(!t)return;moved=t.planEnd!==draft.planEnd||t.planStart!==draft.planStart||t.deps.join()!==draft.deps.join();Object.assign(t,draft)}
+  const n=ui.cascade&&moved?cascade(t):0;
+  closeModal();commit();
+  toast(`已儲存「${t.name}」${n?`，連動順延 ${n} 項後續作業`:''}`);
+}
+function deleteCurrent(){
+  if(!draft||draftIsNew)return;
+  const t=getTask(draft.id);if(!t||!confirm(`確定刪除「${t.name}」？`))return;
+  pushUndo();
+  state.tasks=state.tasks.filter(x=>x.id!==t.id);
+  state.tasks.forEach(x=>x.deps=x.deps.filter(d=>d!==t.id));
+  closeModal();commit();toast('已刪除（Ctrl+Z 可復原）');
+}
+function duplicateCurrent(){
+  if(!draft||draftIsNew)return;
+  const src=getTask(draft.id);if(!src)return;
+  pushUndo();
+  const c=normTask({...JSON.parse(JSON.stringify(src)),id:uid(),name:src.name+'（複本）',actualStart:'',actualEnd:'',progress:0,logs:[],cost:0,checklist:src.checklist.map(x=>({text:x.text,done:false}))});
+  state.tasks.push(c);closeModal();commit();openModal(c.id);toast('已複製，可直接修改');
+}
+
+/* ============ 快速新增 ============ */
+function quickAdd(){
+  const cat=$('#qaCat').value.trim(),name=$('#qaName').value.trim(),s=$('#qaStart').value,e=$('#qaEnd').value;
+  if(!cat||!name||!s||!e){alert('請填寫類別、名稱與日期');return}
+  if(e<s){alert('結束日不可早於開始日');return}
+  pushUndo();
+  catColor(cat);
+  state.tasks.push(normTask({category:cat,name,owner:$('#qaOwner').value.trim(),planStart:s,planEnd:e}));
+  $('#qaName').value='';$('#qaStart').value=D.add(e,1);$('#qaEnd').value=D.add(e,1+D.diff(s,e));
+  commit();$('#qaName').focus();toast(`已加入「${name}」`);
+}
+
+/* ============ 匯入/匯出 ============ */
+function download(name,content,type){
+  const b=new Blob([content],{type});const a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function fname(ext){return `${(state.project.name||'工程進度').replace(/[\\/:*?"<>|]/g,'_')}_${D.today()}.${ext}`}
+function exportJSON(){download(fname('json'),JSON.stringify(serialize(),null,2),'application/json');toast('已存檔 JSON')}
+function exportCSV(){
+  const T=D.today();
+  const head=['類別','細項名稱','負責人','優先','權重','里程碑','預計開始','預計結束','工期(天)','實際開始','實際完成','進度%','應達%','差異%','狀態','延遲(天)','前置作業','檢核完成','預算','實際成本','備註'];
+  const q=v=>{v=String(v??'');return/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=filtered().map(t=>[t.category,t.name,t.owner,t.priority,t.weight,t.milestone?'是':'',t.planStart,t.planEnd,D.diff(t.planStart,t.planEnd)+1,t.actualStart,t.actualEnd,t.progress,expectedPct(t,T),t.progress-expectedPct(t,T),STATUS[statusOf(t,T)].label,delayDays(t,T)||'',t.deps.map(d=>getTask(d)?.name).filter(Boolean).join('、'),t.checklist.length?`${t.checklist.filter(c=>c.done).length}/${t.checklist.length}`:'',t.budget||'',t.cost||'',t.note]);
+  download(fname('csv'),'﻿'+[head,...rows].map(r=>r.map(q).join(',')).join('\r\n'),'text/csv;charset=utf-8');
+  toast('已匯出 CSV（可直接用 Excel 開啟）');
+}
+function importData(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!Array.isArray(data)&&!Array.isArray(data.tasks))throw 0;
+      if(state.tasks.length&&!confirm('匯入將取代目前資料（可用「復原」還原），確定？'))return;
+      pushUndo();applyData(data);didInitialScroll=false;commit();toast(`匯入成功：${state.tasks.length} 項`);
+    }catch(err){alert('檔案格式錯誤，請選擇本系統匯出的 JSON')}
+    finally{input.value=''}
+  };
+  r.readAsText(f);
+}
+
+/* ============ 範例 ============ */
+function loadSample(){
+  if(state.tasks.length&&!confirm('載入範例將取代目前資料（可用「復原」還原），確定？'))return;
+  pushUndo();
+  const T=D.today(),a=n=>n===null||n===undefined?'':D.add(T,n);
+  // [類別, 名稱, 負責人, 預計起, 預計迄, 進度, 實際起, 實際迄, 前置idx[], 預算, 成本, 里程碑, 檢核]
+  const S=[
+    ['機構設計','需求確認與設備規格書','王工',-34,-28,100,-34,-27,[],0,0,0,['客戶需求訪談','節拍/產能確認','規格書簽核']],
+    ['機構設計','概念設計與整機 Layout','王工',-27,-18,100,-26,-16,[0],0,0,0,['工站配置','人機動線','安全圍籬規劃']],
+    ['機構設計','設計審查 DR1','PM',-15,-15,100,-15,-15,[1],0,0,1],
+    ['機構設計','3D 細部設計（送料/定位/取放）','王工',-14,3,75,-14,null,[2],0,0,0,['送料模組','定位治具','取放模組','干涉檢查']],
+    ['機構設計','2D 出圖與 BOM','李工',4,12,10,0,null,[3],0,0,0,['加工圖','組立圖','BOM 表']],
+    ['電控設計','電控架構與 I/O 表','陳工',-24,-13,90,-22,null,[0],0,0,0],
+    ['電控設計','電路圖設計','陳工',-12,0,65,-11,null,[5],0,0,0],
+    ['採購','標準品採購（馬達/氣缸/線軌）','林專員',-6,16,35,-6,null,[1],850000,420000,0],
+    ['採購','電控元件採購（PLC/伺服/感測器）','林專員',1,20,0,null,null,[6],620000,0,0],
+    ['加工製作','非標件加工（外包）','精密加工廠',13,32,0,null,null,[4],380000,0,0],
+    ['組立','機構組立','組立組',33,45,0,null,null,[7,9],0,0,0],
+    ['配線','電控盤配線與現場配線','電控組',38,48,0,null,null,[8],0,0,0],
+    ['程式開發','PLC 程式','陳工',4,40,0,null,null,[6],0,0,0],
+    ['程式開發','HMI 畫面','陳工',20,42,0,null,null,[6],0,0,0],
+    ['試車調機','單機試車與 CT 調整','全員',49,58,0,null,null,[10,11,12,13],0,0,0],
+    ['驗收','FAT 廠內驗收','PM',59,59,0,null,null,[14],0,0,1],
+    ['驗收','出貨與 SAT 現場驗收','PM',61,68,0,null,null,[15],0,0,0],
+  ];
+  const ids=S.map(()=>uid());
+  state={project:{name:'自動化組裝設備專案（範例）'},catColor:{},collapsed:{},tasks:[]};
+  S.forEach((r,i)=>{
+    const[cat,name,owner,ps,pe,p,as,ae,deps,budget,cost,ms,ck]=r;
+    const logs=[];
+    if(p>0&&as!==null){logs.push({date:a(as),progress:0,note:'開工'});const mid=Math.round((as+(ae??0))/2);if(mid>as&&mid<(ae??0))logs.push({date:a(mid),progress:Math.round(p*.5),note:''});logs.push({date:a(ae??0),progress:p,note:p>=100?'完成':'例行更新'})}
+    catColor(cat);
+    state.tasks.push(normTask({id:ids[i],category:cat,name,owner,planStart:a(ps),planEnd:a(pe),progress:p,actualStart:a(as),actualEnd:a(ae),
+      deps:deps.map(d=>ids[d]),budget,cost,milestone:!!ms,priority:i===3||i===6?'高':'中',weight:ms?0.5:Math.max(1,(pe-ps+1)/5),
+      checklist:(ck||[]).map((x,k)=>({text:x,done:p>=100||k<Math.floor((ck.length)*p/100)})),logs,note:i===7?'線軌交期 4 週，需追蹤':''}));
+  });
+  didInitialScroll=false;commit();toast('已載入自動化設備範例專案');
+}
+
+/* ============ 其他 ============ */
+let toastTimer;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.remove('hidden');t.style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.style.opacity=0;setTimeout(()=>t.classList.add('hidden'),260)},2600)}
+function toggleTheme(){
+  const r=document.documentElement, cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  r.dataset.theme=cur==='dark'?'light':'dark';LS.set(LS_THEME,r.dataset.theme);
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const th=LS.get(LS_THEME);if(th)document.documentElement.dataset.theme=th;
+  let data=null;
+  try{const raw=LS.get(LS_KEY);if(raw)data=JSON.parse(raw)}catch(e){}
+  if(!data){try{const old=LS.get(LS_OLD);if(old)data=JSON.parse(old)}catch(e){}}
+  applyData(data);
+  try{Object.assign(ui,JSON.parse(LS.get(LS_UI)||'{}'))}catch(e){}
+  const T=D.today();$('#qaStart').value=T;$('#qaEnd').value=D.add(T,6);
+
+  document.querySelectorAll('#viewTabs button').forEach(b=>b.onclick=()=>{ui.view=b.dataset.v;persistUI();renderAll();if(ui.view==='gantt')scrollToToday(false)});
+  const bind=(sel,key,ev='change',fn=v=>v)=>$(sel).addEventListener(ev,e=>{ui[key]=fn(e.target.type==='checkbox'?e.target.checked:e.target.value);persistUI();renderAll()});
+  bind('#fCat','cat');bind('#fOwner','owner');bind('#fStatus','status');bind('#fSearch','search','input');
+  bind('#optDeps','showDeps');bind('#optCascade','cascade');
+  $('#fZoom').addEventListener('change',e=>{ui.zoom=e.target.value;persistUI();renderAll();scrollToToday(false)});
+  $('#projName').addEventListener('change',e=>{state.project.name=e.target.value.trim()||'未命名專案';persist()});
+  ['#ePS','#ePE','#eAS','#eAE','#eProg','#eBudget','#eCost','#eHold'].forEach(s=>$(s).addEventListener('input',renderModalParts));
+  $('#ePS').addEventListener('change',()=>{if($('#ePE').value<$('#ePS').value)$('#ePE').value=$('#ePS').value;renderModalParts()});
+  $('#depSearch').addEventListener('input',renderDeps);
+  $('#ckNew').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCheck()}});
+  $('#qaName').addEventListener('keydown',e=>{if(e.key==='Enter')quickAdd()});
+  $('#viewAnalysis').addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o)openModal(o.dataset.open)});
+  document.addEventListener('keydown',e=>{
+    const inModal=!$('#modal').classList.contains('hidden');
+    if(e.key==='Escape'&&inModal)closeModal();
+    else if(inModal&&e.key==='Enter'&&(e.ctrlKey||e.metaKey))saveModal();
+    else if(!inModal&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();undo()}
+  });
+  initGanttEvents();initTableEvents();
+  renderAll();
+});
+</script>
+</body>
+</html>
