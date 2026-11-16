@@ -1,0 +1,836 @@
+<title>普利珠組立工作站模擬</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: full-height 3D stage on the left, HMI-style control rail on the right (stacks under the stage on phones). Single light industrial look. */
+:root{
+  color-scheme: light;
+  --bg:#e9edf2;          /* shop-floor grey, slight blue bias */
+  --stage:#f4f6fb;       /* matches the CAD render background */
+  --panel:#ffffff;
+  --ink:#18212c;
+  --ink-2:#536173;
+  --line:#d5dce5;
+  --accent:#f2c200;      /* safety yellow, robot colour */
+  --accent-ink:#2a2200;
+  --run:#1d9a57; --wait:#d68a00; --stop:#8b95a3; --alarm:#d24646;
+  --chip:#1f4fbf;
+  --f-ui:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:100%}
+.stage{position:relative;background:var(--stage);min-height:0;overflow:hidden}
+.stage canvas{display:block}
+.hud{position:absolute;left:max(12px,env(safe-area-inset-left,0px));top:12px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.hud .kpi{pointer-events:auto;background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:74px}
+.kpi b{display:block;font-family:var(--f-num);font-size:18px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:11px;color:var(--ink-2);letter-spacing:.04em}
+.cams{position:absolute;right:12px;bottom:12px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.cams button{background:rgba(255,255,255,.92)}
+.panel{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;min-height:0;
+  padding-block:16px 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:14px}
+h1{font-size:18px;margin:0;text-wrap:balance;line-height:1.35}
+.sub{color:var(--ink-2);font-size:12px;margin-top:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:#f6f8fb;color:var(--ink);border-radius:5px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:#9fb0c4}
+button:focus-visible,input:focus-visible{outline:2px solid var(--chip);outline-offset:1px}
+button.primary{background:var(--accent);border-color:#d6ab00;color:var(--accent-ink);font-weight:700}
+button.danger{background:#fff;border-color:#e5b4b4;color:var(--alarm)}
+.switch{display:flex;align-items:center;gap:8px;font-size:13px}
+.switch input{width:16px;height:16px;accent-color:var(--chip)}
+.speed{display:flex;align-items:center;gap:8px;font-size:13px}
+.speed input{flex:1}
+.speed output{font-family:var(--f-num);min-width:44px;text-align:right}
+.sect{font-size:11px;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:4px}
+.mode{font-size:12px;color:var(--ink-2);line-height:1.5;background:#f3f6fa;border-radius:5px;padding:8px 10px}
+.st{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.st .code{font-family:var(--f-num);font-size:12px;font-weight:700;background:var(--chip);color:#fff;border-radius:4px;padding:2px 6px;align-self:start;margin-top:2px}
+.st .name{font-weight:700}
+.st .spec{font-size:12px;color:var(--ink-2)}
+.st .status{display:flex;align-items:center;gap:6px;font-size:12px;min-width:0}
+.st .status i{width:9px;height:9px;border-radius:50%;background:var(--stop);flex:none}
+.st .status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st[data-s="run"] .status i{background:var(--run)}
+.st[data-s="wait"] .status i{background:var(--wait)}
+.st .btns{grid-column:2;display:flex;gap:6px;flex-wrap:wrap}
+.st .btns button{padding:4px 9px;font-size:12px}
+.st[data-s="run"] .tg,.st[data-s="wait"] .tg{background:#e8f6ee;border-color:#9fd3b5;color:#14673b}
+.flow{margin:0;padding-left:20px;font-size:12px;color:var(--ink-2);line-height:1.7}
+.tag{font-family:var(--f-ui);font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(24,33,44,.82);color:#fff;white-space:nowrap;border-left:3px solid var(--stop);pointer-events:none}
+.tag b{font-family:var(--f-num);margin-right:4px}
+.tag[data-s="run"]{border-left-color:#3ddc84}
+.tag[data-s="wait"]{border-left-color:#ffb020}
+.labels-off .tag{display:none}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:58vh auto;height:auto}
+  .panel{border-left:0;border-top:1px solid var(--line);overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="app">
+  <div class="stage" id="stage">
+    <div class="hud">
+      <div class="kpi"><span>模擬時間</span><b id="kTime">00:00</b></div>
+      <div class="kpi"><span>OK 成品</span><b id="kOk">0</b></div>
+      <div class="kpi"><span>NG</span><b id="kNg">0</b></div>
+      <div class="kpi"><span>CT 秒/顆</span><b id="kCt">–</b></div>
+      <div class="kpi"><span>UPH</span><b id="kUph">–</b></div>
+    </div>
+    <div class="cams">
+      <button data-cam="iso">等角</button>
+      <button data-cam="top">俯視</button>
+      <button data-cam="front">正視</button>
+      <button data-cam="side">側視</button>
+    </div>
+  </div>
+  <aside class="panel">
+    <div>
+      <h1>普利珠組立自動化工作站</h1>
+      <div class="sub">3D 動態模擬 · 單位 mm · 工作台面 H920 · 框架 2500×1600×H2420</div>
+    </div>
+    <div class="row">
+      <button class="primary" id="bAll">全線啟動</button>
+      <button id="bStop">全部停止</button>
+      <button class="danger" id="bReset">重置</button>
+    </div>
+    <label class="switch"><input type="checkbox" id="cLink" checked> 連動模式（各站互鎖，停止的站會卡住前後站）</label>
+    <div class="speed"><span>速度</span><input type="range" id="rSpeed" min="0.25" max="4" step="0.25" value="1"><output id="oSpeed">1.00×</output></div>
+    <label class="switch"><input type="checkbox" id="cLabel" checked> 顯示站別標籤</label>
+    <div class="mode" id="modeTxt"></div>
+    <div class="sect">工作站（可單站運行）</div>
+    <div id="list"></div>
+    <div class="sect">製程流程</div>
+    <ol class="flow">
+      <li>ST1/ST2 側抽屜料盤由人員補入普利本體（Ø80×28）。</li>
+      <li>ST3 龍門 XYZ 由抽屜取料，疊放至 ST4/ST5 旋轉料塔料柱（每柱 8 顆）。</li>
+      <li>ST6 六軸機器人由料塔頂端取料，放入 ST7 分度盤載入位。</li>
+      <li>ST8 左震動盤供軸承 Ø30，取放模組置入普利。</li>
+      <li>ST7 伺服壓床壓入軸承，高度量測判定 OK/NG。</li>
+      <li>ST9 右震動盤供 C 扣，取放模組組裝。</li>
+      <li>ST6 下料：OK 放成品盤（3×4），NG 放 NG 盤（2×2）。</li>
+      <li>ST10/ST11 滿盤經後方滑軌送出，堆疊 5 層後由人員取出。</li>
+    </ol>
+  </aside>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ================= constants ================= */
+const TOP = 920, D2R = Math.PI/180, V3 = THREE.Vector3;
+const lerp=(a,b,k)=>a+(b-a)*k, clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=u=>u*u*(3-2*u);
+const PH = 28;            // pulley height
+const MAXSTACK = 8;
+const SAFE = 1330;        // robot transfer height (tool tip)
+
+/* ================= coroutine engine ================= */
+const ABORT = Symbol('abort');
+class Station{
+  constructor(id, code, name, spec, focus){
+    Object.assign(this,{id,code,name,spec,focus});
+    this.running=false; this.status='待機'; this.tasks=[]; this.gen=0;
+  }
+  _add(t){ return new Promise((res,rej)=>{ t.res=res; t.rej=rej; this.tasks.push(t); }); }
+  wait(d){ return this._add({t:0,d:Math.max(0.01,d)}); }
+  tween(d,fn,e=ease){ return this._add({t:0,d:Math.max(0.01,d),fn,e}); }
+  until(pred){ return this._add({pred}); }   // always yields at least one frame
+  step(dt){
+    if(!this.running || !this.tasks.length) return;
+    const list=this.tasks; this.tasks=[]; const keep=[];
+    for(const k of list){
+      if(k.pred){ if(k.pred()) k.res(); else keep.push(k); continue; }
+      k.t+=dt; const u=Math.min(1,k.t/k.d);
+      if(k.fn) k.fn(k.e(u));
+      if(u>=1) k.res(); else keep.push(k);
+    }
+    this.tasks=keep.concat(this.tasks);
+  }
+  abort(){ this.gen++; const l=this.tasks; this.tasks=[]; for(const k of l) k.rej(ABORT); }
+  get state(){ return !this.running ? 'stop' : (this.status.startsWith('等待') ? 'wait' : 'run'); }
+}
+const sim = { linked:true, speed:1, time:0, ok:0, ng:0, ct:[], lastOut:null };
+const S = {};
+const defs = [
+  ['drawerL','ST1','左側料盤抽屜','2×4 料盤 · 抽屜行程 380 · 人員補料',[-1400,1000,0]],
+  ['drawerR','ST2','右側料盤抽屜','2×3 料盤 · 抽屜行程 380 · 人員補料',[1400,1000,0]],
+  ['gantry','ST3','龍門 XYZ 取放','X 3100 / Y 1400 / Z 1100 · 夾爪 Ø80',[0,1900,-200]],
+  ['magL','ST4','左旋轉料塔','5 柱 × 8 顆 · 72° 分度',[-360,1100,-380]],
+  ['magR','ST5','右旋轉料塔','5 柱 × 8 顆 · 72° 分度',[360,1100,-380]],
+  ['robot','ST6','六軸機器人','臂展 1040 · 上下料 · OK/NG 分流',[0,1400,-60]],
+  ['index','ST7','分度盤 · 壓入 · 量測','6 工位 60° · 伺服壓入 · 高度量測',[120,1150,390]],
+  ['feedL','ST8','左震動盤 · 軸承供料','Ø450 震動盤 · 軸承 Ø30×12',[-560,1200,390]],
+  ['feedR','ST9','右震動盤 · C扣供料','Ø450 震動盤 · C 扣 Ø34',[600,1200,390]],
+  ['trayOK','ST10','OK 成品盤出料堆疊','3×4 成品盤 · 堆疊 5 層',[-780,1100,-700]],
+  ['trayNG','ST11','NG 盤出料堆疊','2×2 NG 盤 · 堆疊 5 層',[780,1100,-700]],
+];
+for(const d of defs){ S[d[0]] = new Station(...d); }
+const stations = Object.values(S);
+const need = id => sim.linked || S[id].running;
+async function waitFor(st,msg,cond,claim){
+  if(!cond()) st.status=msg;
+  await st.until(()=>{ if(cond()){ claim&&claim(); return true; } return false; });
+}
+
+/* ================= renderer / scene ================= */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+const labelR = new CSS2DRenderer();
+labelR.domElement.style.cssText='position:absolute;inset:0;pointer-events:none';
+stage.appendChild(labelR.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf4f6fb);
+const camera = new THREE.PerspectiveCamera(38,1,10,40000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.maxPolarAngle = Math.PI*0.495;
+scene.add(new THREE.HemisphereLight(0xffffff,0xb9c2cf,1.6));
+const sun = new THREE.DirectionalLight(0xffffff,1.6);
+sun.position.set(-2500,5200,3200); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-2600,right:2600,top:2600,bottom:-2600,near:100,far:12000});
+sun.shadow.bias=-0.0004;
+scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(14000,14000), new THREE.ShadowMaterial({opacity:0.12}));
+floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+
+/* ================= materials & helpers ================= */
+function M(c,o={}){ return new THREE.MeshStandardMaterial({color:c,roughness:o.r??0.6,metalness:o.m??0.1,side:o.side??THREE.FrontSide}); }
+const mat = {
+  alu:M(0xb2b7be,{m:0.45,r:0.45}), cab:M(0xc3c7cc,{r:0.75}), work:M(0xd6dce4,{r:0.85}), top:M(0x5a5d62,{r:0.8}),
+  foot:M(0x1c1d20), steel:M(0x8f959d,{m:0.8,r:0.35}), black:M(0x202226,{r:0.5}), dark:M(0x3b3f45,{r:0.6}),
+  yellow:M(0xf2c40f,{r:0.42}), blue:M(0x1f4fbf,{r:0.55}), blueD:M(0x16398c), orange:M(0xd8641c,{r:0.5}),
+  green:M(0x22916a,{r:0.5,side:THREE.DoubleSide}), cream:M(0xdfe6dc,{r:0.8}), disk:M(0xc9d0d8,{m:0.3,r:0.5}),
+  idx:M(0x2c2f34,{r:0.55}), pulley:M(0xd9dde3,{m:0.75,r:0.28,side:THREE.DoubleSide}), seal:M(0x2b58d8,{r:0.4}),
+  brg:M(0x9aa1aa,{m:0.85,r:0.3}), clip:M(0xc98b2b,{m:0.6,r:0.35}), white:M(0xf4f5f7,{r:0.6}),
+};
+function mesh(g,m,p,x=0,y=0,z=0){ const o=new THREE.Mesh(g,m); o.position.set(x,y,z); o.castShadow=o.receiveShadow=true; p.add(o); return o; }
+function boxB(p,w,h,d,m,x,yb,z){ return mesh(new THREE.BoxGeometry(w,h,d),m,p,x,yb+h/2,z); }
+function cylB(p,r,h,m,x,yb,z,seg=32,r2){ return mesh(new THREE.CylinderGeometry(r2??r,r,h,seg),m,p,x,yb+h/2,z); }
+function lamp(color){ return new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:0.05,roughness:0.4}); }
+
+/* parts */
+const pulleyGeo = new THREE.LatheGeometry([[16,0],[40,0],[40,5],[31,14],[40,23],[40,28],[16,28],[16,0]].map(p=>new THREE.Vector2(p[0],p[1])),40);
+const brgGeoO = new THREE.CylinderGeometry(15,15,12,28), brgGeoS=new THREE.CylinderGeometry(12.5,12.5,12.6,28), brgGeoI=new THREE.CylinderGeometry(5,5,12.8,16);
+const clipGeo = new THREE.TorusGeometry(17,2.4,8,28,Math.PI*1.8);
+function makePulley(){
+  const g=new THREE.Group(); mesh(pulleyGeo,mat.pulley,g);
+  g.userData={bearing:null,pressed:false,clip:null,ng:false}; return g;
+}
+function makeBearing(){ const g=new THREE.Group(); mesh(brgGeoO,mat.brg,g,0,6,0); mesh(brgGeoS,mat.seal,g,0,6,0); mesh(brgGeoI,mat.dark,g,0,6,0); return g; }
+function makeClip(){ const g=new THREE.Group(); const t=mesh(clipGeo,mat.clip,g); t.rotation.x=Math.PI/2; return g; }
+function addBearing(p,b=makeBearing(),pressed=false){ p.add(b); b.position.set(0,pressed?14:PH,0); b.rotation.set(0,0,0); p.userData.bearing=b; p.userData.pressed=pressed; }
+function addClip(p,c=makeClip()){ p.add(c); c.position.set(0,29.5,0); c.rotation.set(0,Math.random()*6,0); p.userData.clip=c; }
+function makeFinished(ng=false){ const p=makePulley(); addBearing(p,undefined,true); if(!ng) addClip(p); p.userData.ng=ng; return p; }
+function removePart(p){ if(p && p.parent) p.parent.remove(p); }
+function hold(tip,part,yOff){ tip.attach(part); part.position.set(0,-yOff,0); part.rotation.set(0,0,0); }
+
+/* tray */
+function makeTray(w,d,cols,rows,px,pz,full=null){
+  const g=new THREE.Group(); boxB(g,w,8,d,mat.blue,0,0,0);
+  boxB(g,w,52,8,mat.blue,0,8,-d/2+4); boxB(g,w,52,8,mat.blue,0,8,d/2-4);
+  boxB(g,8,52,d-16,mat.blue,-w/2+4,8,0); boxB(g,8,52,d-16,mat.blue,w/2-4,8,0);
+  boxB(g,w*0.35,10,2,mat.blueD,0,40,-d/2-1); boxB(g,w*0.35,10,2,mat.blueD,0,40,d/2+1);
+  const slots=[];
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const x=(c-(cols-1)/2)*px, z=(r-(rows-1)/2)*pz;
+    cylB(g,30,2,mat.blueD,x,8,z,20);
+    slots.push({p:new V3(x,10,z),part:null});
+  }
+  const t={group:g,slots};
+  if(full) fillTray(t,full);
+  return t;
+}
+function fillTray(t,kind='raw'){ for(const s of t.slots){ if(s.part) continue; const p= kind==='raw'?makePulley():makeFinished(kind==='ng'); t.group.add(p); p.position.copy(s.p); s.part=p; } }
+function clearTray(t){ for(const s of t.slots){ removePart(s.part); s.part=null; } }
+function wpos(obj,local=new V3()){ obj.updateWorldMatrix(true,false); return obj.localToWorld(local.clone()); }
+function slotTop(t,s){ return wpos(t.group,s.p.clone().add(new V3(0,PH,0))); }
+
+function legTable(p,cx,cz,w,d,topM=mat.top){
+  boxB(p,w,20,d,topM,cx,TOP-20,cz);
+  for(const sx of[-1,1]) for(const sz of[-1,1]){
+    const x=cx+sx*(w/2-35), z=cz+sz*(d/2-35);
+    boxB(p,50,TOP-100,50,mat.alu,x,80,z); cylB(p,8,60,mat.steel,x,20,z,12); cylB(p,30,20,mat.foot,x,0,z,20);
+  }
+  for(const sz of[-1,1]) boxB(p,w-70,40,40,mat.alu,cx,240,cz+sz*(d/2-35));
+}
+
+/* ================= world ================= */
+let W=null;
+const holder = new THREE.Group(); scene.add(holder);
+
+function build(){
+  if(W) holder.remove(W.root);
+  const R = new THREE.Group(); holder.add(R);
+  W = {root:R};
+
+  /* main cabinet + frame */
+  boxB(R,2500,TOP-100,1600,mat.cab,0,80,0);
+  boxB(R,2540,20,1640,mat.work,0,TOP-20,0);
+  for(const x of[-1200,-400,400,1200]) for(const z of[-750,750]){ cylB(R,8,60,mat.steel,x,20,z,12); cylB(R,32,20,mat.foot,x,0,z,20); }
+  boxB(R,2420,6,4,mat.dark,0,500,801); boxB(R,4,800,6,mat.dark,-400,120,801); boxB(R,4,800,6,mat.dark,400,120,801);
+  for(const x of[-1250,-420,420,1250]) for(const z of[-800,800]) boxB(R,60,1500,60,mat.alu,x,TOP,z);
+  for(const z of[-800,800]) boxB(R,2560,60,60,mat.alu,0,2360,z);
+  for(const x of[-1250,1250]) boxB(R,60,60,1540,mat.alu,x,2360,0);
+  for(const x of[-1250,1250]) boxB(R,60,60,1540,mat.alu,x,TOP+40,0);
+
+  /* signal tower */
+  cylB(R,10,180,mat.steel,1250,2420,800,12);
+  W.tower = ['red','yellow','green'].map((c,i)=>{ const m=lamp({red:0xe23b3b,yellow:0xf2c200,green:0x1fbf5c}[c]); cylB(R,26,46,m,1250,2600+i*48,800); return m; });
+
+  /* side tables + drawers */
+  W.drawers={};
+  for(const sd of['L','R']){
+    const sx= sd==='L'?-1:1, rows= sd==='L'?4:3, pz= sd==='L'?100:120;
+    legTable(R,sx*1450,0,400,760);
+    for(const z of[-235,235]) boxB(R,560,26,22,mat.orange,sx*1500,TOP,z);
+    for(const z of[-300,300]) for(const dx of[-150,150]) boxB(R,40,420,40,mat.alu,sx*1450+dx,TOP,z);
+    const root=new THREE.Group(); root.position.set(sx*1400,TOP+26,0); R.add(root);
+    boxB(root,280,10,rows*pz+70,mat.dark,0,-8,0);
+    const tray=makeTray(250,rows*pz+40,2,rows,110,pz,'raw'); root.add(tray.group);
+    W.drawers[sd]={root,tray,xWork:sx*1400,xOut:sx*1780,state:'in',gLock:false};
+  }
+
+  /* back stacker tables + rails + shuttles */
+  W.trays={};
+  for(const sd of['L','R']){
+    const sx= sd==='L'?-1:1, cx=sx*780, ok= sd==='L';
+    legTable(R,cx,-1080,460,500);
+    for(const dx of[-175,175]) boxB(R,22,26,1150,mat.orange,cx+dx,TOP,-700);
+    for(const dx of[-205,205]) for(const dz of[-250,250]) boxB(R,44,520,44,mat.alu,cx+dx,TOP,-1080+dz);
+    boxB(R,454,30,30,mat.alu,cx,TOP+490,-1330); boxB(R,454,30,30,mat.alu,cx,TOP+490,-830);
+    const cols= ok?3:2, rows= ok?4:2, px= ok?95:150, pz= ok?95:170;
+    const tray=makeTray(330,430,cols,rows,px,pz); tray.group.position.set(cx,TOP+30,-120); R.add(tray.group);
+    const stack=[];
+    for(let i=0;i<2;i++){ const t=makeTray(330,430,cols,rows,px,pz, ok?'ok':'ng'); t.group.position.set(cx,TOP+100+70*i,-1080); R.add(t.group); stack.unshift(t); }
+    W.trays[ok?'OK':'NG']={tray,stack,cap:cols*rows,count:0,state:'ready',robotBusy:false,cx,cols,rows,px,pz,ok};
+  }
+
+  /* magazines (rotary towers) */
+  W.mags={};
+  for(const sd of['L','R']){
+    const sx= sd==='L'?-1:1, cx=sx*360, cz=-380, dir= sd==='L'?1:-1, tp= sd==='L'?45:135;
+    boxB(R,240,60,240,mat.dark,cx,TOP,cz); cylB(R,70,80,mat.dark,cx,TOP+60,cz);
+    const disk=new THREE.Group(); disk.position.set(cx,TOP+140,cz); R.add(disk);
+    cylB(disk,190,20,mat.disk,0,0,0,48); cylB(disk,40,30,mat.steel,0,20,0);
+    const posts=[];
+    for(let k=0;k<5;k++){
+      const a=(tp+dir*72*k)*D2R, px=125*Math.cos(a), pz=125*Math.sin(a);
+      cylB(disk,6,300,mat.steel,px,20,pz,12); cylB(disk,34,6,mat.dark,px,20,pz,24);
+      const anchor=new THREE.Group(); anchor.position.set(px,26,pz); disk.add(anchor);
+      posts.push({anchor,parts:[]});
+    }
+    const M_={disk,posts,shift:0,dir,rotating:false,lock:null};
+    fillPost(M_.posts[0],MAXSTACK); fillPost(M_.posts[1],MAXSTACK);
+    W.mags[sd]=M_;
+  }
+
+  /* index table */
+  {
+    const cx=120, cz=390;
+    boxB(R,260,40,260,mat.dark,cx,TOP,cz); cylB(R,90,100,mat.dark,cx,TOP+40,cz);
+    const disk=new THREE.Group(); disk.position.set(cx,TOP+140,cz); R.add(disk);
+    cylB(disk,165,20,mat.idx,0,0,0,56); cylB(disk,30,24,mat.steel,0,20,0);
+    const nests=[]; const ring=new THREE.TorusGeometry(41,3.2,8,28);
+    for(let k=0;k<6;k++){
+      const a=(-120-60*k)*D2R, x=115*Math.cos(a), z=115*Math.sin(a);
+      cylB(disk,44,6,mat.dark,x,20,z,28);
+      const r=mesh(ring,mat.orange,disk,x,27,z); r.rotation.x=Math.PI/2;
+      const anchor=new THREE.Group(); anchor.position.set(x,26,z); disk.add(anchor);
+      nests.push({anchor,part:null});
+    }
+    W.idx={disk,nests,shift:0,cycle:0,rotating:false,busy:[0,0,0,0,0,0].map(()=>false),done:[-1,-1,-1,-1,-1,-1],cx,cz};
+    /* press + measure portal (front) */
+    for(const x of[-70,310]) boxB(R,60,840,60,mat.alu,x,TOP,560);
+    boxB(R,440,60,80,mat.alu,120,TOP+840,560);
+    const st2=stationXZ(2), st3=stationXZ(3);
+    boxB(R,120,320,120,mat.white,st2.x,1380,st2.z); cylB(R,48,90,mat.dark,st2.x,1700,st2.z);
+    boxB(R,60,30,90,mat.alu,st2.x,1730,(st2.z+560)/2+10);
+    const ram=new THREE.Group(); R.add(ram); ram.position.set(st2.x,1250,st2.z);
+    cylB(ram,18,420,mat.steel,0,0,0,20); cylB(ram,24,14,mat.steel,0,0,0,24);
+    boxB(R,70,400,70,mat.white,st3.x,1300,st3.z);
+    boxB(R,60,30,90,mat.alu,st3.x,1730,(st3.z+560)/2+10);
+    const probe=new THREE.Group(); R.add(probe); probe.position.set(st3.x,1200,st3.z);
+    cylB(probe,6,200,mat.steel,0,0,0,12); mesh(new THREE.SphereGeometry(8,16,12),mat.steel,probe,0,0,0);
+    const measLamp=lamp(0x9aa3ad); mesh(new THREE.SphereGeometry(18,20,14),measLamp,R,st3.x,1720,st3.z);
+    Object.assign(W.idx,{ram,probe,measLamp});
+  }
+
+  /* vibratory bowls + linear feeders + pick&place */
+  W.feed={};
+  for(const sd of['L','R']){
+    const L_= sd==='L', bx= L_?-700:760, bz=390, outA= L_?0:Math.PI;
+    const s= L_?1:4, nest=stationXZ(s);
+    boxB(R,380,30,380,mat.dark,bx,TOP,bz);
+    cylB(R,150,100,mat.cream,bx,TOP+30,bz,40);
+    const bowl=new THREE.Group(); bowl.position.set(bx,TOP+130,bz); R.add(bowl);
+    cylB(bowl,220,4,mat.green,0,0,0,56);
+    const wall=mesh(new THREE.CylinderGeometry(225,215,150,56,1,true),mat.green,bowl,0,75,0);
+    cylB(bowl,8,70,mat.green,0,4,0,40,90);
+    const pts=[]; for(let i=0;i<=120;i++){ const u=i/120; const a=outA-(1-u)*2.5*Math.PI*2*(L_?1:-1); pts.push(new V3(198*Math.cos(a),10+u*128,198*Math.sin(a))); }
+    mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),160,9,6,false),mat.white,bowl);
+    // linear feeder
+    const sx= L_?1:-1, x0= bx+sx*220, escX= L_?-205:360;
+    const len=Math.abs(escX-x0)+20, mx=(x0+escX)/2;
+    boxB(R,len,90,90,mat.cream,mx,1060,bz); boxB(R,80,140,80,mat.dark,mx,TOP,bz);
+    boxB(R,len,20,44,mat.white,mx,1170,bz);
+    boxB(R,len,16,4,mat.alu,mx,1188,bz-24); boxB(R,len,16,4,mat.alu,mx,1188,bz+24);
+    // bowl flow parts (cosmetic)
+    const kind= L_?'bearing':'clip';
+    const flow=[]; for(let i=0;i<14;i++){ const p= L_?makeBearing():makeClip(); bowl.add(p); flow.push({p,u:i/14}); }
+    // P&P
+    const postX = L_?-270:430;
+    boxB(R,60,560,60,mat.alu,postX,TOP,290);
+    const beamL = Math.abs(nest.x-escX)+140, beamX=(nest.x+escX)/2;
+    boxB(R,beamL,70,60,mat.alu,beamX,1420,330);
+    const car=new THREE.Group(); R.add(car); car.position.set(escX,0,0);
+    boxB(car,110,110,90,mat.dark,0,1400,370);
+    const rod=new THREE.Group(); car.add(rod); rod.position.set(0,1300,390);
+    boxB(rod,30,300,30,mat.steel,0,30,0); boxB(rod,60,30,50,mat.dark,0,8,0);
+    const tip=new THREE.Group(); rod.add(tip);
+    const q=[]; const qdir= L_?-1:1;
+    const F={side:sd,s,kind,bowl,flow,car,rod,tip,escX,nestX:nest.x,nestZ:nest.z,z:bz,queue:q,qdir,
+      hOff: L_?12:2.5, pickY: L_?1202:1195, retY:1300, x:escX, y:1300,
+      accept: L_? (u)=>!u.bearing : (u)=>u.bearing&&u.pressed&&!u.clip&&!u.ng};
+    for(let i=0;i<6;i++){ const p= L_?makeBearing():makeClip(); R.add(p); p.position.set(escX+qdir*i*38, L_?1190:1192.5, bz); q.push(p); }
+    W.feed[sd]=F;
+  }
+
+  /* robot */
+  {
+    const base=new THREE.Group(); base.position.set(0,TOP,-60); R.add(base);
+    boxB(base,340,120,340,mat.dark,0,0,0); cylB(base,130,150,mat.yellow,0,120,0,40);
+    const j1=new THREE.Group(); j1.position.y=270; base.add(j1);
+    cylB(j1,125,80,mat.yellow,0,0,0,40); boxB(j1,220,240,190,mat.yellow,40,60,0);
+    const j2=new THREE.Group(); j2.position.set(80,300,0); j1.add(j2);
+    const m2=mesh(new THREE.CylinderGeometry(88,88,230,32),mat.yellow,j2); m2.rotation.x=Math.PI/2;
+    const m2b=mesh(new THREE.CylinderGeometry(50,50,90,24),mat.black,j2,0,0,-150); m2b.rotation.x=Math.PI/2;
+    boxB(j2,120,520,120,mat.yellow,0,0,0);
+    const j3=new THREE.Group(); j3.position.set(0,520,0); j2.add(j3);
+    const m3=mesh(new THREE.CylinderGeometry(72,72,190,28),mat.yellow,j3); m3.rotation.x=Math.PI/2;
+    mesh(new THREE.BoxGeometry(520,100,100),mat.yellow,j3,260,0,0);
+    boxB(j3,140,120,120,mat.black,-110,-60,0);
+    const j5=new THREE.Group(); j5.position.set(520,0,0); j3.add(j5);
+    const m5=mesh(new THREE.CylinderGeometry(48,48,130,24),mat.yellow,j5); m5.rotation.x=Math.PI/2;
+    cylB(j5,40,40,mat.dark,0,-75,0,24);
+    boxB(j5,150,60,90,mat.black,0,-130,0);
+    const fa=boxB(j5,14,95,46,mat.steel,-50,-222,0), fb=boxB(j5,14,95,46,mat.steel,50,-222,0);
+    const tip=new THREE.Group(); tip.position.y=-200; j5.add(tip);
+    W.robot={base,j1,j2,j3,j5,fa,fb,tip,tipPos:new V3(120,SAFE,250),held:null};
+    robotIK();
+  }
+
+  /* gantry */
+  {
+    for(const x of[-1250,1250]) boxB(R,70,40,1600,mat.black,x,2420,0);
+    const bridge=new THREE.Group(); R.add(bridge);
+    boxB(bridge,3140,110,90,mat.black,0,2470,0);
+    for(const x of[-1250,1250]) boxB(bridge,160,60,180,mat.dark,x,2440,0);
+    const car=new THREE.Group(); bridge.add(car);
+    boxB(car,200,230,80,mat.dark,0,2400,90);
+    const zc=new THREE.Group(); car.add(zc); zc.position.z=110;
+    boxB(zc,80,1150,80,mat.black,0,70,0); cylB(zc,40,120,mat.dark,0,1220,0,20);
+    boxB(zc,150,50,90,mat.dark,0,20,0);
+    const fa=boxB(zc,14,60,40,mat.steel,-48,-20,0), fb=boxB(zc,14,60,40,mat.steel,48,-20,0);
+    const tip=new THREE.Group(); zc.add(tip);
+    W.gantry={bridge,car,zc,fa,fb,tip,x:-600,z:-150,h:2050,held:null};
+    gUpdate();
+  }
+}
+function fillPost(post,n){ for(let i=0;i<n && post.parts.length<MAXSTACK;i++){ const p=makePulley(); post.anchor.add(p); p.position.set(0,post.parts.length*PH,0); post.parts.push(p); } }
+function pickPost(M){ return M.posts[((M.shift%5)+5)%5]; }
+function loadPost(M){ return M.posts[(((M.shift+2)%5)+5)%5]; }
+function postTop(post){ return wpos(post.anchor,new V3(0,post.parts.length*PH,0)); }
+function stationXZ(s){ const a=(-120-60*s)*D2R; return {x:120+115*Math.cos(a), z:390+115*Math.sin(a)}; }
+function nestAt(s){ const I=W.idx; return I.nests[(((s-I.shift)%6)+6)%6]; }
+function nestTop(s){ return wpos(nestAt(s).anchor,new V3(0,PH,0)); }
+function putNest(n,p){ n.anchor.add(p); p.position.set(0,0,0); p.rotation.set(0,0,0); n.part=p; }
+
+/* ================= robot kinematics ================= */
+const L2=520, L3=520, LT=200, SH_OFF=80, SH_Y=TOP+270+300, RBX=0, RBZ=-60;
+function robotIK(){
+  const r_=W.robot, p=r_.tipPos;
+  const dx=p.x-RBX, dz=p.z-RBZ, th=Math.atan2(dz,dx);
+  r_.j1.rotation.y=-th;
+  const r=Math.hypot(dx,dz)-SH_OFF, h=p.y+LT-SH_Y;
+  const D=clamp(Math.hypot(r,h),40,L2+L3-1);
+  const phi2=Math.atan2(h,r)+Math.acos(clamp((L2*L2+D*D-L3*L3)/(2*L2*D),-1,1));
+  const elb=Math.acos(clamp((L2*L2+L3*L3-D*D)/(2*L2*L3),-1,1));
+  const phi3=phi2-(Math.PI-elb), z2=phi2-Math.PI/2;
+  r_.j2.rotation.z=z2; r_.j3.rotation.z=phi3-z2; r_.j5.rotation.z=-phi3;
+}
+function cylOf(p){ let a=Math.atan2(p.z-RBZ,p.x-RBX); if(a>100*D2R) a-=2*Math.PI; return {a,r:Math.hypot(p.x-RBX,p.z-RBZ),y:p.y}; }
+async function rMove(st,p,speed=1600){
+  const r_=W.robot, A=cylOf(r_.tipPos), B=cylOf(p);
+  const d=Math.hypot((B.a-A.a)*Math.max(A.r,B.r),B.r-A.r,B.y-A.y);
+  await st.tween(0.12+d/speed,k=>{ const a=lerp(A.a,B.a,k), r=lerp(A.r,B.r,k);
+    r_.tipPos.set(RBX+r*Math.cos(a),lerp(A.y,B.y,k),RBZ+r*Math.sin(a)); robotIK(); });
+}
+async function rGoto(st,p){
+  const t=W.robot.tipPos;
+  if(t.y<SAFE-1) await rMove(st,new V3(t.x,SAFE,t.z),1100);
+  await rMove(st,new V3(p.x,SAFE,p.z),2000);
+  if(p.y<SAFE-1) await rMove(st,p,900);
+}
+async function rGrip(st,close){ const r_=W.robot; const a=r_.fb.position.x, b=close?44:50; await st.tween(0.18,k=>{ const x=lerp(a,b,k); r_.fa.position.x=-x; r_.fb.position.x=x; }); }
+
+/* ================= gantry ================= */
+function gUpdate(){ const g=W.gantry; g.bridge.position.z=g.z-110; g.car.position.x=g.x; g.zc.position.y=g.h; }
+async function gMove(st,x,z,h,speed){ const g=W.gantry, x0=g.x,z0=g.z,h0=g.h; const d=Math.hypot(x-x0,z-z0,h-h0);
+  await st.tween(0.12+d/speed,k=>{ g.x=lerp(x0,x,k); g.z=lerp(z0,z,k); g.h=lerp(h0,h,k); gUpdate(); }); }
+async function gGoto(st,p){ const g=W.gantry; if(g.h<2049) await gMove(st,g.x,g.z,2050,1000); await gMove(st,p.x,p.z,2050,1500); if(p.y<2049) await gMove(st,p.x,p.z,p.y,1000); }
+async function gGrip(st,close){ const g=W.gantry; const a=g.fb.position.x, b=close?44:50; await st.tween(0.18,k=>{ const x=lerp(a,b,k); g.fa.position.x=-x; g.fb.position.x=x; }); }
+
+/* ================= pick & place modules ================= */
+async function ppMove(st,F,x,y){ const x0=F.x,y0=F.y; const d=Math.abs(x-x0)+Math.abs(y-y0); if(d<0.5) return;
+  await st.tween(0.1+d/700,k=>{ F.x=lerp(x0,x,k); F.y=lerp(y0,y,k); F.car.position.x=F.x; F.rod.position.y=F.y; }); }
+
+/* ================= station programs ================= */
+async function drawerProg(st,sd){
+  const D=W.drawers[sd];
+  while(true){
+    const left=D.tray.slots.filter(s=>s.part).length;
+    if(left>0){
+      if(!need('gantry')){ st.status=`模擬取料（龍門未運行）剩 ${left}`; await st.wait(0.8);
+        if(!D.gLock){ const s=D.tray.slots.find(s=>s.part); if(s){ removePart(s.part); s.part=null; } } continue; }
+      st.status=`供料中 · 剩 ${left} 顆`; await st.wait(0.3); continue;
+    }
+    await waitFor(st,'等待龍門離開',()=>!D.gLock,()=>{ D.state='moving'; });
+    st.status='料盤空 · 抽屜拉出'; await st.tween(1.2,k=>D.root.position.x=lerp(D.xWork,D.xOut,k));
+    st.status='人員補料'; await st.wait(1.6); fillTray(D.tray,'raw');
+    st.status='抽屜推入定位'; await st.tween(1.2,k=>D.root.position.x=lerp(D.xOut,D.xWork,k));
+    D.state='in';
+  }
+}
+
+async function gantryProg(st){
+  const g=W.gantry; let turn=0;
+  while(true){
+    const order= turn%2?['R','L']:['L','R']; let sd=null;
+    for(const s of order){
+      const M=W.mags[s], D=W.drawers[s];
+      const magOK= !need('mag'+s) || loadPost(M).parts.length<MAXSTACK;
+      const drOK = !need('drawer'+s) || (D.state==='in' && D.tray.slots.some(x=>x.part));
+      if(magOK&&drOK){ sd=s; break; }
+    }
+    if(!sd){ st.status='等待料塔空位／抽屜補料'; if(g.h<2049) await gMove(st,g.x,g.z,2050,1000); else await st.wait(0.3); continue; }
+    turn++;
+    const D=W.drawers[sd], M=W.mags[sd];
+    st.status=`取料 · ${sd==='L'?'左':'右'}抽屜`;
+    await gGoto(st,new V3(D.xWork,2050,0));
+    await waitFor(st,'等待抽屜定位',()=>D.state==='in'&&!D.gLock,()=>{ D.gLock=true; });
+    let slot=D.tray.slots.find(s=>s.part);
+    if(!slot){ if(!need('drawer'+sd)){ fillTray(D.tray,'raw'); slot=D.tray.slots[0]; } else { D.gLock=false; continue; } }
+    await gGoto(st,slotTop(D.tray,slot));
+    await gGrip(st,true); hold(g.tip,slot.part,PH); g.held=slot.part; slot.part=null;
+    await gMove(st,g.x,g.z,2050,1000); D.gLock=false;
+    st.status=`放料 · ${sd==='L'?'左':'右'}料塔`;
+    const c=wpos(M.disk); await gMove(st,c.x,c.z,2050,1500);
+    while(true){
+      await waitFor(st,'等待料塔停止',()=>!M.lock&&!M.rotating,()=>{ M.lock='gantry'; });
+      const lp=loadPost(M);
+      if(lp.parts.length<MAXSTACK) break;
+      if(!need('mag'+sd)){ for(const p of lp.parts) removePart(p); lp.parts=[]; break; }
+      M.lock=null; st.status='等待料塔空位'; await st.wait(0.4);
+    }
+    const lp=loadPost(M); const t=postTop(lp);
+    await gMove(st,t.x,t.z,2050,1200);
+    await gMove(st,t.x,t.z,t.y+PH,1000);
+    await gGrip(st,false);
+    lp.anchor.add(g.held); g.held.position.set(0,lp.parts.length*PH,0); g.held.rotation.set(0,0,0); lp.parts.push(g.held); g.held=null;
+    await gMove(st,g.x,g.z,2050,1000); M.lock=null;
+  }
+}
+
+async function magProg(st,sd){
+  const M=W.mags[sd];
+  while(true){
+    const pk=pickPost(M), total=M.posts.reduce((a,p)=>a+p.parts.length,0);
+    if(!need('gantry') && loadPost(M).parts.length===0 && total<MAXSTACK*2 && !M.lock){ fillPost(loadPost(M),MAXSTACK); }
+    if(!need('robot') && pk.parts.length>0){ st.status=`模擬取料（機器人未運行）剩 ${pk.parts.length}`; await st.wait(0.9);
+      if(!M.lock && !M.rotating && pk.parts.length) removePart(pk.parts.pop()); continue; }
+    if(pk.parts.length===0 && total>0){
+      await waitFor(st,'等待取放離開料塔',()=>!M.lock,()=>{ M.lock='mag'; M.rotating=true; });
+      st.status='分度旋轉 72°'; const f0=M.dir*72*M.shift*D2R;
+      await st.tween(0.9,k=>M.disk.rotation.y=f0+M.dir*72*D2R*k);
+      M.shift++; M.rotating=false; M.lock=null; continue;
+    }
+    st.status= pk.parts.length?`供料位 ${pk.parts.length} 顆 · 庫存 ${total}`:'等待龍門補料';
+    await st.wait(0.3);
+  }
+}
+
+async function robotProg(st){
+  const I=W.idx; let turn=0;
+  while(true){
+    const gated=need('index');
+    if(gated) await waitFor(st,'等待分度盤到位',()=>!I.rotating&&(I.done[5]<I.cycle||I.done[0]<I.cycle));
+    const c=I.cycle;
+    if(!gated || I.done[5]<c){ await robotUnload(st,gated); if(gated) I.done[5]=Math.max(I.done[5],c); }
+    if(!gated || I.done[0]<c){ await robotLoad(st,gated,turn++); if(gated) I.done[0]=Math.max(I.done[0],c); }
+    if(!gated) await st.wait(0.15);
+  }
+}
+async function robotUnload(st,gated){
+  const I=W.idx, r_=W.robot;
+  if(!gated && !I.rotating && !nestAt(5).part) putNest(nestAt(5),makeFinished(Math.random()<0.15));
+  if(!nestAt(5).part) return;
+  st.status='下料 · 夾取組立品';
+  const a=nestTop(5); await rGoto(st,new V3(a.x,SAFE,a.z));
+  await waitFor(st,'等待分度盤停止',()=>!I.rotating,()=>{ I.busy[5]=true; });
+  const n=nestAt(5); if(!n.part){ I.busy[5]=false; return; }
+  const p=nestTop(5);
+  await rMove(st,p,900); await rGrip(st,true);
+  const part=n.part; hold(r_.tip,part,PH); n.part=null; r_.held=part;
+  await rMove(st,new V3(p.x,SAFE,p.z),1100); I.busy[5]=false;
+  const bad= part.userData.ng || !part.userData.clip;
+  const T= bad?W.trays.NG:W.trays.OK, tid= bad?'trayNG':'trayOK';
+  st.status= bad?'放置 NG 盤':'放置 OK 成品盤';
+  if(!need(tid) && T.count>=T.cap){ clearTray(T.tray); T.count=0; }
+  await waitFor(st, bad?'等待 NG 盤更換':'等待成品盤更換',()=>T.state==='ready'&&T.count<T.cap,()=>{ T.robotBusy=true; });
+  const slot=T.tray.slots.find(s=>!s.part); const sp=slotTop(T.tray,slot);
+  await rGoto(st,sp); await rGrip(st,false);
+  T.tray.group.add(part); part.position.copy(slot.p); part.rotation.set(0,0,0); slot.part=part; T.count++; r_.held=null;
+  await rMove(st,new V3(sp.x,SAFE,sp.z),1100); T.robotBusy=false;
+  if(bad) sim.ng++; else sim.ok++;
+  if(sim.lastOut!=null){ sim.ct.push(sim.time-sim.lastOut); if(sim.ct.length>12) sim.ct.shift(); }
+  sim.lastOut=sim.time;
+}
+async function robotLoad(st,gated,turn){
+  const I=W.idx, r_=W.robot; const order= turn%2?['R','L']:['L','R']; let M=null;
+  const avail = s=>{ const m=W.mags[s]; return !m.rotating && !m.lock && (pickPost(m).parts.length>0 || !need('mag'+s)); };
+  await waitFor(st,'等待料塔供料',()=>order.some(avail),()=>{ const s=order.find(avail); M=W.mags[s]; M.lock='robot'; });
+  st.status='上料 · 料塔取普利';
+  const pp=pickPost(M); if(!pp.parts.length) fillPost(pp,1);
+  const t=postTop(pp);
+  await rGoto(st,t); await rGrip(st,true);
+  const part=pp.parts.pop(); hold(r_.tip,part,PH); r_.held=part;
+  await rMove(st,new V3(t.x,SAFE,t.z),1100); M.lock=null;
+  st.status='上料 · 放入分度盤';
+  const a=nestTop(0); await rGoto(st,new V3(a.x,SAFE,a.z));
+  await waitFor(st,'等待分度盤停止',()=>!I.rotating,()=>{ I.busy[0]=true; });
+  const n=nestAt(0); if(n.part){ removePart(n.part); n.part=null; }
+  const p=nestTop(0);
+  await rMove(st,p,900); await rGrip(st,false); putNest(n,part); r_.held=null;
+  await rMove(st,new V3(p.x,SAFE,p.z),1100); I.busy[0]=false;
+}
+
+async function indexProg(st){
+  const I=W.idx;
+  const pending=()=>[[0,'robot','六軸上料'],[5,'robot','六軸下料'],[1,'feedL','軸承置入'],[4,'feedR','C扣置入']].filter(([s,id])=>need(id)&&I.done[s]<I.cycle).map(x=>x[2]);
+  while(true){
+    const c=I.cycle;
+    if(!need('robot')){ const n0=nestAt(0); if(!n0.part) putNest(n0,makePulley()); const n5=nestAt(5); if(n5.part){ removePart(n5.part); n5.part=null; } }
+    if(!need('feedL')){ const n=nestAt(1); if(n.part && !n.part.userData.bearing) addBearing(n.part); }
+    if(!need('feedR')){ const n=nestAt(4); if(n.part && W.feed.R.accept(n.part.userData)) addClip(n.part); }
+    if(I.done[2]<c){ await pressCycle(st); I.done[2]=c; }
+    if(I.done[3]<c){ await measureCycle(st); I.done[3]=c; }
+    const pd=pending(); const msg= pd.length?'等待 '+pd.join('、'):'等待作業完成';
+    await waitFor(st,msg,()=>I.busy.every(b=>!b)&&pending().length===0,()=>{ I.rotating=true; });
+    st.status='分度旋轉 60°'; const f0=I.shift*60*D2R;
+    await st.tween(0.7,k=>I.disk.rotation.y=f0+60*D2R*k);
+    I.shift++; I.cycle++; I.rotating=false;
+    await st.wait(0.1);
+  }
+}
+async function pressCycle(st){
+  const I=W.idx, n=nestAt(2), ram=I.ram, u=n.part&&n.part.userData;
+  if(u && u.bearing && !u.pressed){
+    st.status='伺服壓入軸承'; const yC=wpos(n.anchor).y+PH+12, yE=wpos(n.anchor).y+14+12;
+    await st.tween(0.35,k=>ram.position.y=lerp(1250,yC,k));
+    await st.tween(0.45,k=>{ ram.position.y=lerp(yC,yE,k); u.bearing.position.y=lerp(PH,14,k); },x=>x);
+    u.pressed=true; await st.wait(0.1);
+    await st.tween(0.3,k=>ram.position.y=lerp(yE,1250,k));
+  } else if(u){ st.status='壓入站：無軸承，略過'; await st.wait(0.15); }
+}
+async function measureCycle(st){
+  const I=W.idx, n=nestAt(3), pr=I.probe, u=n.part&&n.part.userData;
+  if(!u) return;
+  st.status='高度量測'; const y=wpos(n.anchor).y+(u.bearing?(u.pressed?26:40):PH);
+  await st.tween(0.3,k=>pr.position.y=lerp(1200,y,k));
+  const bad=!u.bearing||!u.pressed||Math.random()<0.04; u.ng=u.ng||bad;
+  I.measLamp.color.set(bad?0xe23b3b:0x1fbf5c); I.measLamp.emissive.set(bad?0xe23b3b:0x1fbf5c); I.measLamp.emissiveIntensity=0.9;
+  await st.wait(0.15); await st.tween(0.25,k=>pr.position.y=lerp(y,1200,k));
+}
+
+async function feedProg(st,sd){
+  const F=W.feed[sd], I=W.idx, s=F.s; let held=null;
+  while(true){
+    if(!held){
+      st.status= F.kind==='bearing'?'取軸承':'取 C 扣';
+      await ppMove(st,F,F.escX,F.retY); await ppMove(st,F,F.escX,F.pickY);
+      held=F.queue.shift(); hold(F.tip,held,F.hOff);
+      const np= F.kind==='bearing'?makeBearing():makeClip(); W.root.add(np);
+      np.position.set(F.escX+F.qdir*6*38,F.kind==='bearing'?1190:1192.5,F.z); F.queue.push(np);
+      const q=F.queue.map((p,i)=>[p,p.position.x,F.escX+F.qdir*i*38]);
+      st.tween(0.4,k=>{ for(const [p,a,b] of q) p.position.x=lerp(a,b,k); }).catch(()=>{});
+      await st.wait(0.1); await ppMove(st,F,F.escX,F.retY);
+    }
+    await ppMove(st,F,F.nestX,F.retY);
+    const gated=need('index');
+    if(gated) await waitFor(st,'等待分度盤到位',()=>!I.rotating&&I.done[s]<I.cycle,()=>{ I.busy[s]=true; });
+    else await waitFor(st,'等待分度盤停止',()=>!I.rotating,()=>{ I.busy[s]=true; });
+    const c=I.cycle, n=nestAt(s);
+    if(!gated && !(n.part && F.accept(n.part.userData))){
+      removePart(n.part); const p=makePulley(); if(F.kind==='clip') addBearing(p,undefined,true); putNest(n,p);
+    }
+    if(n.part && F.accept(n.part.userData)){
+      st.status= F.kind==='bearing'?'軸承置入普利':'C 扣組裝';
+      const top=nestTop(s).y, y= F.kind==='bearing'? top+12 : top+1.5+F.hOff;
+      await ppMove(st,F,F.nestX,y);
+      if(F.kind==='bearing') addBearing(n.part,held); else addClip(n.part,held);
+      held=null; await st.wait(0.1);
+      await ppMove(st,F,F.nestX,F.retY);
+    } else st.status='此工位無需作業';
+    I.busy[s]=false; if(gated) I.done[s]=Math.max(I.done[s],c);
+    if(!gated) await st.wait(0.5);
+  }
+}
+
+async function trayProg(st,key){
+  const T=W.trays[key], ok=key==='OK', id= ok?'trayOK':'trayNG';
+  while(true){
+    if(T.count<T.cap){
+      if(!need('robot')){ st.status=`模擬放料 ${T.count}/${T.cap}`; await st.wait(0.45);
+        if(!T.robotBusy && T.state==='ready'){ const s=T.tray.slots.find(x=>!x.part); const p=makeFinished(!ok); T.tray.group.add(p); p.position.copy(s.p); s.part=p; T.count++; } continue; }
+      st.status=`收料中 ${T.count}/${T.cap}`; await st.wait(0.3); continue;
+    }
+    await waitFor(st,'等待機器人離開',()=>!T.robotBusy,()=>{ T.state='moving'; });
+    const g=T.tray.group;
+    st.status='滿盤送出'; await st.tween(1.6,k=>g.position.z=lerp(-120,-1080,k));
+    st.status='頂升入堆疊'; const ys=T.stack.map(t=>t.group.position.y);
+    await st.tween(0.6,k=>{ g.position.y=lerp(TOP+30,TOP+100,k); T.stack.forEach((t,i)=>t.group.position.y=ys[i]+70*k); });
+    T.stack.unshift(T.tray);
+    const nt=makeTray(330,430,T.cols,T.rows,T.px,T.pz); nt.group.position.set(T.cx,TOP+30,-1080); W.root.add(nt.group);
+    nt.group.scale.set(1,0.01,1);
+    st.status='空盤補入回送'; await st.tween(0.3,k=>nt.group.scale.y=Math.max(0.01,k));
+    T.tray=nt; T.count=0;
+    await st.tween(1.6,k=>nt.group.position.z=lerp(-1080,-120,k));
+    T.state='ready';
+    if(T.stack.length>=5){ st.status='堆疊滿 5 層 · 人員取出'; await st.wait(2.5); for(const t of T.stack) W.root.remove(t.group); T.stack=[]; }
+  }
+}
+
+/* ================= run control ================= */
+const progs = {
+  drawerL:st=>drawerProg(st,'L'), drawerR:st=>drawerProg(st,'R'), gantry:gantryProg,
+  magL:st=>magProg(st,'L'), magR:st=>magProg(st,'R'), robot:robotProg, index:indexProg,
+  feedL:st=>feedProg(st,'L'), feedR:st=>feedProg(st,'R'), trayOK:st=>trayProg(st,'OK'), trayNG:st=>trayProg(st,'NG'),
+};
+function startProgs(){ for(const st of stations){ st.status='待機'; progs[st.id](st).catch(e=>{ if(e!==ABORT) console.error(e); }); } }
+function resetAll(){
+  for(const st of stations){ st.running=false; st.abort(); }
+  Object.assign(sim,{time:0,ok:0,ng:0,ct:[],lastOut:null});
+  build(); startProgs(); renderList();
+}
+
+/* ================= labels ================= */
+const tags={};
+for(const st of stations){
+  const el=document.createElement('div'); el.className='tag'; el.innerHTML=`<b>${st.code}</b>${st.name}`;
+  const o=new CSS2DObject(el); o.position.set(st.focus[0],st.focus[1]+(st.id==='gantry'?700:300),st.focus[2]); scene.add(o); tags[st.id]=el;
+}
+
+/* ================= UI ================= */
+const list=document.getElementById('list');
+function renderList(){
+  list.innerHTML='';
+  for(const st of stations){
+    const d=document.createElement('div'); d.className='st'; d.dataset.id=st.id;
+    d.innerHTML=`<span class="code">${st.code}</span><div><div class="name">${st.name}</div><div class="spec">${st.spec}</div>
+      <div class="status"><i></i><span>${st.status}</span></div></div>
+      <div class="btns"><button class="tg" id="tg-${st.id}">運行</button><button class="solo" id="solo-${st.id}">單站運行</button><button class="fc" id="fc-${st.id}">聚焦</button></div>`;
+    d.querySelector('.tg').onclick=()=>{ st.running=!st.running; refresh(); };
+    d.querySelector('.solo').onclick=()=>{ for(const s of stations) s.running=false; sim.linked=false; cLink.checked=false; st.running=true; focus(st); refresh(); };
+    d.querySelector('.fc').onclick=()=>focus(st);
+    list.appendChild(d);
+  }
+  refresh();
+}
+const cLink=document.getElementById('cLink');
+cLink.onchange=()=>{ sim.linked=cLink.checked; refresh(); };
+document.getElementById('bAll').onclick=()=>{ sim.linked=true; cLink.checked=true; for(const s of stations) s.running=true; refresh(); };
+document.getElementById('bStop').onclick=()=>{ for(const s of stations) s.running=false; refresh(); };
+document.getElementById('bReset').onclick=()=>resetAll();
+const rSpeed=document.getElementById('rSpeed'), oSpeed=document.getElementById('oSpeed');
+rSpeed.oninput=()=>{ sim.speed=+rSpeed.value; oSpeed.textContent=sim.speed.toFixed(2)+'×'; };
+document.getElementById('cLabel').onchange=e=>stage.classList.toggle('labels-off',!e.target.checked);
+
+function refresh(){
+  for(const st of stations){
+    const d=list.querySelector(`[data-id="${st.id}"]`); if(!d) continue;
+    const s=st.state; d.dataset.s=s; tags[st.id].dataset.s=s;
+    d.querySelector('.status span').textContent= st.running? st.status : '停止 · '+st.status;
+    d.querySelector('.tg').textContent= st.running?'停止':'運行';
+  }
+  const n=stations.filter(s=>s.running).length;
+  document.getElementById('modeTxt').textContent = sim.linked
+    ? `連動模式 · 運行中 ${n}/${stations.length} 站。站與站之間有互鎖，未運行的站會讓上下游等待。`
+    : `單站模式 · 運行中 ${n}/${stations.length} 站。未運行的上下游由模擬自動供料／清料，可單獨檢視各站動作。`;
+  const mm=Math.floor(sim.time/60), ss=Math.floor(sim.time%60);
+  document.getElementById('kTime').textContent=`${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  document.getElementById('kOk').textContent=sim.ok; document.getElementById('kNg').textContent=sim.ng;
+  if(sim.ct.length){ const ct=sim.ct.reduce((a,b)=>a+b,0)/sim.ct.length; document.getElementById('kCt').textContent=ct.toFixed(1); document.getElementById('kUph').textContent=Math.round(3600/ct); }
+  else { document.getElementById('kCt').textContent='–'; document.getElementById('kUph').textContent='–'; }
+}
+setInterval(refresh,250);
+
+/* camera */
+const cams={ iso:[[-3300,3600,4300],[0,1100,0]], top:[[0,7200,60],[0,900,0]], front:[[0,1900,5200],[0,1250,0]], side:[[5400,2300,0],[0,1150,0]] };
+let camTw=null;
+function flyTo(pos,tgt,dur=0.9){ camTw={p0:camera.position.clone(),t0:controls.target.clone(),p1:new V3(...pos),t1:new V3(...tgt),t:0,d:dur}; }
+function focus(st){ const f=st.focus; flyTo([f[0]+1700,f[1]+1500,f[2]+2300],f); }
+document.querySelectorAll('[data-cam]').forEach(b=>b.onclick=()=>{ const c=cams[b.dataset.cam]; flyTo(c[0],c[1]); });
+camera.position.set(...cams.iso[0]); controls.target.set(...cams.iso[1]);
+
+function resize(){ const w=stage.clientWidth,h=stage.clientHeight; renderer.setSize(w,h); labelR.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(stage); resize();
+
+/* ================= main loop ================= */
+let last=performance.now(), blink=0;
+function frame(now){
+  const rdt=Math.min(0.05,(now-last)/1000); last=now; const dt=rdt*sim.speed; blink+=rdt;
+  let any=false;
+  for(const st of stations){ if(st.running) any=true; st.step(dt); }
+  if(any) sim.time+=dt;
+  // bowl vibration + part flow
+  for(const sd of['L','R']){
+    const F=W.feed[sd], on=S['feed'+sd].running;
+    F.bowl.rotation.y = on? Math.sin(now*0.09)*0.006 : 0;
+    if(on) for(const f of F.flow){ f.u=(f.u+dt*0.05)%1; }
+    for(const f of F.flow){ const a=(sd==='L'?0:Math.PI)-(1-f.u)*2.5*Math.PI*2*(sd==='L'?1:-1); f.p.position.set(198*Math.cos(a),10+f.u*128+(sd==='L'?2:4),198*Math.sin(a)); }
+  }
+  if(W.idx.measLamp.emissiveIntensity>0.05) W.idx.measLamp.emissiveIntensity=Math.max(0.05,W.idx.measLamp.emissiveIntensity-rdt*0.6);
+  // signal tower: green = all running, yellow = partial / waiting, red = stopped
+  const n=stations.filter(s=>s.running).length, waiting=stations.some(s=>s.state==='wait');
+  const [red,yel,grn]=W.tower;
+  red.emissiveIntensity= n===0?1.2:0.05;
+  yel.emissiveIntensity= (n>0&&(n<stations.length||waiting))?(Math.sin(blink*6)>0?1.2:0.15):0.05;
+  grn.emissiveIntensity= n>0?1.0:0.05;
+  if(camTw){ camTw.t+=rdt; const k=ease(Math.min(1,camTw.t/camTw.d)); camera.position.lerpVectors(camTw.p0,camTw.p1,k); controls.target.lerpVectors(camTw.t0,camTw.t1,k); if(k>=1) camTw=null; }
+  controls.update();
+  renderer.render(scene,camera); labelR.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+resetAll();
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches){ for(const s of stations) s.running=true; refresh(); }
+requestAnimationFrame(frame);
+</script>
