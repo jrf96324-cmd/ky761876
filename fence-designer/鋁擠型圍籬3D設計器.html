@@ -251,6 +251,11 @@ td input[type=number]{height:24px;width:80px}
 </section>
 <div class="toast" id="toast"></div>
 
+<div id="errbar" style="display:none;position:fixed;left:0;right:0;top:0;z-index:999;background:#7f1d1d;color:#fff;padding:10px 16px;font-size:14px;line-height:1.6"></div>
+<script>
+window.__errs=[];
+window.onerror=function(m,src,l,c){ window.__errs.push(m+' (行 '+l+')'); var b=document.getElementById('errbar'); if(b){ b.style.display='block'; b.innerHTML='程式錯誤：'+window.__errs.join('<br>')+'<br><small>請截圖此訊息回報。建議使用最新版 Chrome / Edge。</small>'; } };
+</script>
 <script>/**
  * @license
  * Copyright 2010-2021 Three.js Authors
@@ -1374,7 +1379,7 @@ const partPanelColor = p => S.overrides[p.id] || S.panelColor;
 const isAlu = p => p.kind==='post'||p.kind==='beam'||p.kind==='dframe';
 const isPanel = p => p.kind==='panel'||p.kind==='dpanel';
 const panelName = hex => (PANEL_COLORS.find(c=>c.hex.toLowerCase()===hex.toLowerCase())||{name:'自訂 '+hex.toUpperCase()}).name;
-const panelPrice = () => S.panelPrice[S.panel] ?? PANELS[S.panel].price;
+const panelPrice = () => (S.panelPrice[S.panel]!=null?S.panelPrice[S.panel]:PANELS[S.panel].price);
 
 /* ================= 型材斷面（T 槽） ================= */
 function profilePts(P, slot){
@@ -1528,7 +1533,7 @@ function pack(lens,stock,kerf){
   });
   return {bars,over};
 }
-function accPrice(key,def){ return S.accPrice[key] ?? def; }
+function accPrice(key,def){ return (S.accPrice[key]!=null?S.accPrice[key]:def); }
 function computeBOM(){
   const alu={}, pan={}, acc=[], st=S.price;
   let lenTot=0,kgTot=0,cuts=0;
@@ -1585,18 +1590,22 @@ function computeBOM(){
 
 /* ================= Three.js 場景 ================= */
 const stage=$('stage'), c3d=$('c3d');
-const renderer=new THREE.WebGLRenderer({canvas:c3d,antialias:true,alpha:true,preserveDrawingBuffer:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.outputEncoding=THREE.sRGBEncoding;
-renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
-renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+let renderer=null, HAS3D=false, GLERR='';
+function tryGL(opts){ try{ return new THREE.WebGLRenderer(Object.assign({canvas:c3d,alpha:true,preserveDrawingBuffer:true},opts)); }catch(e){ GLERR=e.message||String(e); return null; } }
+renderer=tryGL({antialias:true})||tryGL({antialias:false,powerPreference:'low-power',failIfMajorPerformanceCaveat:false});
+if(renderer){ HAS3D=true;
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+}
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(38,1,10,200000);
 const controls=new THREE.OrbitControls(camera,c3d);
 controls.enableDamping=true; controls.dampingFactor=0.09; controls.screenSpacePanning=true;
 controls.maxPolarAngle=Math.PI*0.495;
 
-(function env(){
+(function env(){ if(!HAS3D) return; try{
   const pm=new THREE.PMREMGenerator(renderer), es=new THREE.Scene();
   const g=new THREE.SphereGeometry(100,32,16), col=[], top=new THREE.Color('#e0f2fe'), mid=new THREE.Color('#64748b'), bot=new THREE.Color('#0f172a');
   const pos=g.attributes.position;
@@ -1608,6 +1617,7 @@ controls.maxPolarAngle=Math.PI*0.495;
     m.position.set(x,y,z); m.rotation.set(rx,ry,0); m.lookAt(0,0,0); es.add(m);
   });
   scene.environment=pm.fromScene(es,0.03).texture;
+  }catch(e){ console.warn('env',e); }
 })();
 scene.add(new THREE.HemisphereLight(0xdbeafe,0x1e293b,0.55));
 const sun=new THREE.DirectionalLight(0xffffff,1.6); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-0.0004; sun.shadow.normalBias=1.5; scene.add(sun,sun.target);
@@ -1832,11 +1842,11 @@ function fitView(kind){
 }
 function resize(){
   const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h) return;
-  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  if(renderer) renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
   if(view==='2d') draw2D();
 }
-new ResizeObserver(resize).observe(stage);
-(function loop(){ requestAnimationFrame(loop); if(view!=='3d') return; controls.update(); if(selHelper) selHelper.update(); renderer.render(scene,camera); updateLabels(); })();
+if(window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener('resize',resize);
+(function loop(){ requestAnimationFrame(loop); if(view!=='3d'||!HAS3D) return; controls.update(); if(selHelper) selHelper.update(); renderer.render(scene,camera); updateLabels(); })();
 
 /* ================= 2D 工程三視圖 ================= */
 let hits2d=[];
@@ -2091,7 +2101,7 @@ function exportCSV(){
 }
 function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
 $('btn-csv').onclick=exportCSV;
-$('btn-png').onclick=()=>{ const cv=view==='3d'?c3d:$('c2d'); if(view==='3d') renderer.render(scene,camera); cv.toBlob(b=>download(b,`圍籬_${view}_${S.w}x${S.d}x${S.h}.png`)); };
+$('btn-png').onclick=()=>{ const cv=view==='3d'?c3d:$('c2d'); if(view==='3d'&&HAS3D) renderer.render(scene,camera); cv.toBlob(b=>download(b,`圍籬_${view}_${S.w}x${S.d}x${S.h}.png`)); };
 
 /* ================= 頂部工具列 ================= */
 function renderTop(){
@@ -2132,7 +2142,7 @@ function switchView(v){
   closeEditor(); $('tip').style.display='none';
   buildDims(); if(v==='2d') draw2D(); else resize();
 }
-$('tab-3d').onclick=()=>switchView('3d'); $('tab-2d').onclick=()=>switchView('2d');
+$('tab-3d').onclick=()=>{ if(!HAS3D){ no3DMsg(); return; } switchView('3d'); }; $('tab-2d').onclick=()=>switchView('2d');
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>fitView(b.dataset.view));
 c3d.addEventListener('dblclick',()=>fitView('iso'));
 
@@ -2150,9 +2160,19 @@ function update(){
   build3D(); renderTop(); renderStyleUI(); renderBOM(); renderHUD();
   if(view==='2d') draw2D();
 }
+function no3DMsg(){
+  toast('此電腦瀏覽器無法啟用 WebGL 3D，已改用工程三視圖。請開啟硬體加速後重新整理。');
+  const b=$('errbar'); b.style.display='block'; b.style.background='#78350f';
+  b.innerHTML='⚠ 3D 無法顯示（WebGL 未啟用'+(GLERR?'：'+GLERR:'')+'）。三視圖、尺寸修改、BOM、估價仍可正常使用。<br>'+
+   '<small>解決方式：Chrome 網址列輸入 <b>chrome://settings/system</b> → 開啟「可用時使用圖形加速功能」→ 重新啟動瀏覽器；或到 <b>chrome://gpu</b> 查看 WebGL 狀態。Edge 為 edge://settings/system。</small>'+
+   ' <button class="btn vb" onclick="this.parentNode.style.display=\'none\'" style="margin-left:8px">關閉</button>';
+}
 function init(){
   ['w','d','h'].forEach(resetSpacing); applyDoorW(); clampDoorH();
-  update(); resize(); fitView('iso');
+  if(!HAS3D){ view='2d'; }
+  try{ update(); }catch(e){ console.error(e); window.onerror(e.message,'',0,0); }
+  resize();
+  if(HAS3D) fitView('iso'); else { switchView('2d'); no3DMsg(); }
 }
 init();
 </script>
