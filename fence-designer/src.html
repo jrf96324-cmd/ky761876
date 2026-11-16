@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>鋁擠型圍籬設計器</title>
+<style>
+:root{--bg:#070c16;--panel:#0e1524;--panel2:#121b2e;--line:#1f2b43;--line2:#2c3d5c;--text:#e6edf7;--muted:#8fa0ba;--accent:#38bdf8;--accent2:#2563eb;--warn:#f59e0b;--ok:#22c55e;--door:#fb923c}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 "Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{background:linear-gradient(180deg,#101c33,#0b1324);border-bottom:1px solid var(--line);padding:8px 12px 6px;flex:none}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;margin-bottom:6px}
+.logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#38bdf8,#2563eb);display:grid;place-items:center;box-shadow:0 0 18px rgba(56,189,248,.45)}
+.brand small{color:var(--muted);font-weight:400;font-size:12px}
+.brand .sp{flex:1}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row+.row{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.f{display:flex;flex-direction:column;gap:2px}
+.f>label,.lbl{font-size:11px;color:var(--muted);font-weight:600}
+input,select,button{font:inherit;color:var(--text)}
+input[type=number],input[type=text],select{height:28px;background:#0a1222;border:1px solid var(--line2);border-radius:6px;padding:0 8px}
+input[type=number]{width:78px;text-align:right;color:#7dd3fc;font-weight:700;font-variant-numeric:tabular-nums}
+input.sm{width:58px}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.2)}
+input[type=color]{width:32px;height:28px;padding:0;border:1px solid var(--line2);border-radius:6px;background:none;cursor:pointer}
+input[type=range]{accent-color:var(--door);width:90px}
+.btn{height:28px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:#13203a;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.pri{background:linear-gradient(135deg,#0ea5e9,#2563eb);border:none;color:#fff}
+.btn.pri:hover{filter:brightness(1.1);color:#fff}
+.chk{display:flex;align-items:center;gap:6px;height:28px;cursor:pointer;font-size:12px;white-space:nowrap}
+.doorbox{display:flex;gap:8px;align-items:flex-end;padding:4px 8px;border:1px solid rgba(251,146,60,.45);background:rgba(251,146,60,.07);border-radius:8px}
+.doorbox .chk{color:var(--door);font-weight:700}
+.doorbox.off .dc{opacity:.4;pointer-events:none}
+.doorbox.na{opacity:.35;pointer-events:none}
+.splist{display:flex;gap:4px;overflow-x:auto;max-width:380px}
+.splist input{width:66px!important;height:26px;text-align:center!important;font-size:12px}
+.splist input.door{border-color:var(--door);color:var(--door)}
+.main{flex:1;display:flex;min-height:0}
+.viewport{flex:1;display:flex;flex-direction:column;min-width:0}
+.vtabs{display:flex;align-items:center;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.vtab{padding:5px 14px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:700}
+.vtab.on{background:rgba(56,189,248,.14);color:var(--accent)}
+.vtabs .sp{flex:1}
+.vb{height:26px;padding:0 9px;font-size:12px}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(ellipse at 30% 0%,#1d3a63 0%,#0b1528 48%,#060a13 100%)}
+#c3d,#c2d{position:absolute;inset:0;width:100%;height:100%;display:block}
+#c2d{display:none;background:#fff}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.dim{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;background:rgba(8,47,73,.88);border:1px solid #38bdf8;color:#e0f2fe;border-radius:5px;padding:1px 6px;font:700 11px/16px ui-monospace,Consolas,monospace;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.4);transition:background .15s}
+.dim:hover{background:#0284c7;color:#fff}
+.dim.tot{background:rgba(30,58,138,.92);border-color:#93c5fd;font-size:12px}
+.dim.door{border-color:var(--door);background:rgba(124,45,18,.88);color:#ffedd5}
+.dim.lv{border-color:#a78bfa;background:rgba(46,16,101,.85)}
+.hud{position:absolute;left:12px;top:12px;background:rgba(2,6,23,.62);border:1px solid rgba(96,165,250,.3);border-radius:12px;padding:10px 12px;font-size:12px;backdrop-filter:blur(8px);pointer-events:none;min-width:190px}
+.hud b{color:#7dd3fc}
+.hud .k{color:var(--muted)}
+.hint{position:absolute;left:12px;bottom:10px;font-size:11px;color:#9fb3d1;background:rgba(2,6,23,.55);padding:5px 10px;border-radius:8px;pointer-events:none}
+.tip{position:absolute;pointer-events:none;background:#0b1220;border:1px solid var(--accent);color:#e0f2fe;padding:4px 8px;border-radius:6px;font-size:12px;white-space:nowrap;display:none;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.editor{position:absolute;z-index:9;background:#0d1729;border:1px solid var(--accent);border-radius:10px;padding:10px;box-shadow:0 14px 40px rgba(0,0,0,.55);width:210px}
+.editor .et{font-weight:700;font-size:12px;color:var(--accent);margin-bottom:6px}
+.editor input{width:100%!important;height:32px;font-size:15px}
+.editor .eh{font-size:11px;color:var(--muted);margin-top:5px}
+.editor .eb{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#7c2d12;border:1px solid var(--door);color:#fff;padding:8px 16px;border-radius:8px;z-index:50;display:none;font-size:13px}
+.side{width:320px;flex:none;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto}
+.sec{padding:12px 14px;border-bottom:1px solid var(--line)}
+.sec h4{margin:0 0 10px;font-size:12px;color:var(--accent);letter-spacing:.05em;display:flex;align-items:center;gap:6px}
+.sec h4 .sp{flex:1}
+.sub{font-size:11px;color:var(--muted);margin:10px 0 5px;font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid2 select,.grid2 input{width:100%}
+.sw{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.swc{width:26px;height:26px;border-radius:6px;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);position:relative}
+.swc.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.35)}
+.swname{font-size:11px;color:var(--muted);margin-top:4px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cards.c3{grid-template-columns:repeat(3,1fr)}
+.pc{border:1px solid var(--line2);border-radius:8px;padding:5px 2px 4px;text-align:center;cursor:pointer;font-size:11px;font-weight:700;background:#0a1222;color:#cbd5e1;transition:.15s}
+.pc:hover{border-color:#60a5fa}
+.pc svg{display:block;margin:0 auto 3px}
+.pc.on{border-color:var(--accent);background:rgba(56,189,248,.12);color:var(--accent);box-shadow:0 0 12px rgba(56,189,248,.18)}
+.pc small{display:block;font-weight:400;color:var(--muted);font-size:10px}
+.sel-empty{color:var(--muted);font-size:12px;line-height:1.7}
+.kv{display:grid;grid-template-columns:78px 1fr;gap:4px 8px;font-size:12px;margin-bottom:8px}
+.kv b{color:var(--muted);font-weight:600}
+.ed-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.ed-row label{flex:1;font-size:12px;color:#cbd5e1}
+.ed-row input{width:90px}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;background:rgba(56,189,248,.15);color:var(--accent)}
+.tag.door{background:rgba(251,146,60,.15);color:var(--door)}
+.bom{height:36vh;flex:none;display:flex;flex-direction:column;background:var(--panel);border-top:1px solid var(--line)}
+.btabs{display:flex;align-items:center;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.btab{padding:6px 14px;cursor:pointer;color:var(--muted);font-weight:700;border-radius:6px 6px 0 0;border:1px solid transparent;border-bottom:none;margin-bottom:-1px}
+.btab.on{color:var(--accent);background:var(--panel2);border-color:var(--line)}
+.btabs .sp{flex:1}
+.btabs .tot{font-size:12px;color:var(--muted);margin-right:8px}
+.btabs .tot b{color:#86efac;font-size:14px}
+.bbody{flex:1;overflow:auto;background:var(--panel2)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{position:sticky;top:0;background:#16213a;color:#9fb3d1;text-align:left;padding:7px 8px;font-weight:700;z-index:1;white-space:nowrap}
+td{padding:5px 8px;border-bottom:1px solid #1a2540;white-space:nowrap}
+tr:hover td{background:rgba(56,189,248,.06)}
+tr.sum td{font-weight:700;color:#e2e8f0;background:#111b30}
+.n{text-align:right;font-variant-numeric:tabular-nums;font-family:ui-monospace,Consolas,monospace}
+.dot{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+td input[type=number]{height:24px;width:80px}
+.nest{padding:10px 12px}
+.ng{margin-bottom:14px}
+.ng h5{margin:0 0 6px;font-size:12px;color:#cbd5e1}
+.ng h5 span{color:var(--muted);font-weight:400;margin-left:8px}
+.barrow{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.barrow .bi{width:46px;font-size:11px;color:var(--muted);text-align:right}
+.bar{flex:1;display:flex;height:22px;border-radius:4px;overflow:hidden;background:repeating-linear-gradient(45deg,#1e293b 0 6px,#111827 6px 12px);border:1px solid #334155}
+.seg{height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#0b1220;font-weight:700;border-right:2px solid #0b1220;overflow:hidden;white-space:nowrap}
+.barrow .bu{width:56px;font-size:11px;color:var(--muted)}
+.est{display:grid;grid-template-columns:minmax(320px,1.2fr) minmax(260px,1fr);gap:0}
+.est .params{padding:10px 14px;border-left:1px solid var(--line)}
+.est .params .ed-row label{color:var(--muted)}
+.note{font-size:11px;color:var(--muted);padding:6px 10px}
+.warn{color:var(--warn)}
+@media (max-width:980px){
+  body{height:auto;overflow:auto}
+  .main{flex-direction:column}
+  .viewport{height:62vh}
+  .side{width:auto;border-left:none}
+  .bom{height:auto;min-height:50vh}
+  .est{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="1"/><path d="M6 2v3M10 2v3M6 14v-3M10 14v-3M2 6h3M2 10h3M14 6h-3M14 10h-3"/></svg></div>
+    鋁擠型圍籬 3D 設計器 <small>結構・料件樣式・裁切 BOM・估價</small>
+    <span class="sp"></span>
+    <button class="btn" id="btn-csv">匯出 BOM (CSV)</button>
+    <button class="btn pri" id="btn-png">匯出圖片</button>
+  </div>
+  <div class="row">
+    <div class="f"><label>結構模式</label>
+      <select id="in-mode">
+        <option value="full">矩陣（含內隔間）</option>
+        <option value="hollow">中空（外圍一圈）</option>
+        <option value="u_shape">U 型（後＋左右）</option>
+        <option value="l_shape">L 型（後＋左）</option>
+        <option value="parallel">雙邊相對（左右）</option>
+        <option value="single">單面牆（正面）</option>
+      </select></div>
+    <div class="f"><label>總寬 W</label><input type="number" id="in-w" step="10"></div>
+    <div class="f"><label>總深 D</label><input type="number" id="in-d" step="10"></div>
+    <div class="f"><label>總高 H</label><input type="number" id="in-h" step="10"></div>
+    <div class="f"><label>寬格數</label><input type="number" class="sm" id="in-cols" min="1" max="10"></div>
+    <div class="f"><label>深格數</label><input type="number" class="sm" id="in-rows" min="1" max="10"></div>
+    <div class="f"><label>層數</label><input type="number" class="sm" id="in-levels" min="1" max="6"></div>
+    <label class="chk" title="鎖定時修改單格尺寸由最後一格吸收差值；解除則總尺寸跟著改變"><input type="checkbox" id="in-lock"> 鎖定總尺寸</label>
+    <div class="doorbox" id="doorbox">
+      <label class="chk"><input type="checkbox" id="door-active"> 正面開門</label>
+      <div class="f dc"><label>門位置</label><select id="door-idx"></select></div>
+      <div class="f dc"><label>開口寬</label><input type="number" class="sm" id="door-w" step="10" style="width:72px"></div>
+      <div class="f dc"><label>開口高</label><input type="number" class="sm" id="door-h" step="10" style="width:72px"></div>
+      <div class="f dc"><label>鉸鏈側</label><select id="door-hinge"><option value="L">左</option><option value="R">右</option></select></div>
+      <div class="f dc"><label>開啟角度 <span id="door-ang-v"></span></label><input type="range" id="door-ang" min="0" max="110"></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="f"><label>寬度各格淨距 (mm)</label><div class="splist" id="sp-w"></div></div>
+    <div class="f"><label>深度各格淨距 (mm)</label><div class="splist" id="sp-d"></div></div>
+    <div class="f"><label>各層淨高 (mm，由下而上)</label><div class="splist" id="sp-h"></div></div>
+  </div>
+</header>
+
+<div class="main">
+  <section class="viewport">
+    <div class="vtabs">
+      <div class="vtab on" id="tab-3d">3D 結構預覽</div>
+      <div class="vtab" id="tab-2d">工程三視圖</div>
+      <span class="sp"></span>
+      <button class="btn vb" data-view="iso">等角</button>
+      <button class="btn vb" data-view="front">前視</button>
+      <button class="btn vb" data-view="right">右視</button>
+      <button class="btn vb" data-view="top">俯視</button>
+    </div>
+    <div id="stage">
+      <canvas id="c3d"></canvas>
+      <canvas id="c2d"></canvas>
+      <div id="labels"></div>
+      <div class="hud" id="hud"></div>
+      <div class="hint" id="hint">左鍵旋轉｜右鍵平移｜滾輪縮放｜<b style="color:#7dd3fc">點料件</b>可改尺寸/顏色｜<b style="color:#7dd3fc">點藍色尺寸</b>直接修改</div>
+      <div class="tip" id="tip"></div>
+      <div class="editor" id="editor" hidden>
+        <div class="et" id="ed-t"></div>
+        <input type="number" id="ed-v">
+        <div class="eh" id="ed-h"></div>
+        <div class="eb"><button class="btn" id="ed-c">取消</button><button class="btn pri" id="ed-o">確定</button></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="sec">
+      <h4>型材系列 <span class="sp"></span><span class="tag" id="prof-tag"></span></h4>
+      <div class="cards" id="prof-cards"></div>
+      <div class="sub">門扇型材</div>
+      <div class="cards" id="dprof-cards"></div>
+    </div>
+    <div class="sec">
+      <h4>型材顏色／表面處理</h4>
+      <div class="sw" id="alu-sw"></div>
+      <div class="swname" id="alu-name"></div>
+    </div>
+    <div class="sec">
+      <h4>板材樣式</h4>
+      <div class="cards c3" id="panel-cards"></div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="f"><label>板厚 / 線徑 (mm)</label><select id="panel-thick"></select></div>
+        <div class="f"><label>單價 (NT$/m²)</label><input type="number" id="panel-price" step="50"></div>
+      </div>
+      <div class="sub">板材顏色</div>
+      <div class="sw" id="panel-sw"></div>
+    </div>
+    <div class="sec">
+      <h4>底座與接合</h4>
+      <div class="cards c3" id="base-cards"></div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="f"><label>每接點角座數</label><select id="bpj"><option value="1">1 個</option><option value="2">2 個（雙側）</option></select></div>
+        <div class="f"><label>顯示</label>
+          <div style="display:flex;gap:8px"><label class="chk"><input type="checkbox" id="show-dims">尺寸</label><label class="chk"><input type="checkbox" id="show-edges">邊線</label></div></div>
+      </div>
+    </div>
+    <div class="sec" id="sel-sec">
+      <h4>選取料件 <span class="sp"></span><button class="btn vb" id="sel-clear" style="display:none">取消選取</button></h4>
+      <div id="sel-body"></div>
+    </div>
+  </aside>
+</div>
+
+<section class="bom">
+  <div class="btabs">
+    <div class="btab on" data-t="alu">鋁材裁切清單</div>
+    <div class="btab" data-t="panel">板材清單</div>
+    <div class="btab" data-t="acc">五金配件</div>
+    <div class="btab" data-t="nest">下料排版</div>
+    <div class="btab" data-t="est">估價單</div>
+    <span class="sp"></span>
+    <span class="tot">鋁材 <b id="t-len">0</b> m ｜ 重量 <b id="t-kg">0</b> kg ｜ 長料 <b id="t-bars">0</b> 支 ｜ 含稅估價 <b id="t-cost">0</b></span>
+  </div>
+  <div class="bbody" id="bbody"></div>
+</section>
+<div class="toast" id="toast"></div>
+
+<script>/*__THREE__*/</script>
+<script>/*__ORBIT__*/</script>
+<script>
+"use strict";
+/* ================= 資料庫：型材 / 顏色 / 板材 / 底座 ================= */
+const PROFILES = {
+  '2020':{s:20,slot:6, kg:0.50,bracket:12,nut:4,cap:5, bolt:'M5'},
+  '3030':{s:30,slot:8, kg:0.85,bracket:18,nut:5,cap:6, bolt:'M6'},
+  '4040':{s:40,slot:8, kg:1.45,bracket:25,nut:6,cap:8, bolt:'M8'},
+  '4545':{s:45,slot:10,kg:1.90,bracket:30,nut:6,cap:10,bolt:'M8'},
+  '5050':{s:50,slot:10,kg:2.30,bracket:35,nut:6,cap:12,bolt:'M8'},
+  '6060':{s:60,slot:10,kg:3.00,bracket:45,nut:7,cap:15,bolt:'M8'},
+  '8080':{s:80,slot:10,kg:5.20,bracket:70,nut:8,cap:25,bolt:'M8'}
+};
+const ALU_COLORS = [
+  {id:'silver',name:'銀白陽極',hex:'#c9ced6',metal:.85,rough:.30,up:0},
+  {id:'black', name:'黑色陽極',hex:'#2a2c31',metal:.55,rough:.40,up:.10},
+  {id:'champ', name:'香檳金陽極',hex:'#c9a96e',metal:.85,rough:.30,up:.15},
+  {id:'ti',    name:'鈦灰陽極',hex:'#6d727b',metal:.80,rough:.34,up:.12},
+  {id:'white', name:'白色烤漆',hex:'#eef0f2',metal:.05,rough:.55,up:.20},
+  {id:'blue',  name:'工業藍烤漆',hex:'#1f5fbf',metal:.10,rough:.50,up:.20},
+  {id:'orange',name:'安全橘烤漆',hex:'#f26b1d',metal:.10,rough:.50,up:.20}
+];
+const PANELS = {
+  mesh:   {name:'焊接鐵網',  short:'鐵網',  price:650,  th:[3,4,5],        tex:'mesh',pitch:50},
+  perf:   {name:'沖孔鐵板',  short:'沖孔板',price:1500, th:[1.0,1.2,1.5,2.0],tex:'perf',pitch:16},
+  acrylic:{name:'透明壓克力',short:'壓克力',price:1800, th:[3,5,8,10],      clear:true},
+  pc:     {name:'PC 耐力板', short:'耐力板',price:1400, th:[3,5,8],         clear:true,frost:true},
+  sheet:  {name:'鈑金烤漆板',short:'鈑金',  price:1200, th:[1.0,1.2,1.5,2.0]},
+  none:   {name:'無板材',    short:'無',    price:0,    th:[0]}
+};
+const PANEL_COLORS = [
+  {hex:'#1f2328',name:'消光黑'},{hex:'#f2f2f2',name:'白'},{hex:'#f2b705',name:'安全黃'},
+  {hex:'#2e7d32',name:'墨綠'},{hex:'#8a9099',name:'淺灰'},{hex:'#9fd3ff',name:'透明藍'},{hex:'#ffffff',name:'透明無色'}
+];
+const BASES = {
+  none:  {name:'直接落地',  h:0},
+  foot:  {name:'調整腳座',  h:60},
+  caster:{name:'萬向輪',    h:105}
+};
+
+/* ================= 狀態 ================= */
+const S = {
+  w:3000,d:1500,h:2000,cols:3,rows:1,levels:2,mode:'hollow',lock:true,
+  spW:[],spD:[],spH:[],
+  door:{active:true,idx:1,w:900,h:1800,hinge:'L',angle:35},
+  profile:'4040',doorProfile:'3030',alu:'silver',aluCustom:'#8b5cf6',
+  panel:'mesh',panelColor:'#1f2328',panelThick:4,
+  base:'foot',bpj:1,showDims:true,showEdges:true,
+  overrides:{},
+  price:{aluKg:180,cut:15,labor:800,kerf:3,stock:6000,margin:15,tax:5},
+  panelPrice:{},accPrice:{}
+};
+let parts=[], BOM=null, selectedId=null, view='3d', bomTab='alu';
+
+/* ================= 小工具 ================= */
+const $ = id => document.getElementById(id);
+const fmt = (n,d=0) => Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const money = n => 'NT$ ' + fmt(Math.round(n));
+const P_ = () => PROFILES[S.profile].s;
+const ins = series => Math.round(PROFILES[series||S.profile].slot*0.75);   // 板材入槽深
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2600); }
+function aluDef(key){
+  if(key && key[0]==='#') return {id:key,name:'自訂色 '+key.toUpperCase(),hex:key,metal:.35,rough:.42,up:.25};
+  return ALU_COLORS.find(c=>c.id===key) || ALU_COLORS[0];
+}
+const globalAluKey = () => S.alu==='custom' ? S.aluCustom : S.alu;
+const partAlu = p => aluDef(S.overrides[p.id] || globalAluKey());
+const partPanelColor = p => S.overrides[p.id] || S.panelColor;
+const isAlu = p => p.kind==='post'||p.kind==='beam'||p.kind==='dframe';
+const isPanel = p => p.kind==='panel'||p.kind==='dpanel';
+const panelName = hex => (PANEL_COLORS.find(c=>c.hex.toLowerCase()===hex.toLowerCase())||{name:'自訂 '+hex.toUpperCase()}).name;
+const panelPrice = () => S.panelPrice[S.panel] ?? PANELS[S.panel].price;
+
+/* ================= 型材斷面（T 槽） ================= */
+function profilePts(P, slot){
+  const h=P/2, o=slot/2, n=P*0.075, cw=Math.min(slot*0.95,P*0.36), cd=P*0.16, c=P*0.04;
+  const side=[[-h+c,0],[-o,0],[-o,n],[-cw,n],[-cw,n+cd*0.6],[-o*0.6,n+cd],[o*0.6,n+cd],[cw,n+cd*0.6],[cw,n],[o,n],[o,0],[h-c,0]];
+  const pts=[];
+  for(let k=0;k<4;k++){
+    const a=k*Math.PI/2, ca=Math.cos(a), sa=Math.sin(a);
+    side.forEach(([u,v])=>{ const x=u, y=-h+v; pts.push([x*ca-y*sa, x*sa+y*ca]); });
+  }
+  return pts;
+}
+function profileSVG(series,size=30,color='#cbd5e1'){
+  const p=PROFILES[series], k=(size-2)/p.s, c=size/2;
+  const d=profilePts(p.s,p.slot).map((q,i)=>(i?'L':'M')+(c+q[0]*k).toFixed(1)+' '+(c-q[1]*k).toFixed(1)).join('')+'Z';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><path d="${d}" fill="${color}" stroke="#0b1220" stroke-width=".6"/><circle cx="${c}" cy="${c}" r="${(p.s*0.11*k).toFixed(1)}" fill="#0a1222"/></svg>`;
+}
+
+/* ================= 尺寸邏輯 ================= */
+const spArr = a => a==='w'?S.spW:a==='d'?S.spD:S.spH;
+const cnt = a => a==='w'?S.cols:a==='d'?S.rows:S.levels;
+const AXN = {w:'寬',d:'深',h:'高'};
+function resetSpacing(a){
+  const P=P_(), n=cnt(a), clear=S[a]-(n+1)*P;
+  if(clear < n*10){ toast(`總${AXN[a]}過小，無法容納 ${n} 格`); S[a]=(n+1)*P+n*100; return resetSpacing(a); }
+  const each=Math.floor(clear/n), arr=Array(n).fill(each);
+  arr[n-1]=clear-each*(n-1);
+  if(a==='w') S.spW=arr; else if(a==='d') S.spD=arr; else S.spH=arr;
+}
+function recalcTotal(a){ S[a]=spArr(a).reduce((x,y)=>x+y,0)+(cnt(a)+1)*P_(); }
+function setSpan(a,i,v,quiet){
+  v=Math.round(+v); if(!(v>=10)){ toast('尺寸需 ≥ 10 mm'); return; }
+  const arr=spArr(a);
+  if(!S.lock || arr.length===1){ arr[i]=v; recalcTotal(a); }
+  else{
+    const j = i===arr.length-1 ? arr.length-2 : arr.length-1;
+    const pool=arr[i]+arr[j];
+    if(v>pool-10){ if(!quiet) toast(`已達總${AXN[a]}上限，第 ${j+1} 格最小保留 10 mm（可解除「鎖定總尺寸」）`); v=pool-10; }
+    arr[i]=v; arr[j]=pool-v;
+  }
+  if(a==='w' && S.door.active && i===S.door.idx) S.door.w=arr[i];
+  if(!quiet) update();
+}
+function setTotal(a,v){
+  v=Math.round(+v); if(!(v>0)) return;
+  S[a]=v; resetSpacing(a);
+  if(a==='w') applyDoorW();
+  if(a==='h') clampDoorH();
+  update();
+}
+function setCount(key,v){
+  v=Math.max(1,Math.min(key==='levels'?6:10,Math.round(+v)||1));
+  S[key]=v; const a={cols:'w',rows:'d',levels:'h'}[key];
+  if(!S.lock){ S[a]=(v+1)*P_()+v*Math.round(spArr(a)[0]||500); }
+  resetSpacing(a);
+  if(a==='w'){ if(S.door.idx>=S.cols) S.door.idx=S.cols-1; applyDoorW(); }
+  update();
+}
+const doorAllowed = () => walls().W.includes(S.rows);
+function applyDoorW(){
+  if(!S.door.active||!doorAllowed()) return;
+  if(S.door.idx>=S.cols) S.door.idx=S.cols-1;
+  const n=S.cols, clear=S.w-(n+1)*P_();
+  if(n===1){ S.door.w=S.spW[0]; return; }
+  const dw=Math.min(Math.max(300,Math.round(S.door.w)),clear-(n-1)*10);
+  const rest=clear-dw, each=Math.floor(rest/(n-1)); let left=rest-each*(n-1);
+  S.spW=S.spW.map((_,i)=>{ if(i===S.door.idx) return dw; const v=each+(left>0?1:0); if(left>0) left--; return v; });
+  S.door.w=dw;
+}
+function clampDoorH(){ const mx=S.h-P_()-20; if(S.door.h>mx) S.door.h=mx; if(S.door.h<600) S.door.h=600; }
+function setDoorH(v){ S.door.h=Math.round(+v)||S.door.h; clampDoorH(); update(); }
+
+/* ================= 結構展開（料件清單） ================= */
+function walls(){
+  const R=S.rows,C=S.cols, rng=n=>[...Array(n+1).keys()];
+  switch(S.mode){
+    case 'full':    return {W:rng(R),D:rng(C)};
+    case 'hollow':  return {W:[0,R],D:[0,C]};
+    case 'u_shape': return {W:[0],D:[0,C]};
+    case 'l_shape': return {W:[0],D:[0]};
+    case 'parallel':return {W:[],D:[0,C]};
+    case 'single':  return {W:[R],D:[]};
+  }
+}
+function axisPos(total,sp,P){ const a=[-total/2+P/2]; let c=a[0]; sp.forEach(s=>{c+=P+s;a.push(c)}); return a; }
+const B=(cx,cy,cz,sx,sy,sz)=>({cx,cy,cz,sx,sy,sz});
+let GEO={};  // 共享座標
+function doorGeom(){
+  const P=P_(), hasHeader=(S.h-P)-(S.door.h+P)>=0;
+  return {hasHeader, openTop: hasHeader?S.door.h:S.h-P};
+}
+function buildParts(){
+  const P=P_(), I=ins(), h=S.h, T=PANELS[S.panel].th.includes(S.panelThick)?S.panelThick:PANELS[S.panel].th[0];
+  const out=[], {W,D}=walls();
+  const xs=axisPos(S.w,S.spW,P), zs=axisPos(S.d,S.spD,P), ys=axisPos(h,S.spH,P).map(v=>v+h/2);
+  GEO={xs,zs,ys,P};
+  const posts=new Set();
+  W.forEach(r=>{for(let c=0;c<=S.cols;c++) posts.add(c+','+r)});
+  D.forEach(c=>{for(let r=0;r<=S.rows;r++) posts.add(c+','+r)});
+  [...posts].sort().forEach(k=>{const [c,r]=k.split(',').map(Number);
+    out.push({id:`P${c}-${r}`,kind:'post',name:'立柱',series:S.profile,len:h,axis:'y',box:B(xs[c],h/2,zs[r],P,h,P),c,r});});
+  const lvName=k=>k==='h'?'門眉橫梁':k===0?'底橫梁':k===ys.length-1?'頂橫梁':'中橫梁';
+  function bay(dir,line,b,span,cx,cz,isDoor){
+    let lv=ys.map((y,k)=>({y,k})), dg=null;
+    if(isDoor){
+      dg=doorGeom();
+      lv=lv.filter(L=>L.k===ys.length-1 || L.y-P/2 >= dg.openTop+(dg.hasHeader?P:0));
+      if(dg.hasHeader) lv.push({y:dg.openTop+P/2,k:'h'});
+      lv.sort((a,b)=>a.y-b.y);
+    }
+    const tag=`${dir}${line}-${b}`;
+    lv.forEach(L=>out.push({id:`B${tag}-${L.k}`,kind:'beam',name:lvName(L.k),series:S.profile,len:span,axis:dir==='W'?'x':'z',
+      box:dir==='W'?B(cx,L.y,cz,span,P,P):B(cx,L.y,cz,P,P,span),dir,line,bay:b,lvl:L.k}));
+    if(S.panel!=='none') for(let i=0;i<lv.length-1;i++){
+      const y0=lv[i].y+P/2, y1=lv[i+1].y-P/2, ph=y1-y0; if(ph<5) continue;
+      out.push({id:`N${tag}-${lv[i].k}`,kind:'panel',name:isDoor?'門上氣窗板':'嵌板',w:span+2*I,h:ph+2*I,t:T,dir,line,bay:b,lvl:lv[i].k,
+        box:dir==='W'?B(cx,(y0+y1)/2,cz,span,ph,T):B(cx,(y0+y1)/2,cz,T,ph,span)});
+    }
+    if(isDoor){
+      const dp=PROFILES[S.doorProfile].s, dI=ins(S.doorProfile), g=4, gb=10;
+      const x0=xs[b]+P/2+g, x1=xs[b+1]-P/2-g, y0=gb, y1=dg.openTop-g, Lw=x1-x0, Lh=y1-y0;
+      if(Lw<2*dp+50||Lh<2*dp+50){ toast('門開口過小，無法配置門扇'); return; }
+      const sgn=S.door.hinge==='L'?1:-1, pv={x:S.door.hinge==='L'?x0:x1, y:0, z:cz+dp/2};
+      const mk=(id,kind,name,box,extra)=>{ const p={id,kind,name,box,door:true,pivot:pv,local:{x:box.cx-pv.x,y:box.cy,z:box.cz-pv.z},...extra}; out.push(p); };
+      const ym=(y0+y1)/2;
+      mk('DV1','dframe','門扇立料',B(x0+dp/2,ym,cz,dp,Lh,dp),{series:S.doorProfile,len:Lh,axis:'y'});
+      mk('DV2','dframe','門扇立料',B(x1-dp/2,ym,cz,dp,Lh,dp),{series:S.doorProfile,len:Lh,axis:'y'});
+      mk('DH1','dframe','門扇橫料',B((x0+x1)/2,y0+dp/2,cz,Lw-2*dp,dp,dp),{series:S.doorProfile,len:Lw-2*dp,axis:'x'});
+      mk('DH2','dframe','門扇橫料',B((x0+x1)/2,y1-dp/2,cz,Lw-2*dp,dp,dp),{series:S.doorProfile,len:Lw-2*dp,axis:'x'});
+      if(S.panel!=='none') mk('DP','dpanel','門扇嵌板',B((x0+x1)/2,ym,cz,Lw-2*dp,Lh-2*dp,T),{w:Lw-2*dp+2*dI,h:Lh-2*dp+2*dI,t:T,dir:'W'});
+      GEO.door={x0,x1,y0,y1,Lw,Lh,dp,sgn,pv,cz,bay:b,openTop:dg.openTop,hasHeader:dg.hasHeader};
+    }
+  }
+  GEO.door=null;
+  W.forEach(r=>{for(let c=0;c<S.cols;c++){
+    const isDoor=S.door.active&&doorAllowed()&&r===S.rows&&c===S.door.idx;
+    bay('W',r,c,S.spW[c],(xs[c]+xs[c+1])/2,zs[r],isDoor);
+  }});
+  D.forEach(c=>{for(let r=0;r<S.rows;r++) bay('D',c,r,S.spD[r],xs[c],(zs[r]+zs[r+1])/2,false);});
+  return out;
+}
+
+/* ================= BOM / 下料 / 估價 ================= */
+function pack(lens,stock,kerf){
+  const L=[...lens].sort((a,b)=>b-a), bars=[]; let over=0;
+  L.forEach(l=>{
+    if(l>stock){ over++; bars.push({cuts:[l],rem:0,over:true}); return; }
+    let b=bars.find(b=>!b.over && b.rem>=l+kerf || (!b.over && b.rem>=l && b.rem-l<kerf));
+    if(!b){ b={cuts:[],rem:stock}; bars.push(b); }
+    b.cuts.push(l); b.rem=Math.max(0,b.rem-l-kerf);
+  });
+  return {bars,over};
+}
+function accPrice(key,def){ return S.accPrice[key] ?? def; }
+function computeBOM(){
+  const alu={}, pan={}, acc=[], st=S.price;
+  let lenTot=0,kgTot=0,cuts=0;
+  const nest={};
+  parts.forEach(p=>{
+    if(isAlu(p)){
+      const c=partAlu(p), L=Math.round(p.len*10)/10, key=[p.series,L,c.hex,p.name].join('|');
+      alu[key]=alu[key]||{name:p.name,series:p.series,len:L,color:c,qty:0,door:!!p.door};
+      alu[key].qty++; lenTot+=p.len; kgTot+=p.len/1000*PROFILES[p.series].kg; cuts++;
+      const nk=p.series+'|'+c.hex; (nest[nk]=nest[nk]||{series:p.series,color:c,lens:[]}).lens.push(L);
+    } else if(isPanel(p)){
+      const col=partPanelColor(p), key=[p.name,Math.round(p.w),Math.round(p.h),p.t,col].join('|');
+      pan[key]=pan[key]||{name:p.name,w:Math.round(p.w),h:Math.round(p.h),t:p.t,color:col,qty:0};
+      pan[key].qty++;
+    }
+  });
+  let bars=0;
+  Object.values(nest).forEach(g=>{ g.res=pack(g.lens,st.stock,st.kerf); bars+=g.res.bars.length;
+    const used=g.lens.reduce((a,b)=>a+b,0); g.util=used/(g.res.bars.length*st.stock); });
+  // 五金
+  const PR=PROFILES[S.profile], DP=PROFILES[S.doorProfile];
+  const beams=parts.filter(p=>p.kind==='beam').length, posts=parts.filter(p=>p.kind==='post').length;
+  const joints=beams*2, brk=joints*S.bpj, hasDoor=!!GEO.door;
+  const A=(key,name,spec,qty,unit,def)=>{ if(qty>0) acc.push({key,name,spec,qty,unit,price:accPrice(key,def)}); };
+  A('brk',`${S.profile} 鋁角座`,`含 ${PR.bolt} 螺絲・T 型螺帽 ×2`,brk,'個',PR.bracket);
+  A('nut',`${PR.bolt} T 型螺帽＋內六角螺絲`,`${S.profile} 槽 ${PR.slot}mm`,brk*2,'組',PR.nut);
+  A('cap',`${S.profile} 端蓋`,'黑色 PA',posts*(S.base==='none'?2:1),'個',PR.cap);
+  if(S.base==='foot'){ A('foot','調整腳座',`${PR.bolt}×60 底徑 Ø60`,posts,'個',120); A('fplate',`${S.profile} 腳座連接板`,'鋁擠端面固定',posts,'片',45); }
+  if(S.base==='caster'){ A('caster','2.5" 萬向輪（附煞車）','荷重 60kg/輪',posts,'個',380); A('cplate',`${S.profile} 腳輪連接板`,'鋁合金',posts,'片',150); }
+  if(hasDoor){
+    const n=GEO.door.Lh>1800?3:2;
+    A('dbrk',`${S.doorProfile} 門框內角座`,`含 ${DP.bolt} 螺絲`,4,'個',DP.bracket);
+    A('hinge',`${S.doorProfile} 鋁擠型專用鉸鏈`,'壓鑄鋅合金',n,'個',180);
+    A('handle','門把手','L=150 鋁合金',1,'支',150);
+    A('latch','磁吸門扣','附對位片',1,'組',120);
+  }
+  let seal=0; parts.filter(isPanel).forEach(p=>{ seal+=2*(p.w+p.h)/1000; });
+  if(seal>0) A('seal','嵌板防震膠條',`入槽 ${ins()} mm`,Math.ceil(seal),'m',12);
+  // 估價
+  const aluCost=Object.values(alu).reduce((s,g)=>s+g.qty*g.len/1000*PROFILES[g.series].kg*st.aluKg*(1+g.color.up),0);
+  const cutCost=cuts*st.cut;
+  const accCost=acc.reduce((s,a)=>s+a.qty*a.price,0);
+  const PI=PANELS[S.panel], ti=Math.max(0,PI.th.indexOf(S.panelThick));
+  const pFactor=PI.clear?S.panelThick/PI.th[0]:1+0.3*ti;
+  let area=0; Object.values(pan).forEach(g=>area+=g.qty*g.w*g.h/1e6);
+  const panCost=area*panelPrice()*pFactor;
+  const nPanels=Object.values(pan).reduce((s,g)=>s+g.qty,0);
+  const hrs=joints*0.12+nPanels*0.2+(hasDoor?1.5:0)+posts*(S.base==='none'?0:0.1)+1;
+  const labCost=hrs*st.labor;
+  const sub=aluCost+cutCost+accCost+panCost+labCost, mg=sub*st.margin/100, pre=sub+mg, tax=pre*st.tax/100;
+  return {alu:Object.values(alu).sort((a,b)=>(a.door-b.door)||(b.len-a.len)),pan:Object.values(pan),acc,nest:Object.values(nest),
+    lenTot,kgTot,bars,cuts,area,pFactor,hrs,joints,cost:{aluCost,cutCost,accCost,panCost,labCost,sub,mg,pre,tax,total:pre+tax}};
+}
+
+/* ================= Three.js 場景 ================= */
+const stage=$('stage'), c3d=$('c3d');
+const renderer=new THREE.WebGLRenderer({canvas:c3d,antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(38,1,10,200000);
+const controls=new THREE.OrbitControls(camera,c3d);
+controls.enableDamping=true; controls.dampingFactor=0.09; controls.screenSpacePanning=true;
+controls.maxPolarAngle=Math.PI*0.495;
+
+(function env(){
+  const pm=new THREE.PMREMGenerator(renderer), es=new THREE.Scene();
+  const g=new THREE.SphereGeometry(100,32,16), col=[], top=new THREE.Color('#e0f2fe'), mid=new THREE.Color('#64748b'), bot=new THREE.Color('#0f172a');
+  const pos=g.attributes.position;
+  for(let i=0;i<pos.count;i++){ const t=pos.getY(i)/100; const c=t>0?mid.clone().lerp(top,t):mid.clone().lerp(bot,-t); col.push(c.r,c.g,c.b); }
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  es.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+  [[0,80,0,120,120,-Math.PI/2,0],[90,30,20,40,70,0,-Math.PI/2],[-80,40,-40,50,40,0,Math.PI/2],[20,25,90,60,30,0,Math.PI]].forEach(([x,y,z,w,h,rx,ry])=>{
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(5,5,5.4),side:THREE.DoubleSide}));
+    m.position.set(x,y,z); m.rotation.set(rx,ry,0); m.lookAt(0,0,0); es.add(m);
+  });
+  scene.environment=pm.fromScene(es,0.03).texture;
+})();
+scene.add(new THREE.HemisphereLight(0xdbeafe,0x1e293b,0.55));
+const sun=new THREE.DirectionalLight(0xffffff,1.6); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-0.0004; sun.shadow.normalBias=1.5; scene.add(sun,sun.target);
+const fill=new THREE.DirectionalLight(0x93c5fd,0.45); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xfde68a,0.35); scene.add(rim);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShadowMaterial({opacity:0.42})); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+let grid=null;
+const model=new THREE.Group(); scene.add(model);
+const extras=new THREE.Group(); scene.add(extras);
+const dimGroup=new THREE.Group(); scene.add(dimGroup);
+let pickables=[], dimLabels=[];
+
+const lin=hex=>new THREE.Color(hex).convertSRGBToLinear();
+const geoCache={}, edgeCache={}, matCache={};
+function profileGeo(series,len){
+  const k=series+'|'+len.toFixed(1); if(geoCache[k]) return geoCache[k];
+  const p=PROFILES[series], pts=profilePts(p.s,p.slot).map(q=>new THREE.Vector2(q[0],q[1]));
+  const sh=new THREE.Shape(pts), hole=new THREE.Path(); hole.absarc(0,0,p.s*0.11,0,Math.PI*2,true); sh.holes.push(hole);
+  const g=new THREE.ExtrudeGeometry(sh,{depth:len,bevelEnabled:false,curveSegments:10}); g.translate(0,0,-len/2);
+  return geoCache[k]=g;
+}
+function edgeGeo(series,len){ const k=series+'|'+len.toFixed(1); return edgeCache[k]||(edgeCache[k]=new THREE.EdgesGeometry(profileGeo(series,len),30)); }
+function aluMat(c){
+  const k='alu'+c.hex+c.metal; if(matCache[k]) return matCache[k];
+  return matCache[k]=new THREE.MeshStandardMaterial({color:lin(c.hex),metalness:c.metal,roughness:c.rough,envMapIntensity:1.15});
+}
+const edgeDark=new THREE.LineBasicMaterial({color:0x0b1220,transparent:true,opacity:.32});
+const edgeLight=new THREE.LineBasicMaterial({color:0xcbd5e1,transparent:true,opacity:.28});
+const steel=new THREE.MeshStandardMaterial({color:lin('#3b3f46'),metalness:.7,roughness:.35});
+const chrome=new THREE.MeshStandardMaterial({color:lin('#e5e7eb'),metalness:1,roughness:.15});
+const rubber=new THREE.MeshStandardMaterial({color:lin('#1a1a1a'),metalness:0,roughness:.85});
+const texCache={};
+function patternTex(kind){
+  if(texCache[kind]) return texCache[kind];
+  const cv=document.createElement('canvas'); cv.width=cv.height=64; const x=cv.getContext('2d');
+  if(kind==='mesh'){ x.fillStyle='#000'; x.fillRect(0,0,64,64); x.fillStyle='#fff'; x.fillRect(0,0,64,6); x.fillRect(0,0,6,64); }
+  else { x.fillStyle='#fff'; x.fillRect(0,0,64,64); x.fillStyle='#000'; x.beginPath(); x.arc(32,32,19,0,Math.PI*2); x.fill(); }
+  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8;
+  return texCache[kind]=t;
+}
+
+function makeAlu(p){
+  const c=partAlu(p), m=new THREE.Mesh(profileGeo(p.series,p.len),aluMat(c));
+  if(p.axis==='y') m.rotation.x=-Math.PI/2; else if(p.axis==='x') m.rotation.y=Math.PI/2;
+  m.castShadow=m.receiveShadow=true;
+  if(S.showEdges){ const e=new THREE.LineSegments(edgeGeo(p.series,p.len),(new THREE.Color(c.hex).getHSL({}).l<.35)?edgeLight:edgeDark); m.add(e); }
+  return m;
+}
+const disposables=[];
+function makePanel(p){
+  const def=PANELS[S.panel], col=partPanelColor(p), vw=p.w, vh=p.h; let m, mat;
+  if(def.tex){
+    const t=patternTex(def.tex).clone(); t.needsUpdate=true; t.repeat.set(vw/def.pitch,vh/def.pitch);
+    mat=new THREE.MeshStandardMaterial({color:lin(col),alphaMap:t,transparent:true,depthWrite:false,side:THREE.DoubleSide,metalness:.45,roughness:.5});
+    m=new THREE.Mesh(new THREE.PlaneGeometry(vw,vh),mat); m.renderOrder=1; disposables.push(t,m.geometry);
+  } else if(def.clear){
+    mat=new THREE.MeshPhysicalMaterial({color:lin(col),transparent:true,opacity:def.frost?.42:.2,roughness:def.frost?.45:.04,metalness:0,clearcoat:1,depthWrite:false,side:THREE.DoubleSide,envMapIntensity:1.4});
+    m=new THREE.Mesh(new THREE.BoxGeometry(vw,vh,p.t),mat); m.renderOrder=2; disposables.push(m.geometry);
+  } else {
+    mat=new THREE.MeshStandardMaterial({color:lin(col),metalness:.15,roughness:.55});
+    m=new THREE.Mesh(new THREE.BoxGeometry(vw,vh,p.t),mat); m.castShadow=m.receiveShadow=true; disposables.push(m.geometry);
+  }
+  disposables.push(mat);
+  if(p.dir==='D') m.rotation.y=Math.PI/2;
+  return m;
+}
+function box(w,h,d,mat,x,y,z){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); m.castShadow=true; disposables.push(m.geometry); return m; }
+function cyl(r,h,mat,x,y,z,rot){ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,20),mat); m.position.set(x,y,z); if(rot) m.rotation.set(...rot); m.castShadow=true; disposables.push(m.geometry); return m; }
+
+function clearGroup(g){ while(g.children.length) g.remove(g.children[0]); }
+function build3D(){
+  disposables.splice(0).forEach(o=>o.dispose&&o.dispose());
+  clearGroup(model); clearGroup(extras); pickables=[];
+  const bh=BASES[S.base].h; model.position.y=bh;
+  let pivot=null;
+  if(GEO.door){ const d=GEO.door; pivot=new THREE.Group(); pivot.position.set(d.pv.x,0,d.pv.z);
+    pivot.rotation.y=(S.door.hinge==='L'?-1:1)*S.door.angle*Math.PI/180; model.add(pivot); }
+  parts.forEach(p=>{
+    const o=isPanel(p)?makePanel(p):makeAlu(p); o.userData.part=p; pickables.push(o);
+    if(p.door){ o.position.set(p.local.x,p.local.y,p.local.z); pivot.add(o); }
+    else { o.position.set(p.box.cx,p.box.cy,p.box.cz); model.add(o); }
+  });
+  // 門五金
+  if(GEO.door){
+    const d=GEO.door, s=d.sgn, n=d.Lh>1800?3:2;
+    const hy=n===3?[d.y0+180,(d.y0+d.y1)/2,d.y1-180]:[d.y0+180,d.y1-180];
+    hy.forEach(y=>{ pivot.add(box(22,90,d.dp*0.9,steel,-s*4,y,-d.dp/2)); pivot.add(cyl(5,96,chrome,-s*8,y,2)); });
+    const hx=s*(d.Lw-d.dp/2), hyy=Math.min(Math.max(1050,d.y0+250),d.y1-250);
+    pivot.add(cyl(9,200,chrome,hx,hyy,42));
+    [-80,80].forEach(o=>pivot.add(cyl(6,42,chrome,hx,hyy+o,21,[Math.PI/2,0,0])));
+    // 開門軌跡
+    const pts=[]; for(let a=0;a<=90;a+=3){ const r=a*Math.PI/180; pts.push(new THREE.Vector3(d.pv.x+s*Math.cos(r)*d.Lw,2,d.pv.z+Math.sin(r)*d.Lw)); }
+    const arc=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineDashedMaterial({color:0xfb923c,dashSize:40,gapSize:30,transparent:true,opacity:.8}));
+    arc.computeLineDistances(); disposables.push(arc.geometry,arc.material); model.add(arc);
+  }
+  // 底座
+  if(S.base!=='none') parts.filter(p=>p.kind==='post').forEach(p=>{
+    const {cx,cz}=p.box, P=P_();
+    if(S.base==='foot'){
+      extras.add(box(P,6,P,steel,cx,bh-3,cz));
+      extras.add(cyl(P*0.12+3,bh-14,chrome,cx,(bh-14)/2+8,cz));
+      extras.add(cyl(30,10,rubber,cx,5,cz));
+      extras.add(cyl(P*0.3,8,steel,cx,22,cz,[0,Math.PI/6,0]));
+    } else {
+      extras.add(box(Math.max(P*1.6,70),6,Math.max(P*1.6,70),steel,cx,bh-3,cz));
+      extras.add(box(46,40,10,steel,cx,bh-26,cz-16)); extras.add(box(46,40,10,steel,cx,bh-26,cz+16));
+      extras.add(cyl(36,22,rubber,cx,36,cz,[Math.PI/2,0,0]));
+      extras.add(cyl(14,24,chrome,cx,36,cz,[Math.PI/2,0,0]));
+    }
+  });
+  // 地面 / 燈光
+  const M=Math.max(S.w,S.d,S.h), gs=Math.ceil(Math.max(S.w,S.d)*2.4/500)*500;
+  ground.scale.set(gs*2,gs*2,1);
+  if(grid){ scene.remove(grid); grid.geometry.dispose(); }
+  grid=new THREE.GridHelper(gs,gs/250,0x3b82f6,0x1e3a5f); grid.material.transparent=true; grid.material.opacity=.32; grid.position.y=0.5; scene.add(grid);
+  sun.position.set(M*0.9,M*1.6,M*1.1); sun.target.position.set(0,S.h/3,0);
+  const sc=sun.shadow.camera; sc.left=sc.bottom=-M*1.1; sc.right=sc.top=M*1.1; sc.near=10; sc.far=M*5; sc.updateProjectionMatrix();
+  fill.position.set(-M,M*0.6,M*0.4); rim.position.set(-M*0.4,M*0.8,-M*1.2);
+  controls.target.set(0,bh+S.h/2,0);
+  buildDims();
+  applySelectionVisual();
+}
+
+/* ---- 3D 尺寸標註（可點擊修改） ---- */
+function buildDims(){
+  clearGroup(dimGroup); $('labels').innerHTML=''; dimLabels=[];
+  if(!S.showDims || view!=='3d') return;
+  const {xs,zs,ys,P}=GEO, W=S.w,D=S.d,H=S.h, M=Math.max(W,D,H), o1=M*0.07, o2=M*0.14, bh=BASES[S.base].h;
+  const segs=[], V=(x,y,z)=>new THREE.Vector3(x,y+bh,z), tk=M*0.012;
+  function dim(a,b,off,text,cls,edit){
+    const n=off.clone().normalize(), a2=a.clone().add(off), b2=b.clone().add(off), ex=n.clone().multiplyScalar(tk*1.6);
+    segs.push(a.clone().add(n.clone().multiplyScalar(tk)),a2.clone().add(ex), b.clone().add(n.clone().multiplyScalar(tk)),b2.clone().add(ex), a2,b2);
+    const dir=b2.clone().sub(a2).normalize(), t=dir.clone().add(n).normalize().multiplyScalar(tk);
+    [a2,b2].forEach(p=>segs.push(p.clone().sub(t),p.clone().add(t)));
+    const el=document.createElement('div'); el.className='dim '+(cls||''); el.textContent=text;
+    if(edit) el.onclick=e=>{e.stopPropagation(); openEditor(e.clientX,e.clientY,edit.t,edit.v,edit.f,edit.h);};
+    $('labels').appendChild(el); dimLabels.push({el,pos:a2.clone().lerp(b2,.5)});
+  }
+  const fz=D/2;
+  // 寬度
+  dim(V(-W/2,H,fz),V(W/2,H,fz),new THREE.Vector3(0,o1,0),'W '+fmt(W),'tot',{t:'總寬 W (mm)',v:W,f:v=>setTotal('w',v),h:'各格依格數平均分配'});
+  if(S.cols>1||GEO.door) S.spW.forEach((s,c)=>{ const isD=GEO.door&&GEO.door.bay===c;
+    dim(V(xs[c]+P/2,0,fz),V(xs[c+1]-P/2,0,fz),new THREE.Vector3(0,0,o1),(isD?'門 ':'')+fmt(s),isD?'door':'',{t:`寬度第 ${c+1} 格淨距 (mm)`,v:s,f:v=>setSpan('w',c,v),h:S.lock?'總寬鎖定：差值由其他格吸收':'總寬將隨之變更'}); });
+  // 深度
+  dim(V(W/2,H,-D/2),V(W/2,H,D/2),new THREE.Vector3(0,o1,0),'D '+fmt(D),'tot',{t:'總深 D (mm)',v:D,f:v=>setTotal('d',v)});
+  if(S.rows>1) S.spD.forEach((s,r)=>dim(V(W/2,0,zs[r]+P/2),V(W/2,0,zs[r+1]-P/2),new THREE.Vector3(o1,0,0),fmt(s),'',{t:`深度第 ${r+1} 格淨距 (mm)`,v:s,f:v=>setSpan('d',r,v)}));
+  // 高度
+  dim(V(-W/2,0,fz),V(-W/2,H,fz),new THREE.Vector3(-o2,0,0),'H '+fmt(H),'tot',{t:'總高 H (mm)',v:H,f:v=>setTotal('h',v),h:'不含底座高度'});
+  if(S.levels>1) S.spH.forEach((s,k)=>dim(V(-W/2,ys[k]+P/2,fz),V(-W/2,ys[k+1]-P/2,fz),new THREE.Vector3(-o1,0,0),`L${k+1} ${fmt(s)}`,'lv',{t:`第 ${k+1} 層淨高 (mm)`,v:s,f:v=>setSpan('h',k,v)}));
+  if(GEO.door){ const d=GEO.door, x=S.door.hinge==='L'?xs[d.bay+1]-P/2:xs[d.bay]+P/2;
+    dim(V(x,0,fz),V(x,d.openTop,fz),new THREE.Vector3(0,0,o1*0.55),'門高 '+fmt(d.openTop),'door',{t:'門開口高 (mm)',v:S.door.h,f:setDoorH,h:`最大 ${S.h-P_()*2}（保留門眉）`}); }
+  const g=new THREE.BufferGeometry().setFromPoints(segs);
+  const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x38bdf8,transparent:true,opacity:.85,depthTest:false}));
+  l.renderOrder=10; dimGroup.add(l);
+}
+const _v=new THREE.Vector3();
+function updateLabels(){
+  if(!dimLabels.length) return;
+  const w=stage.clientWidth,h=stage.clientHeight;
+  dimLabels.forEach(d=>{ _v.copy(d.pos).project(camera);
+    if(_v.z>1){ d.el.style.display='none'; return; } d.el.style.display='';
+    d.el.style.transform=`translate(${(_v.x+1)/2*w}px,${(1-_v.y)/2*h}px) translate(-50%,-50%)`; });
+}
+
+/* ---- 選取 / 懸停 ---- */
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2();
+let selHelper=null, hoverObj=null, downPt=null;
+function pick(ev){
+  const r=c3d.getBoundingClientRect(); mouse.set((ev.clientX-r.left)/r.width*2-1,-(ev.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(mouse,camera); const hit=ray.intersectObjects(pickables,false)[0]; return hit?hit.object:null;
+}
+function applySelectionVisual(){
+  if(selHelper){ scene.remove(selHelper); selHelper.geometry.dispose(); selHelper=null; }
+  pickables.forEach(o=>{ if(o.userData.orig){ o.material=o.userData.orig; delete o.userData.orig; } });
+  const o=pickables.find(o=>o.userData.part.id===selectedId);
+  if(!o){ if(selectedId){ selectedId=null; } renderSel(); return; }
+  o.userData.orig=o.material; const m=o.material.clone(); m.emissive=new THREE.Color(0x1d6fe0); m.emissiveIntensity=.65; o.material=m; disposables.push(m);
+  selHelper=new THREE.BoxHelper(o,0x38bdf8); selHelper.material.depthTest=false; selHelper.renderOrder=11; scene.add(selHelper);
+  renderSel();
+}
+function select(id){ selectedId=id; applySelectionVisual(); }
+c3d.addEventListener('pointerdown',e=>{ downPt=[e.clientX,e.clientY]; closeEditor(); });
+c3d.addEventListener('pointerup',e=>{
+  if(!downPt||e.button!==0) return; const mv=Math.hypot(e.clientX-downPt[0],e.clientY-downPt[1]); downPt=null;
+  if(mv>4) return; const o=pick(e); select(o?o.userData.part.id:null);
+});
+let hoverReq=false, lastMove=null;
+c3d.addEventListener('pointermove',e=>{ lastMove=e; if(hoverReq) return; hoverReq=true; requestAnimationFrame(()=>{ hoverReq=false; hover(lastMove); }); });
+c3d.addEventListener('pointerleave',()=>{ $('tip').style.display='none'; });
+function hover(e){
+  if(e.buttons){ $('tip').style.display='none'; return; }
+  const o=pick(e), tip=$('tip');
+  c3d.style.cursor=o?'pointer':'grab';
+  if(!o){ tip.style.display='none'; return; }
+  const p=o.userData.part, r=stage.getBoundingClientRect();
+  tip.innerHTML=isAlu(p)?`<b>${p.name}</b>　${p.series}　L=${fmt(p.len)} mm　<span style="color:#94a3b8">${partAlu(p).name}</span>`:`<b>${p.name}</b>　${fmt(p.w)} × ${fmt(p.h)} × t${p.t}`;
+  tip.style.display='block'; tip.style.left=(e.clientX-r.left+14)+'px'; tip.style.top=(e.clientY-r.top+14)+'px';
+}
+
+/* ---- 編輯小視窗 ---- */
+let edApply=null;
+function openEditor(cx,cy,title,val,apply,hint){
+  const r=stage.getBoundingClientRect(), ed=$('editor');
+  $('ed-t').textContent=title; $('ed-v').value=Math.round(val); $('ed-h').textContent=hint||'按 Enter 確定，Esc 取消'; edApply=apply;
+  ed.hidden=false;
+  ed.style.left=Math.min(Math.max(8,cx-r.left-105),r.width-218)+'px'; ed.style.top=Math.min(Math.max(8,cy-r.top+14),r.height-140)+'px';
+  setTimeout(()=>{ $('ed-v').focus(); $('ed-v').select(); },10);
+}
+function closeEditor(){ $('editor').hidden=true; edApply=null; }
+function commitEditor(){ const v=parseFloat($('ed-v').value), f=edApply; closeEditor(); if(f&&!isNaN(v)) f(v); }
+$('ed-o').onclick=commitEditor; $('ed-c').onclick=closeEditor;
+$('ed-v').addEventListener('keydown',e=>{ if(e.key==='Enter') commitEditor(); if(e.key==='Escape') closeEditor(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && document.activeElement.tagName!=='INPUT'){ closeEditor(); select(null); } });
+
+/* ---- 相機 ---- */
+function fitView(kind){
+  const bh=BASES[S.base].h, R=Math.hypot(S.w,S.d,S.h)/2*0.92, a=Math.max(.6,c3d.clientWidth/Math.max(1,c3d.clientHeight));
+  const dist=R/Math.sin(camera.fov*Math.PI/360)/Math.min(1,a)*1.02;
+  const dirs={iso:[1.05,0.62,1.35],front:[0,0.06,1],right:[1,0.06,0],top:[0,1,0.002]};
+  const dv=new THREE.Vector3(...dirs[kind||'iso']).normalize();
+  controls.target.set(0,bh+S.h/2,0); camera.position.copy(controls.target).addScaledVector(dv,dist); controls.update();
+}
+function resize(){
+  const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h) return;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  if(view==='2d') draw2D();
+}
+new ResizeObserver(resize).observe(stage);
+(function loop(){ requestAnimationFrame(loop); if(view!=='3d') return; controls.update(); if(selHelper) selHelper.update(); renderer.render(scene,camera); updateLabels(); })();
+
+/* ================= 2D 工程三視圖 ================= */
+let hits2d=[];
+function draw2D(){
+  const cv=$('c2d'), r=cv.getBoundingClientRect(), dpr=devicePixelRatio||1; if(!r.width) return;
+  cv.width=r.width*dpr; cv.height=r.height*dpr; const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0);
+  hits2d=[];
+  const CW=r.width, CH=r.height, W=S.w,D=S.d,H=S.h, M=Math.max(W,D,H), gap=M*0.24, P=P_();
+  x.fillStyle='#fff'; x.fillRect(0,0,CW,CH);
+  const xmin=-M*0.2, xmax=W+gap+D+M*0.08, ymin=-M*0.2, ymax=H+gap+D+M*0.1;
+  const tb=56, sc=Math.min((CW-40)/(xmax-xmin),(CH-30-tb)/(ymax-ymin));
+  const ox=(CW-(xmax-xmin)*sc)/2, oy=CH-tb-12-(CH-tb-12-(ymax-ymin)*sc)/2;
+  const X=v=>ox+(v-xmin)*sc, Y=v=>oy-(v-ymin)*sc;
+  // 邊框
+  x.strokeStyle='#0f172a'; x.lineWidth=1.5; x.strokeRect(8.5,8.5,CW-17,CH-17);
+  const views=[
+    {name:'前視圖 FRONT',u:p=>[p.cx+W/2,p.sx],v:p=>[p.cy,p.sy],depth:p=>p.cz,ox:0,oy:0},
+    {name:'俯視圖 TOP',u:p=>[p.cx+W/2,p.sx],v:p=>[D/2-p.cz,p.sz],depth:p=>p.cy,ox:0,oy:H+gap},
+    {name:'右側視圖 RIGHT',u:p=>[D/2-p.cz,p.sz],v:p=>[p.cy,p.sy],depth:p=>p.cx,ox:W+gap,oy:0}
+  ];
+  const panelFill=p=>{ const def=PANELS[S.panel], c=partPanelColor(p);
+    if(def.clear) return 'rgba(125,211,252,.22)';
+    if(def.tex){ return hatch(x,c); } return c+'55'; };
+  views.forEach(vw=>{
+    const list=parts.slice().sort((a,b)=>vw.depth(a.box)-vw.depth(b.box));
+    list.forEach(p=>{
+      const [cu,su]=vw.u(p.box),[cv_,sv]=vw.v(p.box);
+      const x0=X(vw.ox+cu-su/2), y0=Y(vw.oy+cv_+sv/2), w=su*sc, h=sv*sc;
+      if(isPanel(p)){ x.fillStyle=panelFill(p); x.fillRect(x0,y0,w,h); x.strokeStyle='rgba(15,23,42,.35)'; x.lineWidth=.6; x.strokeRect(x0,y0,w,h); }
+      else { const c=partAlu(p); x.fillStyle=p.door?'#fed7aa':shade(c.hex); x.fillRect(x0,y0,w,h); x.strokeStyle=p.door?'#c2410c':'#1e293b'; x.lineWidth=.9; x.strokeRect(x0+.5,y0+.5,w-1,h-1); }
+    });
+    // 地面線
+    x.strokeStyle='#64748b'; x.lineWidth=1; x.setLineDash([]);
+    if(vw.oy===0){ const w0=vw.ox===0?W:D; x.beginPath(); x.moveTo(X(vw.ox-M*0.03),Y(0)); x.lineTo(X(vw.ox+w0+M*0.03),Y(0)); x.stroke(); }
+    const w0=vw.ox===0?W:D;
+    x.fillStyle='#0f172a'; x.font='700 13px "Microsoft JhengHei",sans-serif'; x.textAlign='center';
+    x.fillText(vw.name,X(vw.ox+w0/2),Y(vw.oy+(vw.oy?D:H))-10);
+  });
+  // 門符號
+  if(GEO.door){ const d=GEO.door, s=d.sgn, hx=s>0?d.x0:d.x1, ox_=s>0?d.x1:d.x0;
+    x.strokeStyle='#ea580c'; x.lineWidth=1; x.setLineDash([6,4]);
+    x.beginPath(); x.moveTo(X(hx+W/2),Y(d.y1)); x.lineTo(X(ox_+W/2),Y((d.y0+d.y1)/2)); x.lineTo(X(hx+W/2),Y(d.y0)); x.stroke();
+    // 俯視開門弧
+    const cx=X(d.pv.x+W/2), cy=Y(H+gap+D/2-d.pv.z), rr=d.Lw*sc;
+    x.beginPath(); if(s>0) x.arc(cx,cy,rr,0,Math.PI/2); else x.arc(cx,cy,rr,Math.PI/2,Math.PI); x.stroke();
+    x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx,cy+rr); x.stroke(); x.setLineDash([]);
+  }
+  // 尺寸標註
+  const {xs,zs,ys}=GEO;
+  function dim(x1,y1,x2,y2,off,text,edit,color){
+    const hor=Math.abs(y1-y2)<1e-6; color=color||'#0369a1';
+    x.strokeStyle=color; x.fillStyle=color; x.lineWidth=.8; x.setLineDash([]);
+    let a,b; if(hor){ a=[X(x1),Y(y1+off)]; b=[X(x2),Y(y2+off)]; x.beginPath(); x.moveTo(X(x1),Y(y1)+(off<0?2:-2)); x.lineTo(a[0],a[1]+(off<0?4:-4)); x.moveTo(X(x2),Y(y2)+(off<0?2:-2)); x.lineTo(b[0],b[1]+(off<0?4:-4)); x.stroke(); }
+    else { a=[X(x1+off),Y(y1)]; b=[X(x2+off),Y(y2)]; x.beginPath(); x.moveTo(X(x1)+(off<0?-2:2),Y(y1)); x.lineTo(a[0]+(off<0?-4:4),a[1]); x.moveTo(X(x2)+(off<0?-2:2),Y(y2)); x.lineTo(b[0]+(off<0?-4:4),b[1]); x.stroke(); }
+    x.beginPath(); x.moveTo(a[0],a[1]); x.lineTo(b[0],b[1]); x.stroke();
+    const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+    [[a,ang],[b,ang+Math.PI]].forEach(([p,an])=>{ x.beginPath(); x.moveTo(p[0],p[1]); x.lineTo(p[0]+7*Math.cos(an+.3),p[1]+7*Math.sin(an+.3)); x.lineTo(p[0]+7*Math.cos(an-.3),p[1]+7*Math.sin(an-.3)); x.closePath(); x.fill(); });
+    const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+    x.save(); x.translate(mx,my); if(!hor) x.rotate(-Math.PI/2);
+    x.font='700 11px ui-monospace,Consolas,monospace'; const tw=x.measureText(text).width+8;
+    x.fillStyle='#fff'; x.fillRect(-tw/2,-8,tw,15); x.fillStyle=color; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,0,0);
+    if(edit){ x.strokeStyle=color; x.lineWidth=.6; x.strokeRect(-tw/2,-8,tw,15); }
+    x.restore();
+    if(edit){ const hw=hor?tw:15, hh=hor?15:tw; hits2d.push({x:mx-hw/2,y:my-hh/2,w:hw,h:hh,...edit}); }
+  }
+  const o1=-M*0.07, o2=-M*0.14;
+  dim(0,0,W,0,o2,'W '+fmt(W),{t:'總寬 W (mm)',v:W,f:v=>setTotal('w',v)},'#1e3a8a');
+  S.spW.forEach((s,c)=>dim(xs[c]+P/2+W/2,0,xs[c+1]-P/2+W/2,0,o1,fmt(s),{t:`寬度第 ${c+1} 格淨距 (mm)`,v:s,f:v=>setSpan('w',c,v)},GEO.door&&GEO.door.bay===c?'#c2410c':null));
+  dim(0,0,0,H,o2,'H '+fmt(H),{t:'總高 H (mm)',v:H,f:v=>setTotal('h',v)},'#1e3a8a');
+  if(S.levels>1) S.spH.forEach((s,k)=>dim(0,ys[k]+P/2,0,ys[k+1]-P/2,o1,fmt(s),{t:`第 ${k+1} 層淨高 (mm)`,v:s,f:v=>setSpan('h',k,v)},'#6d28d9'));
+  dim(0,H+gap,0,H+gap+D,o2,'D '+fmt(D),{t:'總深 D (mm)',v:D,f:v=>setTotal('d',v)},'#1e3a8a');
+  if(S.rows>1) S.spD.forEach((s,r)=>dim(0,H+gap+D/2-(zs[r+1]-P/2),0,H+gap+D/2-(zs[r]+P/2),o1,fmt(s),{t:`深度第 ${r+1} 格淨距 (mm)`,v:s,f:v=>setSpan('d',r,v)}));
+  dim(W+gap,0,W+gap+D,0,o1,'D '+fmt(D),{t:'總深 D (mm)',v:D,f:v=>setTotal('d',v)},'#1e3a8a');
+  if(GEO.door){ const d=GEO.door, xx=(d.x0+d.x1)/2+W/2;
+    dim(xx,0,xx,d.openTop,0,'門高 '+fmt(d.openTop),{t:'門開口高 (mm)',v:S.door.h,f:setDoorH},'#c2410c'); }
+  // 標題欄
+  const tbx=CW-470, tby=CH-tb-10;
+  x.strokeStyle='#0f172a'; x.lineWidth=1; x.strokeRect(tbx,tby,460,tb);
+  [150,300,380].forEach(v=>{ x.beginPath(); x.moveTo(tbx+v,tby); x.lineTo(tbx+v,tby+tb); x.stroke(); });
+  x.beginPath(); x.moveTo(tbx+150,tby+tb/2); x.lineTo(tbx+460,tby+tb/2); x.stroke();
+  x.textAlign='left'; x.textBaseline='middle'; x.fillStyle='#0f172a';
+  x.font='700 14px "Microsoft JhengHei",sans-serif'; x.fillText('鋁擠型圍籬',tbx+10,tby+20);
+  x.font='11px "Microsoft JhengHei",sans-serif'; x.fillStyle='#475569'; x.fillText(`${W}×${D}×${H} mm`,tbx+10,tby+40);
+  const scaleN=Math.round(96/(sc*25.4));
+  const cells=[[`型材 ${S.profile}／${aluDef(globalAluKey()).name}`,150,0],[`單位 mm`,300,0],[`比例 1:${scaleN}`,380,0],
+    [`板材 ${PANELS[S.panel].short} t${S.panelThick}`,150,1],[`第三角法`,300,1],[new Date().toISOString().slice(0,10),380,1]];
+  x.fillStyle='#0f172a'; cells.forEach(([t,cx,ry])=>x.fillText(t,tbx+cx+8,tby+ry*tb/2+tb/4));
+  x.fillStyle='#64748b'; x.font='11px "Microsoft JhengHei",sans-serif'; x.textAlign='left';
+  x.fillText('＊點擊尺寸數字可直接修改',18,CH-20);
+}
+function shade(hex){ const c=new THREE.Color(hex); const l=c.getHSL({}).l; return l<.3?'#94a3b8':hex; }
+const hatchCache={};
+function hatch(ctx,col){
+  if(hatchCache[col]) return hatchCache[col];
+  const c=document.createElement('canvas'); c.width=c.height=8; const x=c.getContext('2d');
+  x.strokeStyle=col; x.globalAlpha=.55; x.lineWidth=1; x.beginPath(); x.moveTo(0,8); x.lineTo(8,0); x.stroke();
+  return hatchCache[col]=ctx.createPattern(c,'repeat');
+}
+$('c2d').addEventListener('click',e=>{ const r=e.target.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  const h=hits2d.find(h=>mx>=h.x&&mx<=h.x+h.w&&my>=h.y&&my<=h.y+h.h); if(h) openEditor(e.clientX,e.clientY,h.t,h.v,h.f); else closeEditor(); });
+$('c2d').addEventListener('mousemove',e=>{ const r=e.target.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  e.target.style.cursor=hits2d.some(h=>mx>=h.x&&mx<=h.x+h.w&&my>=h.y&&my<=h.y+h.h)?'pointer':'default'; });
+
+/* ================= 側欄：料件樣式 ================= */
+function renderStyleUI(){
+  $('prof-cards').innerHTML=Object.keys(PROFILES).map(k=>`<div class="pc ${k===S.profile?'on':''}" data-p="${k}">${profileSVG(k,30,k===S.profile?'#7dd3fc':'#cbd5e1')}${k}<small>${PROFILES[k].kg} kg/m</small></div>`).join('');
+  $('dprof-cards').innerHTML=['2020','3030','4040','4545'].map(k=>`<div class="pc ${k===S.doorProfile?'on':''}" data-dp="${k}">${profileSVG(k,22,k===S.doorProfile?'#fdba74':'#cbd5e1')}${k}</div>`).join('');
+  $('prof-tag').textContent=`${S.profile}・槽 ${PROFILES[S.profile].slot}・${PROFILES[S.profile].bolt}`;
+  const ak=globalAluKey();
+  $('alu-sw').innerHTML=ALU_COLORS.map(c=>`<div class="swc ${S.alu===c.id?'on':''}" data-a="${c.id}" title="${c.name}" style="background:linear-gradient(135deg,#fff8 0%,${c.hex} 45%,${c.hex} 70%,#0006 100%)"></div>`).join('')
+    +`<input type="color" id="alu-custom" value="${S.aluCustom}" title="自訂顏色" style="${S.alu==='custom'?'outline:2px solid #38bdf8':''}">`;
+  const ad=aluDef(ak); $('alu-name').textContent=`${ad.name}　${ad.up?'加價 +'+Math.round(ad.up*100)+'%':'標準價'}`;
+  const icon={
+    mesh:'<svg width="40" height="26"><defs><pattern id="pm" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 0H6M0 0V6" stroke="#cbd5e1" stroke-width="1.2"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pm)" stroke="#64748b"/></svg>',
+    perf:'<svg width="40" height="26"><defs><pattern id="pp" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#94a3b8"/><circle cx="3" cy="3" r="1.6" fill="#0a1222"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pp)"/></svg>',
+    acrylic:'<svg width="40" height="26"><defs><linearGradient id="pa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0f2fe" stop-opacity=".7"/><stop offset=".5" stop-color="#7dd3fc" stop-opacity=".15"/><stop offset="1" stop-color="#bae6fd" stop-opacity=".5"/></linearGradient></defs><rect width="40" height="26" rx="3" fill="url(#pa)" stroke="#7dd3fc"/><path d="M8 20L18 6M14 22L24 8" stroke="#fff" stroke-opacity=".6"/></svg>',
+    pc:'<svg width="40" height="26"><rect width="40" height="26" rx="3" fill="#cbd5e1" fill-opacity=".35" stroke="#94a3b8"/><path d="M0 6H40M0 13H40M0 20H40" stroke="#e2e8f0" stroke-opacity=".5"/></svg>',
+    sheet:'<svg width="40" height="26"><rect width="40" height="26" rx="3" fill="#64748b" stroke="#94a3b8"/><path d="M0 0L40 26" stroke="#94a3b8" stroke-opacity=".3"/></svg>',
+    none:'<svg width="40" height="26"><rect x=".5" y=".5" width="39" height="25" rx="3" fill="none" stroke="#64748b" stroke-dasharray="3 2"/><path d="M12 7L28 19M28 7L12 19" stroke="#64748b"/></svg>'
+  };
+  $('panel-cards').innerHTML=Object.entries(PANELS).map(([k,v])=>`<div class="pc ${k===S.panel?'on':''}" data-pn="${k}">${icon[k]}${v.short}</div>`).join('');
+  const th=PANELS[S.panel].th; if(!th.includes(S.panelThick)) S.panelThick=th[Math.min(1,th.length-1)];
+  $('panel-thick').innerHTML=th.map(t=>`<option ${t===S.panelThick?'selected':''}>${t}</option>`).join('');
+  $('panel-price').value=panelPrice();
+  $('panel-sw').innerHTML=PANEL_COLORS.map(c=>`<div class="swc ${c.hex===S.panelColor?'on':''}" data-pc="${c.hex}" title="${c.name}" style="background:${c.hex}"></div>`).join('')
+    +`<input type="color" id="panel-custom" value="${S.panelColor}" title="自訂顏色">`;
+  const bicon={none:'<svg width="40" height="26"><rect x="16" y="2" width="8" height="20" fill="#94a3b8"/><path d="M4 23H36" stroke="#64748b" stroke-width="2"/></svg>',
+    foot:'<svg width="40" height="26"><rect x="16" y="0" width="8" height="12" fill="#94a3b8"/><rect x="19" y="12" width="2" height="7" fill="#e2e8f0"/><rect x="12" y="19" width="16" height="3" rx="1" fill="#475569"/><path d="M4 23H36" stroke="#64748b" stroke-width="2"/></svg>',
+    caster:'<svg width="40" height="26"><rect x="16" y="0" width="8" height="8" fill="#94a3b8"/><rect x="12" y="8" width="16" height="2" fill="#475569"/><circle cx="20" cy="16" r="6" fill="#1f2937" stroke="#94a3b8"/><path d="M4 23H36" stroke="#64748b" stroke-width="2"/></svg>'};
+  $('base-cards').innerHTML=Object.entries(BASES).map(([k,v])=>`<div class="pc ${k===S.base?'on':''}" data-b="${k}">${bicon[k]}${v.name}<small>${v.h?'+'+v.h+' mm':'—'}</small></div>`).join('');
+  $('bpj').value=S.bpj; $('show-dims').checked=S.showDims; $('show-edges').checked=S.showEdges;
+}
+document.querySelector('.side').addEventListener('click',e=>{
+  const t=e.target.closest('[data-p],[data-dp],[data-a],[data-pn],[data-pc],[data-b]'); if(!t) return;
+  const d=t.dataset;
+  if(d.p){ S.profile=d.p; ['w','d','h'].forEach(resetSpacing); applyDoorW(); clampDoorH(); }
+  if(d.dp) S.doorProfile=d.dp;
+  if(d.a) S.alu=d.a;
+  if(d.pn) S.panel=d.pn;
+  if(d.pc) S.panelColor=d.pc;
+  if(d.b){ S.base=d.b; update(); fitView('iso'); return; }
+  update();
+});
+document.querySelector('.side').addEventListener('input',e=>{
+  if(e.target.id==='alu-custom'){ S.aluCustom=e.target.value; S.alu='custom'; update(); }
+  if(e.target.id==='panel-custom'){ S.panelColor=e.target.value; update(); }
+});
+$('panel-thick').onchange=e=>{ S.panelThick=parseFloat(e.target.value); update(); };
+$('panel-price').onchange=e=>{ S.panelPrice[S.panel]=parseFloat(e.target.value)||0; update(); };
+$('bpj').onchange=e=>{ S.bpj=+e.target.value; update(); };
+$('show-dims').onchange=e=>{ S.showDims=e.target.checked; update(); };
+$('show-edges').onchange=e=>{ S.showEdges=e.target.checked; update(); };
+
+/* ---- 選取料件屬性 ---- */
+function renderSel(){
+  const body=$('sel-body'), p=parts.find(p=>p.id===selectedId);
+  $('sel-clear').style.display=p?'':'none';
+  if(!p){ body.innerHTML='<div class="sel-empty">在 3D 視圖<b>點擊任一料件</b>（立柱、橫梁、嵌板、門扇）即可：<br>・修改該料件對應尺寸<br>・個別指定顏色或套用至同類料件<br>點擊<b style="color:#38bdf8">藍色尺寸標籤</b>可直接輸入新尺寸。</div>'; return; }
+  const E=[]; const ax=p.dir==='W'?'w':'d';
+  if(p.kind==='post') E.push(['立柱長度＝總高 H',S.h,v=>setTotal('h',v)]);
+  if(p.kind==='beam'){ E.push(['裁切長度（格淨距）',p.len,v=>setSpan(ax,p.bay,v)]); if(p.lvl==='h') E.push(['門開口高',S.door.h,setDoorH]);
+    else if(typeof p.lvl==='number' && p.lvl>0 && p.lvl<S.levels){ E.push([`下方第 ${p.lvl} 層淨高`,S.spH[p.lvl-1],v=>setSpan('h',p.lvl-1,v)]); } }
+  if(p.kind==='panel'){ E.push(['開口淨寬',ax==='w'?S.spW[p.bay]:S.spD[p.bay],v=>setSpan(ax,p.bay,v)]);
+    if(typeof p.lvl==='number') E.push([`第 ${p.lvl+1} 層淨高`,S.spH[p.lvl],v=>setSpan('h',p.lvl,v)]); }
+  if(p.door){ E.push(['門開口寬',S.door.w,v=>{S.door.w=v;applyDoorW();update();}]); E.push(['門開口高',S.door.h,setDoorH]); }
+  let spec='';
+  if(isAlu(p)){ const c=partAlu(p), kg=p.len/1000*PROFILES[p.series].kg;
+    spec=`<div class="kv"><b>料件</b><span>${p.name} <span class="tag ${p.door?'door':''}">${p.id}</span></span><b>型材</b><span>${p.series}（槽 ${PROFILES[p.series].slot}）</span><b>裁切長度</b><span style="color:#7dd3fc;font-weight:700">${fmt(p.len,1)} mm</span><b>重量</b><span>${fmt(kg,2)} kg</span><b>顏色</b><span><i class="dot" style="background:${c.hex}"></i>${c.name}</span></div>`;
+  } else {
+    spec=`<div class="kv"><b>料件</b><span>${p.name} <span class="tag ${p.door?'door':''}">${p.id}</span></span><b>材質</b><span>${PANELS[S.panel].name} t${p.t}</span><b>下料尺寸</b><span style="color:#7dd3fc;font-weight:700">${fmt(p.w)} × ${fmt(p.h)} mm</span><b>入槽</b><span>四邊各 ${ins(p.door?S.doorProfile:S.profile)} mm</span><b>面積</b><span>${fmt(p.w*p.h/1e6,3)} m²</span><b>顏色</b><span><i class="dot" style="background:${partPanelColor(p)}"></i>${panelName(partPanelColor(p))}</span></div>`;
+  }
+  const eds=E.map((e,i)=>`<div class="ed-row"><label>${e[0]}</label><input type="number" data-e="${i}" value="${Math.round(e[1])}"></div>`).join('');
+  const sw=isAlu(p)
+    ? ALU_COLORS.map(c=>`<div class="swc ${S.overrides[p.id]===c.id?'on':''}" data-oc="${c.id}" title="${c.name}" style="background:linear-gradient(135deg,#fff8,${c.hex} 45%,${c.hex} 70%,#0006)"></div>`).join('')
+    : PANEL_COLORS.map(c=>`<div class="swc ${S.overrides[p.id]===c.hex?'on':''}" data-oc="${c.hex}" title="${c.name}" style="background:${c.hex}"></div>`).join('');
+  body.innerHTML=spec+(eds?`<div class="sub">尺寸修改</div>${eds}`:'')+
+    `<div class="sub">此料件顏色（個別指定）</div><div class="sw">${sw}<input type="color" id="ov-custom" value="${isAlu(p)?partAlu(p).hex:partPanelColor(p)}"></div>
+     <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn vb" id="ov-same">套用至所有「${p.name}」</button><button class="btn vb" id="ov-reset">恢復預設色</button></div>`;
+  body.querySelectorAll('[data-e]').forEach(inp=>inp.onchange=()=>E[+inp.dataset.e][2](parseFloat(inp.value)));
+  const setOv=(val,all)=>{ (all?parts.filter(q=>q.name===p.name):[p]).forEach(q=>{ if(val==null) delete S.overrides[q.id]; else S.overrides[q.id]=val; }); update(); };
+  body.querySelectorAll('[data-oc]').forEach(el=>el.onclick=()=>setOv(el.dataset.oc));
+  $('ov-custom').oninput=e=>setOv(e.target.value);
+  $('ov-same').onclick=()=>setOv(S.overrides[p.id]||(isAlu(p)?globalAluKey():S.panelColor),true);
+  $('ov-reset').onclick=()=>setOv(null);
+}
+$('sel-clear').onclick=()=>select(null);
+
+/* ================= BOM 面板 ================= */
+function renderBOM(){
+  const b=BOM, el=$('bbody'), st=S.price;
+  $('t-len').textContent=fmt(b.lenTot/1000,1); $('t-kg').textContent=fmt(b.kgTot,1); $('t-bars').textContent=b.bars; $('t-cost').textContent=money(b.cost.total);
+  document.querySelectorAll('.btab').forEach(t=>t.classList.toggle('on',t.dataset.t===bomTab));
+  if(bomTab==='alu'){
+    el.innerHTML=`<table><thead><tr><th>#</th><th>品名</th><th>型材</th><th class="n">裁切長度 mm</th><th class="n">數量</th><th class="n">小計長度 m</th><th class="n">單重 kg</th><th class="n">小計 kg</th><th>顏色／表面處理</th><th>加工備註</th></tr></thead><tbody>`+
+      b.alu.map((g,i)=>{ const kg=g.len/1000*PROFILES[g.series].kg;
+        return `<tr><td>${i+1}</td><td>${g.door?'<span class="tag door">門</span> ':''}${g.name}</td><td>${g.series}</td><td class="n">${fmt(g.len,1)}</td><td class="n">${g.qty}</td><td class="n">${fmt(g.len*g.qty/1000,2)}</td><td class="n">${fmt(kg,2)}</td><td class="n">${fmt(kg*g.qty,2)}</td><td><i class="dot" style="background:${g.color.hex}"></i>${g.color.name}</td><td style="color:#94a3b8">${g.name==='立柱'?(S.base==='none'?'兩端端蓋':'底端攻牙 '+PROFILES[g.series].bolt):'兩端直角切 ±0.5'}</td></tr>`; }).join('')+
+      `<tr class="sum"><td></td><td>合計</td><td></td><td></td><td class="n">${b.cuts}</td><td class="n">${fmt(b.lenTot/1000,2)}</td><td></td><td class="n">${fmt(b.kgTot,2)}</td><td colspan="2">鋸片損耗 ${st.kerf} mm／刀</td></tr></tbody></table>`;
+  }
+  if(bomTab==='panel'){
+    const pp=panelPrice()*b.pFactor;
+    el.innerHTML=b.pan.length?`<table><thead><tr><th>#</th><th>品名</th><th>材質</th><th class="n">下料寬 mm</th><th class="n">下料高 mm</th><th class="n">厚度</th><th class="n">數量</th><th class="n">面積 m²</th><th class="n">單價/m²</th><th class="n">金額</th><th>顏色</th></tr></thead><tbody>`+
+      b.pan.map((g,i)=>{ const a=g.w*g.h/1e6*g.qty; return `<tr><td>${i+1}</td><td>${g.name}</td><td>${PANELS[S.panel].name}</td><td class="n">${fmt(g.w)}</td><td class="n">${fmt(g.h)}</td><td class="n">${g.t}</td><td class="n">${g.qty}</td><td class="n">${fmt(a,3)}</td><td class="n">${fmt(pp)}</td><td class="n">${fmt(a*pp)}</td><td><i class="dot" style="background:${g.color}"></i>${panelName(g.color)}</td></tr>`; }).join('')+
+      `<tr class="sum"><td></td><td>合計</td><td colspan="4"></td><td class="n">${b.pan.reduce((s,g)=>s+g.qty,0)}</td><td class="n">${fmt(b.area,3)}</td><td></td><td class="n">${fmt(b.cost.panCost)}</td><td></td></tr></tbody></table><div class="note">下料尺寸＝開口淨距＋四邊入槽 ${ins()} mm。</div>`
+      :'<div class="note">目前未選用板材。</div>';
+  }
+  if(bomTab==='acc'){
+    el.innerHTML=`<table><thead><tr><th>#</th><th>品名</th><th>規格</th><th class="n">數量</th><th>單位</th><th class="n">參考單價 NT$（可修改）</th><th class="n">金額</th></tr></thead><tbody>`+
+      b.acc.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td style="color:#94a3b8">${a.spec}</td><td class="n">${a.qty}</td><td>${a.unit}</td><td class="n"><input type="number" data-acc="${a.key}" value="${a.price}"></td><td class="n">${fmt(a.qty*a.price)}</td></tr>`).join('')+
+      `<tr class="sum"><td></td><td>合計</td><td>接點 ${b.joints} 處 × ${S.bpj} 角座</td><td></td><td></td><td></td><td class="n">${fmt(b.cost.accCost)}</td></tr></tbody></table>`;
+    el.querySelectorAll('[data-acc]').forEach(i=>i.onchange=()=>{ S.accPrice[i.dataset.acc]=parseFloat(i.value)||0; update(); });
+  }
+  if(bomTab==='nest'){
+    const pal=['#7dd3fc','#86efac','#fcd34d','#c4b5fd','#fda4af','#5eead4','#fdba74','#a5b4fc'];
+    el.innerHTML=`<div class="nest"><div class="ed-row" style="max-width:360px"><label>長料長度</label><select id="nest-stock">${[3000,4000,5000,6000].map(v=>`<option ${v===st.stock?'selected':''}>${v}</option>`).join('')}</select><label>鋸縫 mm</label><input type="number" id="nest-kerf" value="${st.kerf}" style="width:60px"></div>`+
+      b.nest.map(g=>{ const lens=[...new Set(g.lens)].sort((a,b)=>b-a), cmap={}; lens.forEach((l,i)=>cmap[l]=pal[i%pal.length]);
+        return `<div class="ng"><h5>${g.series}　<i class="dot" style="background:${g.color.hex}"></i>${g.color.name}<span>${g.res.bars.length} 支 × ${st.stock} mm ｜ 利用率 ${fmt(g.util*100,1)}% ${g.res.over?`<b class="warn">｜ ${g.res.over} 支超長需拼接</b>`:''}</span></h5>`+
+          g.res.bars.map((bar,i)=>`<div class="barrow"><span class="bi">#${i+1}</span><div class="bar">${bar.cuts.map(c=>`<div class="seg" style="width:${Math.min(100,c/st.stock*100)}%;background:${cmap[c]}" title="${fmt(c,1)} mm">${c/st.stock>.07?fmt(c):''}</div>`).join('')}</div><span class="bu">餘 ${fmt(bar.rem)}</span></div>`).join('')+`</div>`; }).join('')+`</div>`;
+    $('nest-stock').onchange=e=>{ st.stock=+e.target.value; update(); };
+    $('nest-kerf').onchange=e=>{ st.kerf=parseFloat(e.target.value)||0; update(); };
+  }
+  if(bomTab==='est'){
+    const c=b.cost;
+    const rows=[['鋁擠型材料',`${fmt(b.kgTot,1)} kg × NT$${st.aluKg}/kg（含表面處理加價）`,c.aluCost],['裁切加工',`${b.cuts} 刀 × NT$${st.cut}`,c.cutCost],
+      ['板材',`${fmt(b.area,2)} m² × NT$${fmt(panelPrice()*b.pFactor)}/m²（${PANELS[S.panel].name} t${S.panelThick}）`,c.panCost],['五金配件',`${b.acc.length} 項`,c.accCost],['組裝工資',`${fmt(b.hrs,1)} 小時 × NT$${st.labor}`,c.labCost]];
+    el.innerHTML=`<div class="est"><div><table><thead><tr><th>項目</th><th>計算依據</th><th class="n">金額 NT$</th></tr></thead><tbody>`+
+      rows.map(r=>`<tr><td>${r[0]}</td><td style="color:#94a3b8">${r[1]}</td><td class="n">${fmt(r[2])}</td></tr>`).join('')+
+      `<tr class="sum"><td>成本小計</td><td></td><td class="n">${fmt(c.sub)}</td></tr><tr><td>管銷利潤</td><td style="color:#94a3b8">${st.margin}%</td><td class="n">${fmt(c.mg)}</td></tr>
+       <tr class="sum"><td>未稅報價</td><td></td><td class="n">${fmt(c.pre)}</td></tr><tr><td>營業稅</td><td style="color:#94a3b8">${st.tax}%</td><td class="n">${fmt(c.tax)}</td></tr>
+       <tr class="sum"><td style="color:#86efac">含稅總價</td><td></td><td class="n" style="color:#86efac;font-size:14px">${fmt(c.total)}</td></tr></tbody></table>
+       <div class="note">＊單價皆為台灣市場參考值，請依實際供應商報價修改。工時：每接點 0.12h、每片板 0.2h、門 1.5h、腳座 0.1h/支、放樣 1h。</div></div>
+       <div class="params"><div class="sub" style="margin-top:0">估價參數</div>`+
+      [['aluKg','鋁材單價 NT$/kg'],['cut','裁切費 NT$/刀'],['labor','工資 NT$/小時'],['margin','管銷利潤 %'],['tax','營業稅 %']].map(([k,l])=>`<div class="ed-row"><label>${l}</label><input type="number" data-st="${k}" value="${st[k]}"></div>`).join('')+
+      `<div class="ed-row"><label>板材單價 NT$/m²（${PANELS[S.panel].short}）</label><input type="number" id="est-pp" value="${panelPrice()}"></div></div></div>`;
+    el.querySelectorAll('[data-st]').forEach(i=>i.onchange=()=>{ st[i.dataset.st]=parseFloat(i.value)||0; update(); });
+    $('est-pp').onchange=e=>{ S.panelPrice[S.panel]=parseFloat(e.target.value)||0; update(); };
+  }
+}
+document.querySelectorAll('.btab').forEach(t=>t.onclick=()=>{ bomTab=t.dataset.t; renderBOM(); });
+
+function exportCSV(){
+  const b=BOM, q=v=>`"${String(v).replace(/"/g,'""')}"`, L=[];
+  L.push(['鋁擠型圍籬 BOM',`${S.w}x${S.d}x${S.h}`,new Date().toLocaleString()].map(q).join(','),'');
+  L.push(['[鋁材裁切]'].join(',')); L.push(['品名','型材','裁切長度mm','數量','顏色','小計kg'].map(q).join(','));
+  b.alu.forEach(g=>L.push([g.name,g.series,g.len,g.qty,g.color.name,(g.len/1000*PROFILES[g.series].kg*g.qty).toFixed(2)].map(q).join(',')));
+  L.push('','[板材]'); L.push(['品名','材質','寬mm','高mm','厚度','數量','顏色'].map(q).join(','));
+  b.pan.forEach(g=>L.push([g.name,PANELS[S.panel].name,g.w,g.h,g.t,g.qty,panelName(g.color)].map(q).join(',')));
+  L.push('','[五金配件]'); L.push(['品名','規格','數量','單位','單價','金額'].map(q).join(','));
+  b.acc.forEach(a=>L.push([a.name,a.spec,a.qty,a.unit,a.price,a.qty*a.price].map(q).join(',')));
+  L.push('','[估價]'); const c=b.cost;
+  [['鋁材',c.aluCost],['裁切',c.cutCost],['板材',c.panCost],['五金',c.accCost],['工資',c.labCost],['管銷利潤',c.mg],['未稅',c.pre],['稅',c.tax],['含稅總價',c.total]].forEach(r=>L.push([r[0],Math.round(r[1])].map(q).join(',')));
+  download(new Blob(['﻿'+L.join('\r\n')],{type:'text/csv;charset=utf-8'}),`圍籬BOM_${S.w}x${S.d}x${S.h}.csv`);
+}
+function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
+$('btn-csv').onclick=exportCSV;
+$('btn-png').onclick=()=>{ const cv=view==='3d'?c3d:$('c2d'); if(view==='3d') renderer.render(scene,camera); cv.toBlob(b=>download(b,`圍籬_${view}_${S.w}x${S.d}x${S.h}.png`)); };
+
+/* ================= 頂部工具列 ================= */
+function renderTop(){
+  $('in-mode').value=S.mode; $('in-w').value=S.w; $('in-d').value=S.d; $('in-h').value=S.h;
+  $('in-cols').value=S.cols; $('in-rows').value=S.rows; $('in-levels').value=S.levels; $('in-lock').checked=S.lock;
+  const db=$('doorbox'), ok=doorAllowed(); db.classList.toggle('na',!ok); db.classList.toggle('off',!S.door.active);
+  $('door-active').checked=S.door.active&&ok;
+  $('door-idx').innerHTML=S.spW.map((_,i)=>`<option value="${i}" ${i===S.door.idx?'selected':''}>第 ${i+1} 格</option>`).join('');
+  $('door-w').value=Math.round(S.door.w); $('door-h').value=Math.round(S.door.h); $('door-hinge').value=S.door.hinge;
+  $('door-ang').value=S.door.angle; $('door-ang-v').textContent=S.door.angle+'°';
+  const list=(a,id)=>{ $(id).innerHTML=spArr(a).map((v,i)=>`<input type="number" data-a="${a}" data-i="${i}" value="${Math.round(v)}" class="${a==='w'&&GEO.door&&GEO.door.bay===i?'door':''}" title="第 ${i+1} 格">`).join(''); };
+  list('w','sp-w'); list('d','sp-d'); list('h','sp-h');
+}
+document.querySelector('.topbar').addEventListener('change',e=>{
+  const t=e.target, v=parseFloat(t.value);
+  if(t.dataset.a){ setSpan(t.dataset.a,+t.dataset.i,v); return; }
+  switch(t.id){
+    case 'in-mode': S.mode=t.value; selectedId=null; applyDoorW(); update(); fitView('iso'); break;
+    case 'in-w': setTotal('w',v); break; case 'in-d': setTotal('d',v); break; case 'in-h': setTotal('h',v); break;
+    case 'in-cols': setCount('cols',v); break; case 'in-rows': setCount('rows',v); break; case 'in-levels': setCount('levels',v); break;
+    case 'in-lock': S.lock=t.checked; break;
+    case 'door-active': S.door.active=t.checked; if(S.door.active) applyDoorW(); update(); break;
+    case 'door-idx': S.door.idx=+t.value; resetSpacing('w'); applyDoorW(); update(); break;
+    case 'door-w': S.door.w=v; applyDoorW(); update(); break;
+    case 'door-h': setDoorH(v); break;
+    case 'door-hinge': S.door.hinge=t.value; update(); break;
+  }
+});
+$('door-ang').oninput=e=>{ S.door.angle=+e.target.value; $('door-ang-v').textContent=S.door.angle+'°';
+  const pv=model.children.find(o=>o.isGroup); if(pv) pv.rotation.y=(S.door.hinge==='L'?-1:1)*S.door.angle*Math.PI/180; };
+
+/* ---- 視圖切換 ---- */
+function switchView(v){
+  view=v; $('tab-3d').classList.toggle('on',v==='3d'); $('tab-2d').classList.toggle('on',v==='2d');
+  c3d.style.display=v==='3d'?'block':'none'; $('c2d').style.display=v==='2d'?'block':'none';
+  ['hud','hint'].forEach(i=>$(i).style.display=v==='3d'?'':'none');
+  document.querySelectorAll('[data-view]').forEach(b=>b.style.display=v==='3d'?'':'none');
+  closeEditor(); $('tip').style.display='none';
+  buildDims(); if(v==='2d') draw2D(); else resize();
+}
+$('tab-3d').onclick=()=>switchView('3d'); $('tab-2d').onclick=()=>switchView('2d');
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>fitView(b.dataset.view));
+c3d.addEventListener('dblclick',()=>fitView('iso'));
+
+/* ================= 主更新 ================= */
+function renderHUD(){
+  const b=BOM, n=k=>parts.filter(p=>p.kind===k).length;
+  $('hud').innerHTML=`<b>${S.w} × ${S.d} × ${S.h}</b> <span class="k">mm${BASES[S.base].h?'（含底座 '+(S.h+BASES[S.base].h)+'）':''}</span><br>
+   <span class="k">型材</span> ${S.profile}・${aluDef(globalAluKey()).name}<br>
+   <span class="k">板材</span> ${PANELS[S.panel].name}${S.panel!=='none'?' t'+S.panelThick:''}<br>
+   <span class="k">立柱</span> ${n('post')}　<span class="k">橫梁</span> ${n('beam')}　<span class="k">嵌板</span> ${n('panel')+n('dpanel')}<br>
+   <span class="k">總重</span> <b>${fmt(b.kgTot,1)} kg</b>　<span class="k">估價</span> <b>${money(b.cost.total)}</b>`;
+}
+function update(){
+  parts=buildParts(); BOM=computeBOM();
+  build3D(); renderTop(); renderStyleUI(); renderBOM(); renderHUD();
+  if(view==='2d') draw2D();
+}
+function init(){
+  ['w','d','h'].forEach(resetSpacing); applyDoorW(); clampDoorH();
+  update(); resize(); fitView('iso');
+}
+init();
+</script>
+</body>
+</html>
