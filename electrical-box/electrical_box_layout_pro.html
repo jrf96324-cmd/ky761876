@@ -81,14 +81,39 @@
   .canvas-container{flex:1;overflow:auto;padding:24px;display:flex;align-items:flex-start;justify-content:center;background-image:radial-gradient(#cbd5e1 1.5px,transparent 1.5px);background-size:20px 20px;position:relative}
   canvas{background:white;box-shadow:var(--shadow);border-radius:8px;touch-action:none}
   .empty-state{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#94a3b8;pointer-events:none;line-height:1.8}
-  .toast{position:fixed;right:18px;bottom:18px;background:var(--slate-900);color:#fff;padding:10px 14px;border-radius:10px;font-size:.9rem;font-weight:800;box-shadow:var(--shadow);opacity:0;transform:translateY(10px);transition:.2s;z-index:60;pointer-events:none}
-  .toast.show{opacity:1;transform:translateY(0)}
+  .toast{position:fixed;left:50%;bottom:18px;max-width:calc(100vw - 32px);background:var(--slate-900);color:#fff;padding:10px 14px;border-radius:10px;font-size:.9rem;font-weight:800;box-shadow:var(--shadow);opacity:0;transform:translate(-50%,10px);transition:.2s;z-index:60;pointer-events:none}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
   .status-ok{color:#047857}.status-ng{color:#dc2626}
   .interference-panel{margin-top:8px;padding:9px;border-radius:9px;background:#f8fafc;border:1px solid var(--border);font-size:.78rem;line-height:1.55}
   .range-row{display:grid;grid-template-columns:1fr 62px;gap:8px;align-items:center}
   input[type="range"]{width:100%}
   .view-hint{font-size:.72rem;color:var(--slate-500);padding:4px 1rem;background:#fff;border-bottom:1px solid var(--border)}
   [hidden]{display:none!important}
+  .content{position:relative}
+  .inspector{position:absolute;right:14px;bottom:14px;width:310px;max-height:min(72%,600px);overflow:auto;background:#fff;color:var(--slate-900);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);z-index:25;font-size:.8rem}
+  .insp-head{position:sticky;top:0;z-index:1;background:var(--slate-900);color:#fff;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .insp-head b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .insp-actions{display:flex;gap:4px;flex-shrink:0}
+  .insp-head button{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:2px 8px;cursor:pointer;font-weight:900}
+  .insp-head button:disabled{opacity:.35;cursor:default}
+  .insp-body{padding:10px;display:flex;flex-direction:column;gap:8px}
+  .insp-sec{font-size:.7rem;font-weight:900;color:var(--slate-500);letter-spacing:.04em;border-top:1px solid var(--slate-200);padding-top:6px}
+  .insp-note{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:6px 8px;font-size:.74rem}
+  .insp-row{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}
+  .insp-foot{display:grid;grid-template-columns:1fr 1fr;gap:6px;border-top:1px solid var(--slate-200);padding-top:8px}
+  .insp-tip{font-size:.68rem;color:var(--slate-500);line-height:1.5}
+  .swatches{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+  .swatch{width:22px;height:22px;border-radius:6px;border:1px solid rgba(0,0,0,.28);cursor:pointer;padding:0}
+  .swatch.on{outline:2px solid var(--primary);outline-offset:1px}
+  .tool-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+  .tool-btn{display:flex;align-items:center;gap:4px;justify-content:center;padding:6px 5px;border:1px solid var(--border);background:#fff;border-radius:7px;cursor:pointer;font-weight:800;font-size:.72rem;color:var(--slate-700);white-space:nowrap}
+  .tool-btn:hover{background:#eff6ff;border-color:#93c5fd}
+  .tool-btn:disabled{opacity:.4;cursor:default}
+  .tool-btn.danger{color:#b91c1c}.tool-btn.danger:hover{background:#fef2f2;border-color:#fca5a5}
+  .tag-btn{font-size:.72rem;color:var(--slate-700);font-weight:900;white-space:nowrap;background:var(--slate-100);border:1px solid var(--border);border-radius:6px;padding:3px 6px;cursor:pointer}
+  .tag-btn:hover{background:#eff6ff;border-color:#93c5fd;color:var(--primary)}
+  .card.card-sel{outline:3px solid #f59e0b;outline-offset:1px}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
   .health{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:7px 1rem;background:#f8fafc;border-bottom:1px solid var(--border);font-size:.76rem}
   .health .h-title{font-weight:900;color:var(--slate-700);margin-right:2px}
   .hchip{display:inline-flex;gap:6px;align-items:center;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:#fff;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--slate-700)}
@@ -119,6 +144,7 @@
     .content{min-height:calc(100vh - 52px)}
     .toolbar{gap:10px;padding:.7rem;flex-wrap:wrap}.toolbar-actions{margin-left:0;flex-wrap:wrap}
     .canvas-container{padding:14px;justify-content:flex-start}
+    .inspector{position:fixed;left:8px;right:8px;bottom:8px;width:auto;max-height:52vh}
   }
 </style>
 </head>
@@ -188,7 +214,11 @@
       <div><label>立體厚度感</label><input type="number" id="viewDepth" min="0" step="1"></div>
       <div><label>斜視角度</label><input type="number" id="viewAngle" min="0" max="0.6" step="0.01"></div>
     </div>
-    <div class="small-note">背板平面：可拖曳元件與配線槽。門板正視：可拖曳 HMI／按鈕。立體：展示用。</div>
+    <div class="form-grid" style="margin-top:8px">
+      <div><label for="snapGrid">拖曳格點吸附 (mm，0=關)</label><input type="number" id="snapGrid" min="0" step="1"></div>
+      <div><label>&nbsp;</label><div class="check-row" style="margin-top:4px"><input type="checkbox" id="multiTap"><span>觸控多選（點選累加）</span></div></div>
+    </div>
+    <div class="small-note"><b>點選圖面上的元件、配線槽、HMI／按鈕</b>，右下角會出現屬性面板，可直接改名稱、顏色、尺寸、位置。Shift／Ctrl＋點選或在空白處拖曳框選可多選，再用面板中的對齊、均分、固定中心距工具排列。</div>
   </div>
 
   <div class="sidebar-section">
@@ -265,6 +295,7 @@
   </div>
   <div class="view-hint" id="viewHint"></div>
   <div class="health" id="healthPanel" aria-live="polite"></div>
+  <aside id="inspector" class="inspector" aria-label="屬性面板" hidden></aside>
   <div class="canvas-container" id="canvasScrollArea"><div class="empty-state" id="emptyState">請輸入規格並點擊自動排列<br>支援滑鼠/觸控拖曳微調</div><canvas id="layoutCanvas"></canvas></div>
 </main>
 </div>
@@ -338,11 +369,11 @@ function defaultState(){
     ],
     ducts:[],
     doorParts:[],
-    settings:{maxWidth:600,useMaxWidth:true,gapX:10,gapY:10,margins:{t:20,b:20,l:20,r:20},allowRotate:true,thickness:1.6,density:7.85,priceKg:0,processCost:0,viewMode:'2d',viewDepth:26,viewAngle:.22,cabinetDepth:300,doorClearance:10,doorWidth:0,doorHeight:0,hingeSide:'left',doorAngle:0,showDoor:true,reservePct:20,encDiff:50,showReserve:true,showGhost:false}
+    settings:{maxWidth:600,useMaxWidth:true,gapX:10,gapY:10,margins:{t:20,b:20,l:20,r:20},allowRotate:true,thickness:1.6,density:7.85,priceKg:0,processCost:0,viewMode:'2d',viewDepth:26,viewAngle:.22,cabinetDepth:300,doorClearance:10,doorWidth:0,doorHeight:0,hingeSide:'left',doorAngle:0,showDoor:true,reservePct:20,encDiff:50,showReserve:true,showGhost:false,snapGrid:5,multiTap:false,lastPitch:50}
   };
 }
 let appState=defaultState();
-let globalBlocks=[],canvasScale=1,drag=null,selected=null,lastLayout={totalW:0,totalH:0};
+let globalBlocks=[],canvasScale=1,drag=null,lastLayout={totalW:0,totalH:0};
 const canvas=document.getElementById('layoutCanvas'),ctx=canvas.getContext('2d');
 
 /* 舊存檔相容 */
@@ -397,7 +428,7 @@ function updateStateFromInputs(){
   s.gapX=+$('gapX').value||0;s.gapY=+$('gapY').value||0;
   s.margins.t=+$('marginTop').value||0;s.margins.b=+$('marginBottom').value||0;s.margins.l=+$('marginLeft').value||0;s.margins.r=+$('marginRight').value||0;
   s.allowRotate=$('allowRotate').checked;s.thickness=+$('thickness').value||1;s.density=+$('material').value||7.85;s.priceKg=+$('priceKg').value||0;s.processCost=+$('processCost').value||0;
-  s.viewDepth=+$('viewDepth').value||0;s.viewAngle=+$('viewAngle').value||.22;
+  s.viewDepth=+$('viewDepth').value||0;s.snapGrid=Math.max(0,+$('snapGrid').value||0);s.multiTap=$('multiTap').checked;s.viewAngle=+$('viewAngle').value||.22;
   s.cabinetDepth=+$('cabinetDepth').value||300;s.doorClearance=+$('doorClearance').value||0;
   s.doorWidth=Math.max(0,+$('doorWidth').value||0);s.doorHeight=Math.max(0,+$('doorHeight').value||0);
   s.hingeSide=$('hingeSide').value;s.doorAngle=Math.max(0,Math.min(110,+$('doorAngleNum').value||0));s.showDoor=$('showDoor').checked;
@@ -435,12 +466,12 @@ function packItems(items,s,ducts,quiet){
   }
   return placed;
 }
-function runAutoLayout(silent){updateStateFromInputs();if(!validateItems())return;globalBlocks=packItems(appState.items,appState.settings,appState.ducts);selected=null;$('emptyState').style.display=(globalBlocks.length||appState.ducts.length)?'none':'block';redraw();if(!silent)toast('已重新排列（已避開配線槽）')}
+function runAutoLayout(silent){updateStateFromInputs();if(!validateItems())return;if(!silent)pushUndo();globalBlocks=packItems(appState.items,appState.settings,appState.ducts);selList=[];renderInspector(true);$('emptyState').style.display=(globalBlocks.length||appState.ducts.length)?'none':'block';redraw();if(!silent)toast('已重新排列（已避開配線槽）')}
 
 function optimizeManualGaps(){
   updateStateFromInputs();
   if(!globalBlocks.length)return alert('尚無排版資料');
-  globalBlocks=compactBlocks(globalBlocks);
+  pushUndo();globalBlocks=compactBlocks(globalBlocks);selList=[];renderInspector(true);
   $('emptyState').style.display='none';redraw();toast('已依手動位置重整間隙');
 }
 /* 依目前視覺列順序緊縮（不改變相對順序，避開配線槽），回傳新陣列 */
@@ -546,46 +577,326 @@ function renderHealth(a){
   h.push(a.enc&&a.encD?`<span class="hchip info">建議標準箱體 ${a.enc[0]}×${a.enc[1]}×${a.encD}</span>`:'<span class="hchip warn">超出常用標準箱，需訂製</span>');
   el.innerHTML=h.join('');
 }
-function applyBestLayout(){const b=bestLayout();if(!b)return alert('全自動排版無法放入所有元件（寬度限制太小？）');globalBlocks=JSON.parse(JSON.stringify(b));selected=null;redraw();toast('已套用全自動最佳排版')}
+function applyBestLayout(){const b=bestLayout();if(!b)return alert('全自動排版無法放入所有元件（寬度限制太小？）');pushUndo();globalBlocks=JSON.parse(JSON.stringify(b));selList=[];renderInspector(true);redraw();toast('已套用全自動最佳排版')}
 
 /* =========================================================================
    視角
    ========================================================================= */
-const VIEW_HINT={'2d':'背板平面視圖：拖曳元件或配線槽微調位置（點選後可看到選取框）。','3d':'立體視圖：展示用，不支援拖曳。','door':'門板正視圖（從門外側看）：拖曳 HMI／按鈕調整位置；虛線為箱內元件投影。'};
+const VIEW_HINT={'2d':'背板平面：點選元件或配線槽即可在屬性面板修改；Shift／Ctrl＋點選或框選可多選對齊；方向鍵微移，Ctrl+Z 復原。','3d':'立體視圖：展示用，不支援選取與拖曳。','door':'門板正視（從門外側看）：點選 HMI／按鈕修改樣式尺寸；框選多個按鈕後可對齊、均分、固定中心距排列；虛線為箱內元件投影。'};
 function syncViewButtons(){const mode=appState.settings.viewMode||'2d';$('view2dBtn').classList.toggle('active',mode==='2d');$('view3dBtn').classList.toggle('active',mode==='3d');$('viewDoorBtn').classList.toggle('active',mode==='door');$('viewHint').textContent=VIEW_HINT[mode]}
-function setViewMode(mode){appState.settings.viewMode=mode;syncViewButtons();redraw();toast({'2d':'背板平面視角','3d':'立體視角','door':'門板正視視角'}[mode])}
+function setViewMode(mode){appState.settings.viewMode=mode;if(mode==='3d'||(mode==='door')!==(selKind()==='door'))setSelection([],false);syncViewButtons();redraw();toast({'2d':'背板平面視角','3d':'立體視角','door':'門板正視視角'}[mode])}
 function toggleViewMode(){const order=['2d','3d','door'];const i=order.indexOf(appState.settings.viewMode||'2d');setViewMode(order[(i+1)%3])}
 
 /* =========================================================================
-   拖曳
+   選取 / 拖曳 / 框選 / 格點吸附 / 復原
    ========================================================================= */
+let selList=[];   // 依點選順序；第一個為對齊基準
+const isSel=o=>selList.includes(o);
+function kindOf(o){return globalBlocks.includes(o)?'block':appState.ducts.includes(o)?'duct':appState.doorParts.includes(o)?'door':null}
+function selKind(){return selList.length?kindOf(selList[0]):null}
+function pruneSelection(){selList=selList.filter(o=>kindOf(o))}
+function setSelection(list,scroll){selList=list.filter(o=>kindOf(o));renderInspector(true);syncCardHighlight(scroll!==false)}
+const round1=v=>Math.round(v*10)/10;
+function snapV(v){const g=+appState.settings.snapGrid||0;return g>0?Math.round(v/g)*g:Math.round(v)}
 function getPos(evt){const rect=canvas.getBoundingClientRect();const p=evt.touches?evt.touches[0]:evt;return {x:(p.clientX-rect.left)/canvasScale-VIEW_PAD,y:(p.clientY-rect.top)/canvasScale-VIEW_PAD}}
+/* 世界座標外框（門件=外框；元件/配線槽=含邊框位移） */
+function worldBox(o){const k=kindOf(o),mg=appState.settings.margins;if(k==='door')return partBezel(o);const b=boundsOf(o);return {x:b.x+mg.l,y:b.y+mg.t,w:b.w,h:b.h}}
+function boundsOf(o){const k=kindOf(o);if(k==='door')return partBezel(o);if(k==='duct')return ductRect(o);return {x:o.x,y:o.y,w:o.w,h:o.h}}
+function placeAt(o,left,top){const k=kindOf(o),b=boundsOf(o);if(k==='door'){o.x=round1(left+b.w/2);o.y=round1(top+b.h/2)}else{o.x=Math.max(0,round1(left));o.y=Math.max(0,round1(top))}}
+function hitTest(pos){
+  const mode=appState.settings.viewMode||'2d',inBox=(r)=>pos.x>=r.x&&pos.x<=r.x+r.w&&pos.y>=r.y&&pos.y<=r.y+r.h;
+  for(let i=selList.length-1;i>=0;i--){const o=selList[i],k=kindOf(o);if((mode==='door')===(k==='door')&&inBox(worldBox(o)))return o}
+  if(mode==='door'){for(let i=appState.doorParts.length-1;i>=0;i--){if(inBox(partBezel(appState.doorParts[i])))return appState.doorParts[i]}return null}
+  for(let i=globalBlocks.length-1;i>=0;i--){if(inBox(worldBox(globalBlocks[i])))return globalBlocks[i]}
+  for(let i=appState.ducts.length-1;i>=0;i--){if(inBox(worldBox(appState.ducts[i])))return appState.ducts[i]}
+  return null;
+}
+function boxHits(r){
+  const mode=appState.settings.viewMode||'2d',pool=mode==='door'?appState.doorParts:globalBlocks.concat(appState.ducts);
+  return pool.filter(o=>rectOverlap(r,worldBox(o))).sort((a,b)=>{const A=worldBox(a),B=worldBox(b);return (A.x-B.x)||(A.y-B.y)});
+}
 function startDrag(evt){
   const mode=appState.settings.viewMode||'2d';if(mode==='3d')return;
-  const pos=getPos(evt),m=appState.settings.margins;
-  let hit=null;
-  if(mode==='door'){
-    const parts=appState.doorParts;
-    for(let i=parts.length-1;i>=0;i--){const r=partBezel(parts[i]);if(pos.x>=r.x&&pos.x<=r.x+r.w&&pos.y>=r.y&&pos.y<=r.y+r.h){hit={kind:'door',index:i,ox:pos.x-parts[i].x,oy:pos.y-parts[i].y};break}}
+  if(evt.touches&&evt.touches.length>1)return;
+  const pos=getPos(evt),obj=hitTest(pos),add=evt.shiftKey||evt.ctrlKey||evt.metaKey||appState.settings.multiTap;
+  if(obj){
+    if(add){
+      if(selKind()&&selKind()!==kindOf(obj))selList=[];
+      if(isSel(obj)){setSelection(selList.filter(o=>o!==obj));redraw();evt.preventDefault();return}
+      selList.push(obj);
+    }else if(!isSel(obj))selList=[obj];
+    drag={type:'move',start:pos,primary:obj,orig:selList.map(o=>({o,x:o.x,y:o.y})),moved:false};
   }else{
-    for(let i=globalBlocks.length-1;i>=0;i--){const b=globalBlocks[i],x=b.x+m.l,y=b.y+m.t;if(pos.x>=x&&pos.x<=x+b.w&&pos.y>=y&&pos.y<=y+b.h){const item=globalBlocks.splice(i,1)[0];globalBlocks.push(item);hit={kind:'block',index:globalBlocks.length-1,ox:pos.x-x,oy:pos.y-y};break}}
-    if(!hit){for(let i=appState.ducts.length-1;i>=0;i--){const r=ductRect(appState.ducts[i]),x=r.x+m.l,y=r.y+m.t;if(pos.x>=x&&pos.x<=x+r.w&&pos.y>=y&&pos.y<=y+r.h){hit={kind:'duct',index:i,ox:pos.x-x,oy:pos.y-y};break}}}
+    if(!add)selList=[];
+    drag={type:'box',start:pos,cur:pos,add,base:selList.slice()};
   }
-  selected=hit?{kind:hit.kind,index:hit.index}:null;
-  if(hit){drag=hit;evt.preventDefault()}
-  redraw();
+  setSelection(selList);evt.preventDefault();redraw();
 }
 function moveDrag(evt){
-  if(!drag)return;
-  const pos=getPos(evt),m=appState.settings.margins;
-  if(drag.kind==='block'){const b=globalBlocks[drag.index];b.x=Math.max(0,Math.round(pos.x-drag.ox-m.l));b.y=Math.max(0,Math.round(pos.y-drag.oy-m.t))}
-  else if(drag.kind==='duct'){const d=appState.ducts[drag.index];d.x=Math.max(0,Math.round(pos.x-drag.ox-m.l));d.y=Math.max(0,Math.round(pos.y-drag.oy-m.t))}
-  else if(drag.kind==='door'){const p=appState.doorParts[drag.index];p.x=Math.round(pos.x-drag.ox);p.y=Math.round(pos.y-drag.oy)}
+  if(!drag)return;const pos=getPos(evt);
+  if(drag.type==='box'){drag.cur=pos;redraw();evt.preventDefault();return}
+  let dx=pos.x-drag.start.x,dy=pos.y-drag.start.y;
+  if(!drag.moved){if(Math.abs(dx)*canvasScale<3&&Math.abs(dy)*canvasScale<3)return;pushUndo();drag.moved=true}
+  const po=drag.orig.find(r=>r.o===drag.primary);dx=snapV(po.x+dx)-po.x;dy=snapV(po.y+dy)-po.y;
+  if(kindOf(drag.primary)!=='door')drag.orig.forEach(r=>{dx=Math.max(dx,-r.x);dy=Math.max(dy,-r.y)});
+  drag.orig.forEach(r=>{r.o.x=round1(r.x+dx);r.o.y=round1(r.y+dy)});
   redraw();evt.preventDefault();
 }
-function endDrag(){if(!drag)return;const k=drag.kind;drag=null;if(k==='duct')renderDucts();if(k==='door')renderDoorParts();redraw()}
+function endDrag(){
+  if(!drag)return;const d=drag;drag=null;
+  if(d.type==='box'){
+    const r={x:Math.min(d.start.x,d.cur.x),y:Math.min(d.start.y,d.cur.y),w:Math.abs(d.cur.x-d.start.x),h:Math.abs(d.cur.y-d.start.y)};
+    if(r.w*canvasScale>4||r.h*canvasScale>4){
+      const hits=boxHits(r),list=d.add?d.base.slice():[];
+      const k=list.length?kindOf(list[0]):(hits.some(o=>kindOf(o)==='block')?'block':hits.length?kindOf(hits[0]):null);
+      hits.forEach(o=>{if(kindOf(o)===k&&!list.includes(o))list.push(o)});
+      setSelection(list);if(list.length>1)toast(`已選取 ${list.length} 件，可在屬性面板對齊／排列`);
+    }
+  }else if(d.moved){renderDucts();renderDoorParts();renderInspector(true)}
+  redraw();
+}
 canvas.addEventListener('mousedown',startDrag);window.addEventListener('mousemove',moveDrag);window.addEventListener('mouseup',endDrag);
 canvas.addEventListener('touchstart',startDrag,{passive:false});window.addEventListener('touchmove',moveDrag,{passive:false});window.addEventListener('touchend',endDrag);
+
+/* 選取高亮、基準標記、框選框、拖曳座標與格點 */
+function drawSelectionOverlay(){
+  const mode=appState.settings.viewMode||'2d',mg=appState.settings.margins;
+  if(drag&&drag.type==='move'&&drag.moved&&(+appState.settings.snapGrid||0)>0){
+    let g=+appState.settings.snapGrid;while(g*canvasScale<8)g*=2;
+    const W=canvas.width/canvasScale,H=canvas.height/canvasScale,ox=kindOf(drag.primary)==='door'?0:mg.l,oy=kindOf(drag.primary)==='door'?0:mg.t;
+    ctx.save();ctx.strokeStyle='rgba(37,99,235,.12)';ctx.lineWidth=1/canvasScale;ctx.beginPath();
+    for(let x=ox%g-VIEW_PAD;x<W;x+=g){ctx.moveTo(x,-VIEW_PAD);ctx.lineTo(x,H)}for(let y=oy%g-VIEW_PAD;y<H;y+=g){ctx.moveTo(-VIEW_PAD,y);ctx.lineTo(W,y)}
+    ctx.stroke();ctx.restore();
+  }
+  selList.forEach((o,i)=>{
+    const b=worldBox(o),ref=i===0&&selList.length>1;
+    ctx.save();ctx.strokeStyle=ref?'#f59e0b':'#2563eb';ctx.lineWidth=ref?3:2;ctx.setLineDash(ref?[]:[6,3]);ctx.strokeRect(b.x-3,b.y-3,b.w+6,b.h+6);
+    if(ref){ctx.fillStyle='#f59e0b';ctx.fillRect(b.x-3,b.y-20,34,16);ctx.fillStyle='#111827';ctx.font=`bold 11px ${FONT}`;ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText('基準',b.x+2,b.y-12)}
+    ctx.restore();
+  });
+  if(drag&&drag.type==='move'&&drag.moved){
+    const o=drag.primary,k=kindOf(o),b=worldBox(o),t=k==='door'?`中心 X ${fmt(o.x)}  Y ${fmt(o.y)}`:`X ${fmt(o.x+mg.l)}  Y ${fmt(o.y+mg.t)}`;
+    ctx.save();ctx.font=`bold 12px ${FONT}`;const tw=ctx.measureText(t).width+12;ctx.fillStyle='rgba(15,23,42,.88)';ctx.fillRect(b.x,b.y+b.h+6,tw,20);ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(t,b.x+6,b.y+b.h+16);ctx.restore();
+  }
+  if(drag&&drag.type==='box'){
+    const x=Math.min(drag.start.x,drag.cur.x),y=Math.min(drag.start.y,drag.cur.y),w=Math.abs(drag.cur.x-drag.start.x),h=Math.abs(drag.cur.y-drag.start.y);
+    ctx.save();ctx.fillStyle='rgba(37,99,235,.08)';ctx.fillRect(x,y,w,h);ctx.strokeStyle='#2563eb';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.strokeRect(x,y,w,h);ctx.restore();
+  }
+}
+
+/* 復原 */
+const undoStack=[];
+function snapshotState(){return JSON.stringify({items:appState.items,ducts:appState.ducts,doorParts:appState.doorParts,blocks:globalBlocks})}
+function pushUndo(){undoStack.push(snapshotState());if(undoStack.length>60)undoStack.shift();updateUndoBtn()}
+function updateUndoBtn(){const b=$('undoBtn');if(b){b.disabled=!undoStack.length;b.title=undoStack.length?`復原（Ctrl+Z），可復原 ${undoStack.length} 步`:'沒有可復原的動作'}}
+function undo(){
+  if(!undoStack.length)return toast('沒有可復原的動作');
+  const st=JSON.parse(undoStack.pop());appState.items=st.items;appState.ducts=st.ducts;appState.doorParts=st.doorParts;globalBlocks=st.blocks;selList=[];
+  renderItems();renderDucts();renderDoorParts();renderInspector(true);redraw();updateUndoBtn();toast('已復原');
+}
+
+/* 側欄卡片 ↔ 圖面選取 */
+function syncCardHighlight(scroll){
+  document.querySelectorAll('.card.card-sel').forEach(c=>c.classList.remove('card-sel'));
+  const cards=[];
+  selList.forEach(o=>{const k=kindOf(o);let el=null;
+    if(k==='door')el=$('doorPartList').children[appState.doorParts.indexOf(o)];
+    else if(k==='duct')el=$('ductList').children[appState.ducts.indexOf(o)];
+    else if(k==='block'){const it=itemOf(o);if(it)el=$('itemList').children[appState.items.indexOf(it)]}
+    if(el&&el.classList.contains('card')){el.classList.add('card-sel');cards.push(el)}});
+  if(scroll&&cards[0]&&window.innerWidth>900)cards[0].scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function selectFromCard(kind,i){
+  const mode=appState.settings.viewMode;
+  if(kind==='door'){if(mode!=='door')setViewMode('door');setSelection([appState.doorParts[i]],false)}
+  else if(kind==='duct'){if(mode!=='2d')setViewMode('2d');setSelection([appState.ducts[i]],false)}
+  else{if(mode!=='2d')setViewMode('2d');const it=appState.items[i];const bs=globalBlocks.filter(b=>b.id===it.id);if(!bs.length)return toast('此規格尚未排入圖面，請按「自動最佳排列」');setSelection(bs,false)}
+  if(window.innerWidth<=900)$('sidebar').classList.remove('open');
+  redraw();
+}
+
+/* =========================================================================
+   屬性面板（點選圖面物件即可修改名稱 / 顏色 / 尺寸 / 位置；多選可對齊排列）
+   ========================================================================= */
+const SWATCH_BLOCK=['#bfdbfe','#93c5fd','#bbf7d0','#86efac','#fde68a','#fcd34d','#fed7aa','#fdba74','#fecaca','#f9a8d4','#ddd6fe','#c4b5fd','#a5f3fc','#e5e7eb','#94a3b8','#f1f5f9'];
+const SWATCH_DOOR=[['#16a34a','綠：啟動 / 運轉'],['#dc2626','紅：停止 / 緊急'],['#f59e0b','黃：注意 / 異常'],['#2563eb','藍：強制動作 / 復歸'],['#f8fafc','白：一般'],['#111827','黑：一般'],['#facc15','黃：緊停底座']];
+const ICON={
+  L:'<path d="M3 2v20"/><rect x="6" y="5" width="13" height="4"/><rect x="6" y="14" width="8" height="4"/>',
+  CX:'<path d="M12 2v20"/><rect x="4" y="5" width="16" height="4"/><rect x="7" y="14" width="10" height="4"/>',
+  R:'<path d="M21 2v20"/><rect x="5" y="5" width="13" height="4"/><rect x="10" y="14" width="8" height="4"/>',
+  T:'<path d="M2 3h20"/><rect x="5" y="6" width="4" height="13"/><rect x="14" y="6" width="4" height="8"/>',
+  CY:'<path d="M2 12h20"/><rect x="5" y="4" width="4" height="16"/><rect x="14" y="7" width="4" height="10"/>',
+  B:'<path d="M2 21h20"/><rect x="5" y="5" width="4" height="13"/><rect x="14" y="10" width="4" height="8"/>',
+  DH:'<path d="M2 3v18M22 3v18"/><rect x="5" y="8" width="3" height="8"/><rect x="10.5" y="8" width="3" height="8"/><rect x="16" y="8" width="3" height="8"/>',
+  DV:'<path d="M3 2h18M3 22h18"/><rect x="8" y="5" width="8" height="3"/><rect x="8" y="10.5" width="8" height="3"/><rect x="8" y="16" width="8" height="3"/>',
+  MID:'<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M12 6v12M6 12h12"/>'
+};
+const ico=n=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">${ICON[n]}</svg>`;
+function swatchHtml(list,cur,fn){return '<div class="swatches">'+list.map(c=>{const [col,tip]=Array.isArray(c)?c:[c,c];return `<button class="swatch${String(cur).toLowerCase()===col?' on':''}" style="background:${col}" title="${esc(tip)}" aria-label="${esc(tip)}" onclick="${fn}('${col}')"></button>`}).join('')+'</div>'}
+function fld(label,id,val,attrs){return `<div><label for="${id}">${label}</label><input id="${id}" ${attrs||'type="number"'} value="${esc(val)}"></div>`}
+function renderInspector(force){
+  const el=$('inspector');if(!el)return;
+  if(!force&&el.contains(document.activeElement))return;
+  pruneSelection();updateUndoBtn();
+  if(!selList.length){el.hidden=true;el.innerHTML='';return}
+  el.hidden=false;
+  const k=selKind(),n=selList.length,mg=appState.settings.margins,o=selList[0];
+  const kindName={block:'箱內元件',duct:'配線槽',door:'門板元件'}[k];
+  let title,body='';
+  if(n===1&&k==='block'){
+    const it=itemOf(o)||{},inf=blockInfo(o),idx=globalBlocks.indexOf(o),sq=it.type==='square';
+    title=`P${idx+1}　${esc(inf.name)}`;
+    body+=`<div class="insp-sec">樣式（同規格 ${it.count||1} 件一起套用）</div>
+      ${fld('名稱','ins-name',inf.name,`type="text" onchange="inspSet('name',this.value)"`)}
+      <div class="insp-row"><input type="color" id="ins-color" value="${esc(inf.color)}" onchange="inspSet('color',this.value)" aria-label="自訂顏色">${swatchHtml(SWATCH_BLOCK,inf.color,'inspColor')}</div>
+      <div class="insp-sec">尺寸 (mm)</div>
+      <div class="form-grid-3">${sq?fld('邊長','ins-w',it.w,`type="number" min="1" onchange="inspSet('w',this.value)"`)+'<div></div>':fld('寬 W','ins-w',it.w,`type="number" min="1" onchange="inspSet('w',this.value)"`)+fld('高 H','ins-h',it.h,`type="number" min="1" onchange="inspSet('h',this.value)"`)}${fld('深度','ins-depth',it.depth,`type="number" min="0" onchange="inspSet('depth',this.value)"`)}</div>
+      <div class="insp-sec">位置（背板左上角基準，同 PDF）</div>
+      <div class="form-grid-3">${fld('X','ins-x',fmt(o.x+mg.l),`type="number" onchange="inspSet('x',this.value)"`)}${fld('Y','ins-y',fmt(o.y+mg.t),`type="number" onchange="inspSet('y',this.value)"`)}<div><label>&nbsp;</label><button class="tool-btn" onclick="inspRotate()" ${sq?'disabled':''}>⟳ 旋轉90°</button></div></div>`;
+  }else if(n===1&&k==='duct'){
+    const i=appState.ducts.indexOf(o),r=ductRect(o);
+    title=`W${i+1}　${esc(o.name)}`;
+    const sizeOpts=DUCT_SIZES.map(([w,h])=>`<option value="${w}x${h}" ${+o.width===w&&+o.depth===h?'selected':''}>${w}×${h}</option>`).join('');
+    body+=`<div class="insp-sec">樣式</div>${fld('名稱','ins-name',o.name,`type="text" onchange="inspSet('name',this.value)"`)}
+      <div class="insp-row"><input type="color" id="ins-color" value="${esc(o.color)}" onchange="inspSet('color',this.value)" aria-label="自訂顏色">${swatchHtml(['#94a3b8','#64748b','#cbd5e1','#9ca3af','#d1d5db','#a8a29e','#bfdbfe','#bbf7d0'],o.color,'inspColor')}</div>
+      <div class="insp-sec">規格 (mm)</div>
+      <div class="form-grid"><div><label for="ins-orient">方向</label><select id="ins-orient" onchange="inspSet('orient',this.value)"><option value="h" ${o.orient==='h'?'selected':''}>水平</option><option value="v" ${o.orient==='v'?'selected':''}>垂直</option></select></div><div><label for="ins-size">標準 寬×高</label><select id="ins-size" onchange="inspSet('size',this.value)"><option value="">自訂</option>${sizeOpts}</select></div></div>
+      <div class="form-grid-3">${fld('長度','ins-len',o.len,`type="number" min="1" onchange="inspSet('len',this.value)"`)}${fld('槽寬','ins-width',o.width,`type="number" min="1" onchange="inspSet('width',this.value)"`)}${fld('槽高(深)','ins-depth',o.depth,`type="number" min="1" onchange="inspSet('depth',this.value)"`)}</div>
+      <div class="insp-sec">位置（背板左上角基準，同 PDF）</div>
+      <div class="form-grid">${fld('X','ins-x',fmt(r.x+mg.l),`type="number" onchange="inspSet('x',this.value)"`)}${fld('Y','ins-y',fmt(r.y+mg.t),`type="number" onchange="inspSet('y',this.value)"`)}</div>`;
+  }else if(n===1&&k==='door'){
+    const i=appState.doorParts.indexOf(o),round=isRound(o);
+    title=`D${i+1}　${esc(o.name)}`;
+    const opts=Object.entries(DOOR_PRESETS).map(([key,v])=>`<option value="${key}" ${o.preset===key?'selected':''}>${v.label}</option>`).join('');
+    body+=`<div class="insp-sec">類型 / 樣式</div>
+      <div class="form-grid">${fld('名稱','ins-name',o.name,`type="text" onchange="inspSet('name',this.value)"`)}<div><label for="ins-preset">類型 / 規格</label><select id="ins-preset" onchange="inspSet('preset',this.value)">${opts}</select></div></div>
+      <div class="insp-row"><input type="color" id="ins-color" value="${esc(o.color||'#16a34a')}" onchange="inspSet('color',this.value)" aria-label="自訂顏色">${swatchHtml(SWATCH_DOOR,o.color,'inspColor')}</div>
+      <div class="insp-sec">尺寸 (mm)</div>
+      ${round?`<div class="form-grid-3">${fld('外徑 Φ','ins-d',o.w,`type="number" step="0.1" min="1" onchange="inspSet('d',this.value)"`)}${fld('開孔 Φ','ins-cut',o.cutW,`type="number" step="0.1" min="0" onchange="inspSet('cut',this.value)"`)}${fld('伸入深度','ins-in',o.insideLength,`type="number" min="0" onchange="inspSet('insideLength',this.value)"`)}</div>`
+             :`<div class="form-grid">${fld('外框寬','ins-w',o.w,`type="number" min="1" onchange="inspSet('w',this.value)"`)}${fld('外框高','ins-h',o.h,`type="number" min="1" onchange="inspSet('h',this.value)"`)}${fld('開孔寬','ins-cw',o.cutW,`type="number" min="0" onchange="inspSet('cutW',this.value)"`)}${fld('開孔高','ins-ch',o.cutH,`type="number" min="0" onchange="inspSet('cutH',this.value)"`)}</div>${fld('伸入深度','ins-in',o.insideLength,`type="number" min="0" onchange="inspSet('insideLength',this.value)"`)}`}
+      <div class="insp-sec">位置（開孔中心，門板左上角基準）</div>
+      <div class="form-grid">${fld('中心 X','ins-x',fmt(o.x),`type="number" step="0.5" onchange="inspSet('x',this.value)"`)}${fld('中心 Y','ins-y',fmt(o.y),`type="number" step="0.5" onchange="inspSet('y',this.value)"`)}</div>
+      <div class="tool-grid"><button class="tool-btn" onclick="centerOnDoor('x')">${ico('CX')}門板左右置中</button><button class="tool-btn" onclick="centerOnDoor('y')">${ico('CY')}門板上下置中</button><div></div></div>`;
+  }else{
+    const ref=selList[0],refName=k==='door'?`D${appState.doorParts.indexOf(ref)+1} ${ref.name}`:k==='duct'?`W${appState.ducts.indexOf(ref)+1} ${ref.name}`:`P${globalBlocks.indexOf(ref)+1} ${blockInfo(ref).name}`;
+    title=`已選取 ${n} 件${kindName}`;
+    const pitch=appState.settings.lastPitch||50;
+    body+=`<div class="insp-note">對齊以 <b>${esc(refName)}</b>（第一個選取，橘框）為基準</div>
+      <div class="insp-sec">對齊</div>
+      <div class="tool-grid">
+        <button class="tool-btn" onclick="alignSel('L')" title="靠左對齊">${ico('L')}靠左</button><button class="tool-btn" onclick="alignSel('CX')" title="水平置中對齊（垂直中心線）">${ico('CX')}左右置中</button><button class="tool-btn" onclick="alignSel('R')" title="靠右對齊">${ico('R')}靠右</button>
+        <button class="tool-btn" onclick="alignSel('T')" title="靠上對齊">${ico('T')}靠上</button><button class="tool-btn" onclick="alignSel('CY')" title="垂直置中對齊（水平中心線）">${ico('CY')}上下置中</button><button class="tool-btn" onclick="alignSel('B')" title="靠下對齊">${ico('B')}靠下</button>
+      </div>
+      <div class="insp-sec">分佈 / 中心距</div>
+      <div class="tool-grid"><button class="tool-btn" onclick="distribute('x')" title="左右兩端不動，中間等距">${ico('DH')}水平均分</button><button class="tool-btn" onclick="distribute('y')" title="上下兩端不動，中間等距">${ico('DV')}垂直均分</button>${k==='door'?`<button class="tool-btn" onclick="centerOnDoor('x')" title="整組移到門板左右中央">${ico('MID')}整組置中</button>`:'<div></div>'}</div>
+      <div class="insp-row"><div style="flex:1"><label for="ins-pitch">固定中心距 (mm)</label><input id="ins-pitch" type="number" min="1" step="1" value="${pitch}"></div><button class="tool-btn" onclick="pitchArrange('x')">→ 橫排</button><button class="tool-btn" onclick="pitchArrange('y')">↓ 直排</button></div>
+      <div class="insp-sec">統一樣式</div>
+      <div class="insp-row"><input type="color" id="ins-color" value="${esc(k==='block'?blockInfo(ref).color:ref.color||'#16a34a')}" onchange="inspColor(this.value)" aria-label="自訂顏色">${swatchHtml(k==='door'?SWATCH_DOOR:SWATCH_BLOCK,'',`inspColor`)}</div>
+      ${k!=='block'?`<button class="tool-btn" onclick="matchSpec()">同基準規格（尺寸 / 開孔 / 深度）</button>`:''}`;
+  }
+  body+=`<div class="insp-foot"><button class="tool-btn" onclick="duplicateSel()" title="Ctrl+D">⧉ 複製</button><button class="tool-btn danger" onclick="deleteSel()" title="Delete">🗑 刪除${n>1?` ${n} 件`:''}</button></div>
+    <div class="insp-tip">方向鍵微移 1 mm（Shift 10 mm）・Shift/Ctrl+點選或框選多選・Ctrl+Z 復原</div>`;
+  el.innerHTML=`<div class="insp-head"><b>${title}</b><span class="insp-actions"><button id="undoBtn" onclick="undo()" aria-label="復原">↶</button><button onclick="setSelection([]);redraw()" aria-label="關閉屬性面板">✕</button></span></div><div class="insp-body">${body}</div>`;
+  updateUndoBtn();
+}
+function afterEdit(msg){renderItems();renderDucts();renderDoorParts();redraw();renderInspector(true);syncCardHighlight(false);if(msg)toast(msg)}
+function syncBlocksToItem(it){globalBlocks.filter(b=>b.id===it.id).forEach(b=>{b.origW=it.w;b.origH=it.h;b.w=b.rotated?it.h:it.w;b.h=b.rotated?it.w:it.h})}
+function inspSet(f,v){
+  const o=selList[0],k=selKind(),mg=appState.settings.margins;if(!o)return;pushUndo();
+  if(k==='block'){const it=itemOf(o);
+    if(f==='name'||f==='color'){if(it)it[f]=v}
+    else if(f==='x')o.x=Math.max(0,(+v||0)-mg.l);else if(f==='y')o.y=Math.max(0,(+v||0)-mg.t);
+    else if(f==='depth'){if(it)it.depth=Math.max(0,+v||0)}
+    else if(f==='w'||f==='h'){const val=Math.max(1,+v||1);if(it){if(it.type==='square'){it.w=it.h=val}else it[f]=val;syncBlocksToItem(it)}}
+  }else if(k==='duct'){
+    if(f==='name'||f==='color'||f==='orient')o[f]=v;
+    else if(f==='size'){if(!v){undoStack.pop();return}const [w,h]=v.split('x').map(Number);o.width=w;o.depth=h}
+    else if(f==='x')o.x=Math.max(0,(+v||0)-mg.l);else if(f==='y')o.y=Math.max(0,(+v||0)-mg.t);
+    else o[f]=Math.max(1,+v||1);
+  }else if(k==='door'){
+    if(f==='name'||f==='color')o[f]=v;
+    else if(f==='preset')Object.assign(o,presetPart(v,o));
+    else if(f==='d'){o.w=o.h=Math.max(1,+v||1)}else if(f==='cut'){o.cutW=o.cutH=Math.max(0,+v||0)}
+    else if(f==='x'||f==='y')o[f]=+v||0;else o[f]=Math.max(0,+v||0);
+  }
+  afterEdit();
+}
+function inspColor(c){
+  if(!selList.length)return;pushUndo();
+  selList.forEach(o=>{const k=kindOf(o);if(k==='block'){const it=itemOf(o);if(it)it.color=c}else o.color=c});
+  afterEdit(selList.length>1?`已套用顏色到 ${selList.length} 件`:'');
+}
+function inspRotate(){const o=selList[0];if(selKind()!=='block'||o.type==='square')return;pushUndo();const w=o.w;o.w=o.h;o.h=w;o.rotated=!o.rotated;afterEdit('已旋轉 90°')}
+function alignSel(mode){
+  if(selList.length<2)return;pushUndo();const r=boundsOf(selList[0]);
+  selList.slice(1).forEach(o=>{const b=boundsOf(o);let x=b.x,y=b.y;
+    if(mode==='L')x=r.x;else if(mode==='R')x=r.x+r.w-b.w;else if(mode==='CX')x=r.x+r.w/2-b.w/2;
+    else if(mode==='T')y=r.y;else if(mode==='B')y=r.y+r.h-b.h;else if(mode==='CY')y=r.y+r.h/2-b.h/2;
+    placeAt(o,x,y)});
+  afterEdit('已對齊');
+}
+function centerOf(o,axis){const b=boundsOf(o);return axis==='x'?b.x+b.w/2:b.y+b.h/2}
+function distribute(axis){
+  if(selList.length<3)return toast('均分需選取 3 件以上');pushUndo();
+  const arr=selList.slice().sort((a,b)=>centerOf(a,axis)-centerOf(b,axis)),c0=centerOf(arr[0],axis),step=(centerOf(arr[arr.length-1],axis)-c0)/(arr.length-1);
+  arr.forEach((o,i)=>{const b=boundsOf(o);if(axis==='x')placeAt(o,c0+step*i-b.w/2,b.y);else placeAt(o,b.x,c0+step*i-b.h/2)});
+  afterEdit(`已等距分佈，中心距 ${fmt(step)} mm`);
+}
+function pitchArrange(axis){
+  const p=+($('ins-pitch')||{}).value;if(!(p>0))return toast('請輸入中心距');appState.settings.lastPitch=p;pushUndo();
+  const arr=selList.slice().sort((a,b)=>centerOf(a,axis)-centerOf(b,axis)),c0=centerOf(arr[0],axis);
+  arr.forEach((o,i)=>{const b=boundsOf(o);if(axis==='x')placeAt(o,c0+p*i-b.w/2,b.y);else placeAt(o,b.x,c0+p*i-b.h/2)});
+  afterEdit(`已以中心距 ${fmt(p)} mm ${axis==='x'?'橫排':'直排'}`);
+}
+function centerOnDoor(axis){
+  if(!selList.length)return;pushUndo();
+  const k=selKind(),bs=selList.map(boundsOf),minA=Math.min(...bs.map(b=>axis==='x'?b.x:b.y)),maxA=Math.max(...bs.map(b=>axis==='x'?b.x+b.w:b.y+b.h));
+  let target;if(k==='door'){const ds=doorSize();target=(axis==='x'?ds.w:ds.h)/2}else{const ext=layoutExtents();target=axis==='x'?(isFinite(usableW())?usableW():ext.maxX)/2:ext.maxY/2}
+  const d=target-(minA+maxA)/2;selList.forEach(o=>{const b=boundsOf(o);axis==='x'?placeAt(o,b.x+d,b.y):placeAt(o,b.x,b.y+d)});
+  afterEdit(k==='door'?`已置中於門板（${axis==='x'?'左右':'上下'}）`:'已置中');
+}
+function matchSpec(){
+  const ref=selList[0],k=selKind();if(selList.length<2)return;pushUndo();
+  selList.slice(1).forEach(o=>{if(k==='door'){const c={x:o.x,y:o.y};['kind','preset','w','h','cutW','cutH','insideLength'].forEach(f=>o[f]=ref[f]);Object.assign(o,c)}else if(k==='duct'){o.width=ref.width;o.depth=ref.depth}});
+  afterEdit('已套用基準規格');
+}
+function duplicateSel(){
+  if(!selList.length)return;pushUndo();const k=selKind(),gx=appState.settings.gapX||10,out=[];
+  selList.forEach(o=>{
+    if(k==='block'){const it=itemOf(o);if(it)it.count=(+it.count||0)+1;const c={...o,x:o.x+o.w+gx};globalBlocks.push(c);out.push(c)}
+    else if(k==='duct'){const c={...o,id:Date.now()+Math.random(),name:o.name+'-複製'};if(o.orient==='h')c.y=o.y+o.width+gx;else c.x=o.x+o.width+gx;appState.ducts.push(c);out.push(c)}
+    else{const c={...o,id:Date.now()+Math.random(),x:o.x+Math.max(o.w,30)+20};appState.doorParts.push(c);out.push(c)}
+  });
+  selList=out;afterEdit(`已複製 ${out.length} 件（可再拖曳到位）`);
+}
+function deleteSel(){
+  if(!selList.length)return;pushUndo();const k=selKind(),n=selList.length;
+  selList.forEach(o=>{
+    if(k==='block'){const it=itemOf(o);globalBlocks.splice(globalBlocks.indexOf(o),1);if(it){it.count=Math.max(0,(+it.count||1)-1);if(!it.count)appState.items.splice(appState.items.indexOf(it),1)}}
+    else if(k==='duct')appState.ducts.splice(appState.ducts.indexOf(o),1);
+    else appState.doorParts.splice(appState.doorParts.indexOf(o),1);
+  });
+  selList=[];afterEdit(`已刪除 ${n} 件（Ctrl+Z 可復原）`);
+}
+let _nudgeT=0;
+document.addEventListener('keydown',e=>{
+  const t=e.target,typing=t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA');
+  if(typing||!$('modal').hidden||!$('pdfPreview').hidden)return;
+  const mod=e.ctrlKey||e.metaKey,mode=appState.settings.viewMode||'2d';
+  if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
+  if(mode==='3d')return;
+  if(mod&&e.key.toLowerCase()==='a'){e.preventDefault();setSelection(mode==='door'?appState.doorParts.slice():globalBlocks.slice());redraw();return}
+  if(!selList.length)return;
+  if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSel();return}
+  if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSel();return}
+  if(e.key==='Escape'){setSelection([]);redraw();return}
+  const step=e.shiftKey?10:1,dir={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,-step],ArrowDown:[0,step]}[e.key];
+  if(!dir)return;e.preventDefault();
+  const now=Date.now();if(now-_nudgeT>800)pushUndo();_nudgeT=now;
+  selList.forEach(o=>{o.x=round1(o.x+dir[0]);o.y=round1(o.y+dir[1]);if(kindOf(o)!=='door'){o.x=Math.max(0,o.x);o.y=Math.max(0,o.y)}});
+  redraw();renderInspector(true);
+});
+document.addEventListener('keyup',e=>{if(e.key&&e.key.startsWith('Arrow')&&selList.length){renderDucts();renderDoorParts()}});
 
 /* =========================================================================
    繪圖（畫面）
@@ -626,6 +937,8 @@ function redraw(){
   ctx.translate(VIEW_PAD,VIEW_PAD);
   if(mode==='door')drawDoorView(totalW,totalH,check);
   else{draw2D(totalW,totalH,maxX,maxY,an);if(m.showDoor)drawDoorOverlay2D(totalW,totalH,check)}
+  drawSelectionOverlay();
+  if(!drag)renderInspector(false);
 }
 function fitText(text,maxW,maxSize,minSize){let size=maxSize;ctx.font=`bold ${size}px ${FONT}`;while(size>minSize&&ctx.measureText(text).width>maxW){size-=.5;ctx.font=`bold ${size}px ${FONT}`}return ctx.measureText(text).width<=maxW}
 function hatch(x,y,w,h,col,step,lw){if(w<=0||h<=0)return;ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.strokeStyle=col;ctx.lineWidth=lw||1;ctx.beginPath();for(let t=-h;t<w;t+=step){ctx.moveTo(x+t,y+h);ctx.lineTo(x+t+h,y)}ctx.stroke();ctx.restore()}
@@ -647,8 +960,9 @@ function draw2D(totalW,totalH,maxX,maxY,an){
   ctx.strokeStyle='#3b82f6';ctx.lineWidth=2;ctx.setLineDash([7,4]);ctx.strokeRect(0,0,totalW,totalH);
   ctx.strokeStyle='#cbd5e1';ctx.lineWidth=1;ctx.strokeRect(mg.l,mg.t,maxX,maxY);ctx.setLineDash([]);
   if(isFinite(usableW())){ctx.save();ctx.strokeStyle='rgba(220,38,38,.5)';ctx.lineWidth=1;ctx.setLineDash([4,4]);const xw=mg.l+usableW();ctx.beginPath();ctx.moveTo(xw,0);ctx.lineTo(xw,bgH);ctx.stroke();ctx.restore()}
-  appState.ducts.forEach((d,i)=>drawDuctFlat(ctx,d,i,mg.l,mg.t,1,selected&&selected.kind==='duct'&&selected.index===i));
-  globalBlocks.forEach((b,i)=>drawFlatBlock(b,i,b.x+mg.l,b.y+mg.t,an&&an.conflicts.get(i)));
+  appState.ducts.forEach((d,i)=>drawDuctFlat(ctx,d,i,mg.l,mg.t,1,isSel(d)));
+  globalBlocks.forEach((b,i)=>{if(!isSel(b))drawFlatBlock(b,i,b.x+mg.l,b.y+mg.t,an&&an.conflicts.get(i))});
+  globalBlocks.forEach((b,i)=>{if(isSel(b))drawFlatBlock(b,i,b.x+mg.l,b.y+mg.t,an&&an.conflicts.get(i))});
   if(s.showGhost&&an&&an.best){ctx.save();ctx.strokeStyle='#059669';ctx.lineWidth=1.6;ctx.setLineDash([5,3]);an.best.forEach(b=>{ctx.strokeRect(b.x+mg.l+1,b.y+mg.t+1,b.w-2,b.h-2)});ctx.setLineDash([]);
     ctx.fillStyle='#047857';ctx.font=`bold 11px ${FONT}`;ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(`綠色虛線＝全自動最佳排版（高 ${Math.ceil(an.bestExt.totalH)} mm）`,mg.l,Math.max(totalH,showR?an.recH:0)+(showR?20:4));ctx.restore()}
   ctx.fillStyle='#1d4ed8';ctx.font=`bold 16px ${FONT}`;ctx.textAlign='center';ctx.textBaseline='alphabetic';
@@ -656,7 +970,7 @@ function draw2D(totalW,totalH,maxX,maxY,an){
   ctx.save();ctx.translate(-12,totalH/2);ctx.rotate(-Math.PI/2);ctx.fillText(`${Math.ceil(totalH)} mm`,0,0);ctx.restore();
 }
 function drawFlatBlock(b,i,x,y,conf){
-  const info=blockInfo(b),sel=selected&&selected.kind==='block'&&selected.index===i;
+  const info=blockInfo(b),sel=isSel(b);
   ctx.shadowColor=sel?'rgba(0,0,0,.35)':'transparent';ctx.shadowBlur=sel?10:0;
   ctx.fillStyle=info.color;ctx.strokeStyle=sel?'#111827':shade(info.color,-90);ctx.lineWidth=sel?2.5:1.5;
   ctx.fillRect(x,y,b.w,b.h);ctx.shadowBlur=0;
@@ -721,7 +1035,7 @@ function drawDoorView(totalW,totalH,check){
   globalBlocks.forEach(b=>{const info=blockInfo(b);ctx.strokeStyle=shade(info.color,-90);ctx.strokeRect(b.x+mg.l,b.y+mg.t,b.w,b.h)});
   ctx.restore();ctx.setLineDash([]);
   // 門件
-  appState.doorParts.forEach((p,i)=>drawDoorPart(ctx,p,i,check.issues.some(x=>x.pi===i),selected&&selected.kind==='door'&&selected.index===i));
+  appState.doorParts.forEach((p,i)=>drawDoorPart(ctx,p,i,check.issues.some(x=>x.pi===i),isSel(p)));
   ctx.fillStyle='#1d4ed8';ctx.font=`bold 16px ${FONT}`;ctx.textAlign='center';ctx.textBaseline='alphabetic';
   ctx.fillText(`門板 ${fmt(ds.w)} × ${fmt(ds.h)} mm（${s.hingeSide==='left'?'左':'右'}鉸鏈，外側視）`,ds.w/2,-12);
 }
@@ -789,7 +1103,7 @@ function renderInputs(){
   $('maxWidth').value=s.maxWidth;$('useMaxWidth').checked=s.useMaxWidth;$('gapX').value=s.gapX;$('gapY').value=s.gapY;
   $('marginTop').value=s.margins.t;$('marginBottom').value=s.margins.b;$('marginLeft').value=s.margins.l;$('marginRight').value=s.margins.r;
   $('allowRotate').checked=s.allowRotate;$('reservePct').value=s.reservePct;$('encDiff').value=s.encDiff;$('showReserve').checked=s.showReserve!==false;$('showGhost').checked=!!s.showGhost;$('thickness').value=s.thickness;$('material').value=String(s.density);$('priceKg').value=s.priceKg;$('processCost').value=s.processCost;
-  $('viewDepth').value=s.viewDepth;$('viewAngle').value=s.viewAngle;$('cabinetDepth').value=s.cabinetDepth;$('doorClearance').value=s.doorClearance;
+  $('viewDepth').value=s.viewDepth;$('snapGrid').value=s.snapGrid??5;$('multiTap').checked=!!s.multiTap;$('viewAngle').value=s.viewAngle;$('cabinetDepth').value=s.cabinetDepth;$('doorClearance').value=s.doorClearance;
   $('doorWidth').value=s.doorWidth;$('doorHeight').value=s.doorHeight;$('hingeSide').value=s.hingeSide;$('doorAngle').value=s.doorAngle;$('doorAngleNum').value=s.doorAngle;$('showDoor').checked=s.showDoor!==false;
   syncViewButtons();toggleMaxWidth();renderItems();renderDucts();renderDoorParts();
 }
@@ -799,12 +1113,12 @@ function renderItems(){
     const sq=it.type==='square',div=document.createElement('div');
     div.className='card';div.style.borderLeftColor=it.color;
     const libOpts='<option value="">— 套用元件庫（名稱/尺寸/深度/顏色）—</option>'+COMP_LIB.map((c,ci)=>`<option value="${ci}">[${c.cat}] ${esc(c.name)} ${c.w}×${c.h} D${c.depth}</option>`).join('');
-    div.innerHTML=`<select style="margin-bottom:6px;font-size:.78rem" onchange="applyCompLib(${idx},this.value)">${libOpts}</select><div class="card-head"><span class="tag">#${idx+1} ${sq?'正方':'矩形'}</span><input type="text" value="${esc(it.name)}" onchange="updateItem(${idx},'name',this.value)" placeholder="元件名稱"><input type="color" value="${esc(it.color)}" oninput="updateItem(${idx},'color',this.value)" title="顯示顏色"><button class="btn-remove" onclick="removeItem(${idx})">×</button></div>`+
+    div.innerHTML=`<select style="margin-bottom:6px;font-size:.78rem" onchange="applyCompLib(${idx},this.value)">${libOpts}</select><div class="card-head"><button class="tag-btn" onclick="selectFromCard('item',${idx})" title="在圖面中選取">#${idx+1} ${sq?'正方':'矩形'} ⌖</button><input type="text" value="${esc(it.name)}" onchange="updateItem(${idx},'name',this.value)" placeholder="元件名稱"><input type="color" value="${esc(it.color)}" oninput="updateItem(${idx},'color',this.value)" title="顯示顏色"><button class="btn-remove" onclick="removeItem(${idx})">×</button></div>`+
       (sq?`<div class="form-grid-3"><div><label style="color:var(--orange)">邊長</label><input type="number" value="${it.w}" onchange="updateItem(${idx},'side',this.value)"></div><div><label>數量</label><input type="number" value="${it.count}" onchange="updateItem(${idx},'count',this.value)"></div><div><label>深度</label><input type="number" value="${it.depth}" onchange="updateItem(${idx},'depth',this.value)"></div></div>`
           :`<div class="form-grid-4"><div><label>寬 W</label><input type="number" value="${it.w}" onchange="updateItem(${idx},'w',this.value)"></div><div><label>高 H</label><input type="number" value="${it.h}" onchange="updateItem(${idx},'h',this.value)"></div><div><label>數量</label><input type="number" value="${it.count}" onchange="updateItem(${idx},'count',this.value)"></div><div><label>深度</label><input type="number" value="${it.depth}" onchange="updateItem(${idx},'depth',this.value)"></div></div>`);
     list.appendChild(div);
   });
-  renderLegend();
+  renderLegend();syncCardHighlight(false);
 }
 function applyCompLib(i,v){if(v==='')return;const c=COMP_LIB[+v],it=appState.items[i];Object.assign(it,{name:c.name,w:c.w,h:c.h,depth:c.depth,color:c.color,type:c.w===c.h?'square':'rect'});renderItems();redraw();toast(`已套用「${c.name}」，按「自動最佳排列」更新尺寸`)}
 /* 顏色圖例：依 顏色+名稱 分組統計 */
@@ -829,11 +1143,12 @@ function renderDucts(){
   appState.ducts.forEach((d,i)=>{
     const div=document.createElement('div');div.className='card';div.style.borderLeftColor=d.color;
     const sizeOpts=DUCT_SIZES.map(([w,h])=>`<option value="${w}x${h}" ${+d.width===w&&+d.depth===h?'selected':''}>${w}×${h}</option>`).join('');
-    div.innerHTML=`<div class="card-head"><span class="tag">W${i+1}</span><input type="text" value="${esc(d.name)}" onchange="updateDuct(${i},'name',this.value)"><input type="color" value="${esc(d.color)}" oninput="updateDuct(${i},'color',this.value)"><button class="btn-remove" onclick="removeDuct(${i})">×</button></div>
+    div.innerHTML=`<div class="card-head"><button class="tag-btn" onclick="selectFromCard('duct',${i})" title="在圖面中選取">W${i+1} ⌖</button><input type="text" value="${esc(d.name)}" onchange="updateDuct(${i},'name',this.value)"><input type="color" value="${esc(d.color)}" oninput="updateDuct(${i},'color',this.value)"><button class="btn-remove" onclick="removeDuct(${i})">×</button></div>
       <div class="form-grid-4"><div><label>方向</label><select onchange="updateDuct(${i},'orient',this.value)"><option value="h" ${d.orient==='h'?'selected':''}>水平</option><option value="v" ${d.orient==='v'?'selected':''}>垂直</option></select></div><div><label>X</label><input type="number" value="${d.x}" onchange="updateDuct(${i},'x',this.value)"></div><div><label>Y</label><input type="number" value="${d.y}" onchange="updateDuct(${i},'y',this.value)"></div><div><label>長度</label><input type="number" value="${d.len}" onchange="updateDuct(${i},'len',this.value)"></div></div>
       <div class="form-grid-3" style="margin-top:5px"><div><label>標準規格 寬×高</label><select onchange="updateDuct(${i},'size',this.value)"><option value="">自訂</option>${sizeOpts}</select></div><div><label>槽寬</label><input type="number" value="${d.width}" onchange="updateDuct(${i},'width',this.value)"></div><div><label>槽高(深)</label><input type="number" value="${d.depth}" onchange="updateDuct(${i},'depth',this.value)"></div></div>`;
     list.appendChild(div);
   });
+  syncCardHighlight(false);
 }
 function addDuct(orient){
   updateStateFromInputs();
@@ -870,13 +1185,14 @@ function renderDoorParts(){
     const div=document.createElement('div');div.className='card';div.style.borderLeftColor=p.kind==='hmi'?'#1f2937':p.color;
     const opts=Object.entries(DOOR_PRESETS).map(([k,v])=>`<option value="${k}" ${p.preset===k?'selected':''}>${v.label}</option>`).join('');
     const round=isRound(p);
-    div.innerHTML=`<div class="card-head"><span class="tag">D${i+1}</span><input type="text" value="${esc(p.name)}" onchange="updateDoorPart(${i},'name',this.value)"><input type="color" value="${esc(p.color||'#16a34a')}" oninput="updateDoorPart(${i},'color',this.value)"><button class="btn-remove" onclick="removeDoorPart(${i})">×</button></div>
+    div.innerHTML=`<div class="card-head"><button class="tag-btn" onclick="selectFromCard('door',${i})" title="在圖面中選取">D${i+1} ⌖</button><input type="text" value="${esc(p.name)}" onchange="updateDoorPart(${i},'name',this.value)"><input type="color" value="${esc(p.color||'#16a34a')}" oninput="updateDoorPart(${i},'color',this.value)"><button class="btn-remove" onclick="removeDoorPart(${i})">×</button></div>
       <div class="form-grid"><div><label>類型 / 規格</label><select onchange="applyDoorPreset(${i},this.value)">${opts}</select></div><div><label>門內伸入深度</label><input type="number" value="${p.insideLength}" onchange="updateDoorPart(${i},'insideLength',this.value)"></div></div>
       <div class="form-grid" style="margin-top:5px"><div><label>中心 X</label><input type="number" value="${fmt(p.x)}" onchange="updateDoorPart(${i},'x',this.value)"></div><div><label>中心 Y</label><input type="number" value="${fmt(p.y)}" onchange="updateDoorPart(${i},'y',this.value)"></div></div>`+
       (round?`<div class="form-grid" style="margin-top:5px"><div><label>外徑 Φ（頭部）</label><input type="number" step="0.1" value="${p.w}" onchange="updateDoorPart(${i},'d',this.value)"></div><div><label>開孔 Φ</label><input type="number" step="0.1" value="${p.cutW}" onchange="updateDoorPart(${i},'cut',this.value)"></div></div>`
              :`<div class="form-grid-4" style="margin-top:5px"><div><label>外框寬</label><input type="number" value="${p.w}" onchange="updateDoorPart(${i},'w',this.value)"></div><div><label>外框高</label><input type="number" value="${p.h}" onchange="updateDoorPart(${i},'h',this.value)"></div><div><label>開孔寬</label><input type="number" value="${p.cutW}" onchange="updateDoorPart(${i},'cutW',this.value)"></div><div><label>開孔高</label><input type="number" value="${p.cutH}" onchange="updateDoorPart(${i},'cutH',this.value)"></div></div>`);
     list.appendChild(div);
   });
+  syncCardHighlight(false);
 }
 function presetPart(key,base){
   const pr=DOOR_PRESETS[key],p=Object.assign({},base,{preset:key,kind:pr.kind});
@@ -1163,7 +1479,7 @@ function renderSavedList(){
 }
 function saveProject(){updateStateFromInputs();const name=$('saveName').value.trim();if(!name)return alert('請輸入方案名稱');const saves=getSaves();saves.unshift({id:Date.now(),name,date:new Date().toLocaleString(),itemCount:appState.items.length,state:JSON.parse(JSON.stringify(appState)),layout:JSON.parse(JSON.stringify(globalBlocks))});if(setSaves(saves)){$('saveName').value='';renderSavedList();toast('方案已儲存')}}
 function loadProject(id){askConfirm('載入此方案？目前未儲存的進度會被覆蓋。',()=>doLoadProject(id))}
-function doLoadProject(id){const t=getSaves().find(s=>s.id===id);if(t){appState=normalizeState(JSON.parse(JSON.stringify(t.state)));globalBlocks=JSON.parse(JSON.stringify(t.layout||[]));selected=null;renderInputs();$('emptyState').style.display=globalBlocks.length?'none':'block';globalBlocks.length?redraw():runAutoLayout();toast('方案已載入')}}
+function doLoadProject(id){const t=getSaves().find(s=>s.id===id);if(t){appState=normalizeState(JSON.parse(JSON.stringify(t.state)));globalBlocks=JSON.parse(JSON.stringify(t.layout||[]));selList=[];undoStack.length=0;renderInspector(true);renderInputs();$('emptyState').style.display=globalBlocks.length?'none':'block';globalBlocks.length?redraw():runAutoLayout();toast('方案已載入')}}
 function deleteProject(id){askConfirm('確定刪除此存檔？',()=>{setSaves(getSaves().filter(s=>s.id!==id));renderSavedList();toast('已刪除')})}
 /* 下載：在 claude.ai 預覽中走 downloads 能力（會跳出確認），一般瀏覽器用 <a download> */
 let _dlCap=null;
@@ -1189,7 +1505,7 @@ function downloadSelf(){downloadBlob('<!DOCTYPE html>\n'+document.documentElemen
 /* =========================================================================
    事件 & 初始化
    ========================================================================= */
-const LIVE_IDS=['reservePct','encDiff','showReserve','showGhost','cabName','cabDrawingNo','cabDesigner','cabBackColor','cabDoorColor','thickness','material','priceKg','processCost','allowRotate','viewDepth','viewAngle','cabinetDepth','doorClearance','doorWidth','doorHeight','hingeSide','showDoor','gapX','gapY','marginTop','marginBottom','marginLeft','marginRight'];
+const LIVE_IDS=['snapGrid','multiTap','reservePct','encDiff','showReserve','showGhost','cabName','cabDrawingNo','cabDesigner','cabBackColor','cabDoorColor','thickness','material','priceKg','processCost','allowRotate','viewDepth','viewAngle','cabinetDepth','doorClearance','doorWidth','doorHeight','hingeSide','showDoor','gapX','gapY','marginTop','marginBottom','marginLeft','marginRight'];
 document.addEventListener('change',e=>{if(e.target&&LIVE_IDS.includes(e.target.id)){updateStateFromInputs();redraw()}});
 ['cabBackColor','cabDoorColor'].forEach(id=>$(id).addEventListener('input',()=>{updateStateFromInputs();redraw()}));
 window.addEventListener('resize',()=>redraw());
