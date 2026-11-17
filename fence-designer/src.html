@@ -139,6 +139,8 @@ td input[type=number]{height:24px;width:80px}
     鋁擠型圍籬 3D 設計器 <small>結構・料件樣式・裁切 BOM・估價</small>
     <span class="sp"></span>
     <button class="btn" id="btn-csv">匯出 BOM (CSV)</button>
+    <button class="btn" id="btn-pdf" title="3D 效果圖、三視圖、BOM、下料、估價（A4 橫向）">匯出 PDF 報告</button>
+    <button class="btn" id="btn-stp" title="AP214 STEP 組立件，可匯入 Creo / SolidWorks / Inventor">匯出 3D STEP</button>
     <button class="btn pri" id="btn-png">匯出圖片</button>
   </div>
   <div class="row">
@@ -698,12 +700,18 @@ const dimGroup=new THREE.Group(); scene.add(dimGroup);
 let pickables=[], dimLabels=[];
 
 const lin=hex=>new THREE.Color(hex).convertSRGBToLinear();
+/* STEP 用：記錄每個幾何的稜柱定義（截面多邊形＋擠出區間＋前置轉換） */
+const rect=(w,h)=>[[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]];
+const circ=(r,n=16)=>Array.from({length:n},(_,i)=>[r*Math.cos(i/n*Math.PI*2),r*Math.sin(i/n*Math.PI*2)]);
+const RXN=new THREE.Matrix4().makeRotationX(-Math.PI/2);
+function setPrism(g,outer,holes,z0,z1,pre){ g.userData.prism={outer,holes:holes||[],z0,z1,pre:pre||null}; return g; }
 const geoCache={}, edgeCache={}, matCache={};
 function profileGeo(series,len){
   const k=series+'|'+len.toFixed(1); if(geoCache[k]) return geoCache[k];
   const p=PROFILES[series], pts=profilePts(p.s,p.slot).map(q=>new THREE.Vector2(q[0],q[1]));
   const sh=new THREE.Shape(pts), hole=new THREE.Path(); hole.absarc(0,0,p.s*0.11,0,Math.PI*2,true); sh.holes.push(hole);
   const g=new THREE.ExtrudeGeometry(sh,{depth:len,bevelEnabled:false,curveSegments:10}); g.translate(0,0,-len/2);
+  setPrism(g,profilePts(p.s,p.slot),[circ(p.s*0.11,16)],-len/2,len/2);
   return geoCache[k]=g;
 }
 function edgeGeo(series,len){ const k=series+'|'+len.toFixed(1); return edgeCache[k]||(edgeCache[k]=new THREE.EdgesGeometry(profileGeo(series,len),30)); }
@@ -741,20 +749,20 @@ function makePanel(p){
   if(def.tex){
     const t=patternTex(def.tex).clone(); t.needsUpdate=true; t.repeat.set(vw/pit,vh/(def.tex==='expd'?pit*0.5:pit));
     mat=new THREE.MeshStandardMaterial({color:lin(col),alphaMap:t,transparent:true,depthWrite:false,side:THREE.DoubleSide,metalness:.45,roughness:.5});
-    m=new THREE.Mesh(new THREE.PlaneGeometry(vw,vh),mat); m.renderOrder=1; disposables.push(t,m.geometry);
+    m=new THREE.Mesh(setPrism(new THREE.PlaneGeometry(vw,vh),rect(vw,vh),[],-p.t/2,p.t/2),mat); m.renderOrder=1; disposables.push(t,m.geometry);
   } else if(def.clear){
     mat=new THREE.MeshPhysicalMaterial({color:lin(col),transparent:true,opacity:def.frost?.42:.2,roughness:def.frost?.45:.04,metalness:0,clearcoat:1,depthWrite:false,side:THREE.DoubleSide,envMapIntensity:1.4});
-    m=new THREE.Mesh(new THREE.BoxGeometry(vw,vh,p.t),mat); m.renderOrder=2; disposables.push(m.geometry);
+    m=new THREE.Mesh(setPrism(new THREE.BoxGeometry(vw,vh,p.t),rect(vw,vh),[],-p.t/2,p.t/2),mat); m.renderOrder=2; disposables.push(m.geometry);
   } else {
     mat=new THREE.MeshStandardMaterial({color:lin(col),metalness:def.metal?.7:(def.acp?.35:.15),roughness:def.metal?.32:(def.acp?.4:.55),envMapIntensity:def.metal?1.2:1});
-    m=new THREE.Mesh(new THREE.BoxGeometry(vw,vh,p.t),mat); m.castShadow=m.receiveShadow=true; disposables.push(m.geometry);
+    m=new THREE.Mesh(setPrism(new THREE.BoxGeometry(vw,vh,p.t),rect(vw,vh),[],-p.t/2,p.t/2),mat); m.castShadow=m.receiveShadow=true; disposables.push(m.geometry);
   }
   disposables.push(mat);
   if(p.dir==='D') m.rotation.y=Math.PI/2;
   return m;
 }
-function box(w,h,d,mat,x,y,z){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); m.castShadow=true; disposables.push(m.geometry); return m; }
-function cyl(r,h,mat,x,y,z,rot){ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,20),mat); m.position.set(x,y,z); if(rot) m.rotation.set(...rot); m.castShadow=true; disposables.push(m.geometry); return m; }
+function box(w,h,d,mat,x,y,z){ const m=new THREE.Mesh(setPrism(new THREE.BoxGeometry(w,h,d),rect(w,h),[],-d/2,d/2),mat); m.position.set(x,y,z); m.castShadow=true; disposables.push(m.geometry); return m; }
+function cyl(r,h,mat,x,y,z,rot){ const m=new THREE.Mesh(setPrism(new THREE.CylinderGeometry(r,r,h,20),circ(r,20),[],-h/2,h/2,RXN),mat); m.position.set(x,y,z); if(rot) m.rotation.set(...rot); m.castShadow=true; disposables.push(m.geometry); return m; }
 
 function clearGroup(g){ while(g.children.length) g.remove(g.children[0]); }
 const hwM={
@@ -772,12 +780,13 @@ const jointGeoCache={};
 function jointGeos(J,P){
   const k=J+P; if(jointGeoCache[k]) return jointGeoCache[k];
   let out=[];
-  if(J==='plate'){ out=[new THREE.BoxGeometry(P*2,P*0.92,4)]; }
+  if(J==='plate'){ out=[setPrism(new THREE.BoxGeometry(P*2,P*0.92,4),rect(P*2,P*0.92),[],-2,2)]; }
   else {
     const hv=J==='heavy', b=P*(hv?1.5:0.85), t=P*(hv?0.15:0.12), w=P*(hv?0.42:0.36);
-    const g1=new THREE.BoxGeometry(t,b,w).translate(t/2,b/2,0), g2=new THREE.BoxGeometry(b,t,w).translate(b/2,t/2,0);
+    const g1=setPrism(new THREE.BoxGeometry(t,b,w).translate(t/2,b/2,0),rect(t,b),[],-w/2,w/2,new THREE.Matrix4().makeTranslation(t/2,b/2,0));
+    const g2=setPrism(new THREE.BoxGeometry(b,t,w).translate(b/2,t/2,0),rect(b,t),[],-w/2,w/2,new THREE.Matrix4().makeTranslation(b/2,t/2,0));
     const tri=new THREE.Shape([new THREE.Vector2(t,t),new THREE.Vector2(b*0.9,t),new THREE.Vector2(t,b*0.9)]);
-    const rib=z=>new THREE.ExtrudeGeometry(tri,{depth:w*0.2,bevelEnabled:false}).translate(0,0,z-w*0.1);
+    const rib=z=>setPrism(new THREE.ExtrudeGeometry(tri,{depth:w*0.2,bevelEnabled:false}).translate(0,0,z-w*0.1),[[t,t],[b*0.9,t],[t,b*0.9]],[],z-w*0.1,z+w*0.1);
     out=hv?[g1,g2,rib(-w*0.32),rib(w*0.32)]:[g1,g2,rib(0)];
   }
   return jointGeoCache[k]=out;
@@ -822,7 +831,7 @@ function buildCorners(){
       const notch=[[px+dx*P/2,pz-dz*P/2],[px+dx*(P/2+Lg),pz-dz*P/2],[px-dx*P/2,pz+dz*(P/2+Lg)],[px-dx*P/2,pz+dz*P/2],[px+dx*P/2,pz+dz*P/2]];
       [[full,h+5],[notch,P+5]].forEach(([pts,y])=>{
         const g=new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(q=>new THREE.Vector2(q[0],q[1]))),{depth:5,bevelEnabled:false});
-        g.rotateX(Math.PI/2); disposables.push(g); const m=new THREE.Mesh(g,hwM.plate); m.position.y=y; m.castShadow=true; grp.add(m); });
+        g.rotateX(Math.PI/2); setPrism(g,pts,[],0,5,new THREE.Matrix4().makeRotationX(Math.PI/2)); disposables.push(g); const m=new THREE.Mesh(g,hwM.plate); m.position.y=y; m.castShadow=true; grp.add(m); });
     }); }
   if(grp.children.length) model.add(hwTag(grp,'corner'));
 }
@@ -848,7 +857,7 @@ function buildDoorHW(d,pivot){
     case 'profile': gD.add(box(20,400,20,aluMat(aluDef(globalAluKey())),hx,hyy,46)); [-170,170].forEach(o=>gD.add(box(22,24,36,hwM.dark,hx,hyy+o,18))); break;
     case 'lever': gD.add(cyl(26,10,chromeMat,hx,hyy,5,RX)); gD.add(cyl(7,26,chromeMat,hx,hyy,20,RX)); gD.add(box(130,16,16,chromeMat,hx-s*58,hyy,32)); break;
     case 'knob': gD.add(cyl(24,8,chromeMat,hx,hyy,4,RX)); gD.add(cyl(8,24,chromeMat,hx,hyy,18,RX));
-      { const k=new THREE.Mesh(new THREE.SphereGeometry(24,24,16),chromeMat); k.position.set(hx,hyy,42); k.castShadow=true; disposables.push(k.geometry); gD.add(k); } break;
+      { const k=new THREE.Mesh(setPrism(new THREE.SphereGeometry(24,24,16),circ(24,20),[],-18,18),chromeMat); k.position.set(hx,hyy,42); k.castShadow=true; disposables.push(k.geometry); gD.add(k); } break;
     case 'recess': gD.add(box(46,140,3,chromeMat,hx,hyy,1.5)); gD.add(box(34,124,4,hwM.dark,hx,hyy,2.5)); break;
   }
   pivot.add(hwTag(gD,'handle'));
@@ -1028,11 +1037,13 @@ if(window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window
 
 /* ================= 2D 工程三視圖 ================= */
 let hits2d=[];
-function draw2D(){
-  const cv=$('c2d'), r=cv.getBoundingClientRect(), dpr=devicePixelRatio||1; if(!r.width) return;
-  cv.width=r.width*dpr; cv.height=r.height*dpr; const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0);
-  hits2d=[];
-  const CW=r.width, CH=r.height, W=S.w,D=S.d,H=S.h, M=Math.max(W,D,H), gap=M*0.24, P=P_();
+function draw2D(opt){
+  let x,CW,CH;
+  if(opt){ x=opt.ctx; CW=opt.w; CH=opt.h; for(const k in hatchCache) delete hatchCache[k]; }
+  else { const cv=$('c2d'), r=cv.getBoundingClientRect(), dpr=devicePixelRatio||1; if(!r.width) return;
+    cv.width=r.width*dpr; cv.height=r.height*dpr; x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); CW=r.width; CH=r.height; }
+  const saveHits=hits2d; hits2d=[];
+  const W=S.w,D=S.d,H=S.h, M=Math.max(W,D,H), gap=M*0.24, P=P_();
   x.fillStyle='#fff'; x.fillRect(0,0,CW,CH);
   const xmin=-M*0.2, xmax=W+gap+D+M*0.08, ymin=-M*0.2, ymax=H+gap+D+M*0.1;
   const tb=56, sc=Math.min((CW-40)/(xmax-xmin),(CH-30-tb)/(ymax-ymin));
@@ -1116,7 +1127,8 @@ function draw2D(){
     [`板材 ${PANELS[S.panel].short} t${thickOf(S.panel)}`,150,1],[`第三角法`,300,1],[new Date().toISOString().slice(0,10),380,1]];
   x.fillStyle='#0f172a'; cells.forEach(([t,cx,ry])=>x.fillText(t,tbx+cx+8,tby+ry*tb/2+tb/4));
   x.fillStyle='#64748b'; x.font='11px "Microsoft JhengHei",sans-serif'; x.textAlign='left';
-  x.fillText('＊點擊尺寸數字可直接修改',18,CH-20);
+  if(!opt) x.fillText('＊點擊尺寸數字可直接修改',18,CH-20);
+  else { hits2d=saveHits; for(const k in hatchCache) delete hatchCache[k]; }
 }
 function shade(hex){ const c=new THREE.Color(hex); const l=c.getHSL({}).l; return l<.3?'#94a3b8':hex; }
 const hatchCache={};
@@ -1260,7 +1272,7 @@ function renderBOM(){
   if(bomTab==='alu'){
     el.innerHTML=`<table><thead><tr><th>#</th><th>品名</th><th>型材</th><th class="n">裁切長度 mm</th><th class="n">數量</th><th class="n">小計長度 m</th><th class="n">單重 kg</th><th class="n">小計 kg</th><th>顏色／表面處理</th><th>加工備註</th></tr></thead><tbody>`+
       b.alu.map((g,i)=>{ const kg=g.len/1000*PROFILES[g.series].kg;
-        return `<tr><td>${i+1}</td><td>${g.door?'<span class="tag door">門</span> ':''}${g.name}</td><td>${g.series}</td><td class="n">${fmt(g.len,1)}</td><td class="n">${g.qty}</td><td class="n">${fmt(g.len*g.qty/1000,2)}</td><td class="n">${fmt(kg,2)}</td><td class="n">${fmt(kg*g.qty,2)}</td><td><i class="dot" style="background:${g.color.hex}"></i>${g.color.name}</td><td style="color:#94a3b8">${g.name==='立柱'?(S.base==='none'?'兩端端蓋':'底端攻牙 '+PROFILES[g.series].bolt):g.name==='轉角立柱'?'兩端插入三向角件':g.name==='轉角斜撐'?'兩端 45° 斜切':S.joint==='hidden'?'直角切＋端面攻牙':'兩端直角切 ±0.5'}</td></tr>`; }).join('')+
+        return `<tr><td>${i+1}</td><td>${g.door?'<span class="tag door">門</span> ':''}${g.name}</td><td>${g.series}</td><td class="n">${fmt(g.len,1)}</td><td class="n">${g.qty}</td><td class="n">${fmt(g.len*g.qty/1000,2)}</td><td class="n">${fmt(kg,2)}</td><td class="n">${fmt(kg*g.qty,2)}</td><td><i class="dot" style="background:${g.color.hex}"></i>${g.color.name}</td><td style="color:#94a3b8">${aluNote(g)}</td></tr>`; }).join('')+
       `<tr class="sum"><td></td><td>合計</td><td></td><td></td><td class="n">${b.cuts}</td><td class="n">${fmt(b.lenTot/1000,2)}</td><td></td><td class="n">${fmt(b.kgTot,2)}</td><td colspan="2">鋸片損耗 ${st.kerf} mm／刀</td></tr></tbody></table>`;
   }
   if(bomTab==='panel'){
@@ -1319,6 +1331,271 @@ function exportCSV(){
 function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
 $('btn-csv').onclick=exportCSV;
 $('btn-png').onclick=()=>{ const cv=view==='3d'?c3d:$('c2d'); if(view==='3d'&&HAS3D) renderer.render(scene,camera); cv.toBlob(b=>download(b,`圍籬_${view}_${S.w}x${S.d}x${S.h}.png`)); };
+
+/* ================= 匯出：STEP (AP214 組立件) ================= */
+function stepEnc(s){
+  let o='', g=''; const fl=()=>{ if(g){ o+='\\X2\\'+g+'\\X0\\'; g=''; } };
+  s=String(s);
+  for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i);
+    if(c>=32&&c<=126){ fl(); o+= c===39?"''":(c===92?'\\\\':s[i]); }
+    else g+=c.toString(16).toUpperCase().padStart(4,'0'); }
+  fl(); return "'"+o+"'";
+}
+const SR=v=>{ let s=(+(+v).toFixed(5)).toString(); if(s==='-0') s='0'; return /[.e]/.test(s)?s:s+'.'; };
+function stepWriter(){
+  const W={n:0,lines:[],
+    add(s){ this.n++; this.lines.push('#'+this.n+'='+s+';'); return '#'+this.n; },
+    reserve(){ this.n++; this.lines.push(null); return {id:'#'+this.n,idx:this.lines.length-1}; },
+    fill(r,s){ this.lines[r.idx]=r.id+'='+s+';'; }};
+  W.P=(x,y,z)=>W.add(`CARTESIAN_POINT('',(${SR(x)},${SR(y)},${SR(z)}))`);
+  W.D=(x,y,z)=>W.add(`DIRECTION('',(${SR(x)},${SR(y)},${SR(z)}))`);
+  W.AX=(o,z,x)=>W.add(`AXIS2_PLACEMENT_3D('',${W.P(...o)},${W.D(...z)},${W.D(...x)})`);
+  return W;
+}
+/* 稜柱實體：外框(逆時針)＋孔(順時針)沿 Z 由 z0 擠出至 z1，全部以平面面片構成 */
+function stepPrism(W,pr,name){
+  const area=L=>{ let a=0; for(let i=0;i<L.length;i++){ const p=L[i],q=L[(i+1)%L.length]; a+=p[0]*q[1]-q[0]*p[1]; } return a/2; };
+  const clean=L=>L.filter((p,i)=>{ const q=L[(i+1)%L.length]; return Math.hypot(p[0]-q[0],p[1]-q[1])>1e-6; }).map(p=>[p[0],p[1]]);
+  const outer=clean(pr.outer); if(area(outer)<0) outer.reverse();
+  const holes=(pr.holes||[]).map(h=>{ const c=clean(h); if(area(c)>0) c.reverse(); return c; }).filter(h=>h.length>2);
+  const z0=pr.z0, z1=pr.z1, faces=[];
+  const VP=c=>W.add(`VERTEX_POINT('',${W.P(...c)})`);
+  const EC=(a,b,pa,pb)=>{ const dx=pb[0]-pa[0],dy=pb[1]-pa[1],dz=pb[2]-pa[2],l=Math.hypot(dx,dy,dz);
+    const vec=W.add(`VECTOR('',${W.D(dx/l,dy/l,dz/l)},${SR(l)})`);
+    const ln=W.add(`LINE('',${W.P(...pa)},${vec})`);
+    return W.add(`EDGE_CURVE('',${a},${b},${ln},.T.)`); };
+  const OE=(e,s)=>W.add(`ORIENTED_EDGE('',*,*,${e},${s?'.T.':'.F.'})`);
+  const face=(bounds,o,n,x)=>{ const pl=W.add(`PLANE('',${W.AX(o,n,x)})`); return W.add(`ADVANCED_FACE('',(${bounds.join(',')}),${pl},.T.)`); };
+  const L=[outer,...holes].map(Lp=>{
+    const n=Lp.length, cb=Lp.map(p=>[p[0],p[1],z0]), ct=Lp.map(p=>[p[0],p[1],z1]);
+    const vb=cb.map(VP), vt=ct.map(VP), Eb=[], Et=[], V=[];
+    for(let i=0;i<n;i++){ const j=(i+1)%n; Eb.push(EC(vb[i],vb[j],cb[i],cb[j])); Et.push(EC(vt[i],vt[j],ct[i],ct[j])); V.push(EC(vb[i],vt[i],cb[i],ct[i])); }
+    for(let i=0;i<n;i++){ const j=(i+1)%n, dx=Lp[j][0]-Lp[i][0], dy=Lp[j][1]-Lp[i][1], l=Math.hypot(dx,dy);
+      const lp=W.add(`EDGE_LOOP('',(${[OE(Eb[i],1),OE(V[j],1),OE(Et[i],0),OE(V[i],0)].join(',')}))`);
+      faces.push(face([W.add(`FACE_OUTER_BOUND('',${lp},.T.)`)],cb[i],[dy/l,-dx/l,0],[dx/l,dy/l,0])); }
+    return {Eb,Et};
+  });
+  const topB=L.map((l,k)=>{ const lp=W.add(`EDGE_LOOP('',(${l.Et.map(e=>OE(e,1)).join(',')}))`); return W.add(`${k?'FACE_BOUND':'FACE_OUTER_BOUND'}('',${lp},.T.)`); });
+  faces.push(face(topB,[0,0,z1],[0,0,1],[1,0,0]));
+  const botB=L.map((l,k)=>{ const lp=W.add(`EDGE_LOOP('',(${l.Eb.slice().reverse().map(e=>OE(e,0)).join(',')}))`); return W.add(`${k?'FACE_BOUND':'FACE_OUTER_BOUND'}('',${lp},.T.)`); });
+  faces.push(face(botB,[0,0,z0],[0,0,-1],[1,0,0]));
+  const sh=W.add(`CLOSED_SHELL('',(${faces.join(',')}))`);
+  return W.add(`MANIFOLD_SOLID_BREP(${stepEnc(name)},${sh})`);
+}
+function solidName(o){
+  const p=o.userData.part;
+  if(!p) return BASES[S.base].name;
+  if(p.kind==='hw') return hwName(p.group);
+  if(isAlu(p)) return `${p.name}_${p.series}_L${Math.round(p.len*10)/10}`;
+  if(isPanel(p)) return `${p.name}_${PANELS[p.ptype].short}_${Math.round(p.w)}x${Math.round(p.h)}x${p.t}`;
+  return p.name||'part';
+}
+/* 收集場景中所有可輸出的實體（含 InstancedMesh），座標轉為 Z 軸朝上 */
+function collectSolids(){
+  scene.updateMatrixWorld(true);
+  const Zup=new THREE.Matrix4().set(1,0,0,0, 0,0,-1,0, 0,1,0,0, 0,0,0,1), out=[], im=new THREE.Matrix4();
+  [model,extras].forEach(root=>root.traverse(o=>{
+    if(!o.isMesh||!o.visible) return; const pr=o.geometry&&o.geometry.userData.prism; if(!pr) return;
+    const mat=o.userData.orig||o.material, c=mat.color.clone().convertLinearToSRGB(), rgb=[c.r,c.g,c.b].map(v=>Math.round(v*1000)/1000);
+    const name=solidName(o);
+    const sig=JSON.stringify([pr.outer.map(q=>[+q[0].toFixed(2),+q[1].toFixed(2)]),(pr.holes||[]).map(h=>h.length),+pr.z0.toFixed(2),+pr.z1.toFixed(2)]);
+    const key=name+'|'+rgb.join(',')+'|'+sig;
+    const mats=[];
+    if(o.isInstancedMesh){ for(let i=0;i<o.count;i++){ o.getMatrixAt(i,im); mats.push(o.matrixWorld.clone().multiply(im)); } }
+    else mats.push(o.matrixWorld.clone());
+    mats.forEach(M=>{ const T=Zup.clone().multiply(M); if(pr.pre) T.multiply(pr.pre); out.push({pr,T,name,rgb,key}); });
+  }));
+  return out;
+}
+function exportSTEP(){
+  if(!parts.length){ toast('目前沒有可輸出的料件'); return; }
+  const keep=selectedId; if(keep) select(null);
+  const solids=collectSolids();
+  if(keep) select(keep);
+  const W=stepWriter();
+  const app=W.add(`APPLICATION_CONTEXT('core data for automotive mechanical design processes')`);
+  W.add(`APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,${app})`);
+  const pc=W.add(`PRODUCT_CONTEXT('',${app},'mechanical')`);
+  const pdc=W.add(`PRODUCT_DEFINITION_CONTEXT('part definition',${app},'design')`);
+  const lu=W.add(`(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.))`);
+  const au=W.add(`(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.))`);
+  const su=W.add(`(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT())`);
+  const unc=W.add(`UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-03),${lu},'distance_accuracy_value','confusion accuracy')`);
+  const ctx=W.add(`(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((${unc}))GLOBAL_UNIT_ASSIGNED_CONTEXT((${lu},${au},${su}))REPRESENTATION_CONTEXT('Context #1','3D Context with UNIT and UNCERTAINTY'))`);
+  const prods=[];
+  const mkProd=(id,name)=>{ const pr=W.add(`PRODUCT(${stepEnc(id)},${stepEnc(name)},'',(${pc}))`); prods.push(pr);
+    const pdf=W.add(`PRODUCT_DEFINITION_FORMATION('','',${pr})`), pd=W.add(`PRODUCT_DEFINITION('design','',${pdf},${pdc})`);
+    return {pd,pds:W.add(`PRODUCT_DEFINITION_SHAPE('','',${pd})`)}; };
+  const root=mkProd('FENCE_ASM',`鋁擠型圍籬_${S.w}x${S.d}x${S.h}`);
+  const rootAx=W.AX([0,0,0],[0,0,1],[1,0,0]), rootSR=W.reserve();
+  const defs=new Map(), styled=[], places=[], styles={};
+  const style=rgb=>{ const k=rgb.join(); if(styles[k]) return styles[k];
+    const c=W.add(`COLOUR_RGB('',${SR(rgb[0])},${SR(rgb[1])},${SR(rgb[2])})`);
+    const fa=W.add(`FILL_AREA_STYLE('',(${W.add(`FILL_AREA_STYLE_COLOUR('',${c})`)}))`);
+    const sss=W.add(`SURFACE_SIDE_STYLE('',(${W.add(`SURFACE_STYLE_FILL_AREA(${fa})`)}))`);
+    return styles[k]=W.add(`PRESENTATION_STYLE_ASSIGNMENT((${W.add(`SURFACE_STYLE_USAGE(.BOTH.,${sss})`)}))`); };
+  solids.forEach((s,i)=>{
+    let d=defs.get(s.key);
+    if(!d){ const no=defs.size+1, {pd,pds}=mkProd(`P${String(no).padStart(3,'0')}`,s.name), cax=W.AX([0,0,0],[0,0,1],[1,0,0]);
+      const brep=stepPrism(W,s.pr,s.name);
+      styled.push(W.add(`STYLED_ITEM('color',(${style(s.rgb)}),${brep})`));
+      const rep=W.add(`ADVANCED_BREP_SHAPE_REPRESENTATION(${stepEnc(s.name)},(${cax},${brep}),${ctx})`);
+      W.add(`SHAPE_DEFINITION_REPRESENTATION(${pds},${rep})`);
+      d={pd,rep,cax}; defs.set(s.key,d); }
+    const e=s.T.elements, nz=new THREE.Vector3(e[8],e[9],e[10]).normalize(), nx=new THREE.Vector3(e[0],e[1],e[2]).normalize();
+    const pl=W.AX([e[12],e[13],e[14]],[nz.x,nz.y,nz.z],[nx.x,nx.y,nx.z]); places.push(pl);
+    const idt=W.add(`ITEM_DEFINED_TRANSFORMATION('','',${d.cax},${pl})`);
+    const rr=W.add(`(REPRESENTATION_RELATIONSHIP('','',${d.rep},${rootSR.id})REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(${idt})SHAPE_REPRESENTATION_RELATIONSHIP())`);
+    const nauo=W.add(`NEXT_ASSEMBLY_USAGE_OCCURRENCE(${stepEnc('NAUO'+(i+1))},${stepEnc(s.name)},'',${root.pd},${d.pd},$)`);
+    W.add(`CONTEXT_DEPENDENT_SHAPE_REPRESENTATION(${rr},${W.add(`PRODUCT_DEFINITION_SHAPE('','',${nauo})`)})`);
+  });
+  W.fill(rootSR,`SHAPE_REPRESENTATION(${stepEnc('FENCE_ASM')},(${[rootAx,...places].join(',')}),${ctx})`);
+  W.add(`SHAPE_DEFINITION_REPRESENTATION(${root.pds},${rootSR.id})`);
+  W.add(`PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,(${prods.join(',')}))`);
+  W.add(`MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',(${styled.join(',')}),${ctx})`);
+  const ts=new Date().toISOString().slice(0,19);
+  const txt=['ISO-10303-21;','HEADER;',"FILE_DESCRIPTION(('Aluminium extrusion fence assembly'),'2;1');",
+    `FILE_NAME('fence_${S.w}x${S.d}x${S.h}.stp','${ts}',('Fence Designer'),(''),'Fence Designer','Fence Designer','');`,
+    "FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));",'ENDSEC;','DATA;',...W.lines,'ENDSEC;','END-ISO-10303-21;',''].join('\n');
+  download(new Blob([txt],{type:'application/step'}),`圍籬_${S.w}x${S.d}x${S.h}.stp`);
+  toast(`STEP 已輸出：${solids.length} 個實體／${defs.size} 種零件`);
+  return {text:txt,solids:solids.length,defs:defs.size};
+}
+
+/* ================= 匯出：PDF 報告（A4 橫向，多頁） ================= */
+const PW=1400, PH=990, PPX=2339, PPY=1654, PFONT='"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+function pdfPage(title,no){
+  const c=document.createElement('canvas'); c.width=PPX; c.height=PPY; const x=c.getContext('2d'); x.scale(PPX/PW,PPY/PH);
+  x.fillStyle='#fff'; x.fillRect(0,0,PW,PH);
+  x.textBaseline='middle'; x.textAlign='left'; x.fillStyle='#0f172a'; x.font=`700 22px ${PFONT}`; x.fillText('鋁擠型圍籬 設計報告',40,34);
+  x.textAlign='right'; x.fillStyle='#1d4ed8'; x.font=`700 18px ${PFONT}`; x.fillText(title,PW-40,34);
+  x.strokeStyle='#1d4ed8'; x.lineWidth=2; x.beginPath(); x.moveTo(40,56); x.lineTo(PW-40,56); x.stroke();
+  x.strokeStyle='#cbd5e1'; x.lineWidth=1; x.beginPath(); x.moveTo(40,PH-34); x.lineTo(PW-40,PH-34); x.stroke();
+  x.font=`12px ${PFONT}`; x.fillStyle='#64748b'; x.textAlign='left';
+  x.fillText(`${S.w}×${S.d}×${S.h} mm｜型材 ${S.profile}｜${new Date().toLocaleString()}`,40,PH-18);
+  x.textAlign='right'; x.fillText(`第 ${no} 頁`,PW-40,PH-18);
+  return {c,x};
+}
+function fitTxt(x,t,w){ t=String(t); if(x.measureText(t).width<=w) return t; while(t.length>1&&x.measureText(t+'…').width>w) t=t.slice(0,-1); return t+'…'; }
+function capture3D(w,h){
+  if(!HAS3D) return null;
+  const pr=renderer.getPixelRatio(); renderer.setPixelRatio(1); renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  dimGroup.visible=false; renderer.render(scene,camera); dimGroup.visible=true;
+  const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(renderer.domElement,0,0);
+  renderer.setPixelRatio(pr); resize(); return c;
+}
+function specRows(){
+  const b=BOM, d=GEO.door, pts=[...new Set(parts.filter(isPanel).map(p=>PANELS[p.ptype].short))].join('、')||'無';
+  const modeName=document.querySelector(`#in-mode option[value="${S.mode}"]`).textContent;
+  return [['外形尺寸',`${S.w} × ${S.d} × ${S.h} mm`],['含底座總高',`${S.h+BASES[S.base].h} mm（${BASES[S.base].name}）`],['結構模式',modeName],
+    ['格數／層數',`寬 ${S.cols} 格・深 ${S.rows} 格・${S.levels} 層`],['型材系列',`${S.profile}（槽 ${PROFILES[S.profile].slot}，${PROFILES[S.profile].bolt}）`],
+    ['表面處理',aluDef(globalAluKey()).name],['板材',pts],['接點配件',`${JOINTS[S.joint].name} × ${S.bpj}／接點`],['轉角配件',CORNERS[S.corner].name],
+    ['門',d?`開口 ${Math.round(S.door.w)} × ${Math.round(d.openTop)}（${S.door.hinge==='L'?'左':'右'}鉸鏈）`:'無'],
+    ...(d?[['門五金',`${HANDLES[S.hw.handle].name}・${LATCHES[S.hw.latch].name}・${HINGES[S.hw.hinge].name}`]]:[]),
+    ['鋁材總長',`${fmt(b.lenTot/1000,2)} m（${S.price.stock/1000} m 長料 ${b.bars} 支）`],['總重量',`${fmt(b.kgTot,1)} kg（鋁材）`],['含稅估價',money(b.cost.total)]];
+}
+function pdfKV(x,rows,x0,y0,w,rh){
+  rows.forEach((r,i)=>{ const y=y0+i*rh; x.fillStyle=i%2?'#ffffff':'#f1f5f9'; x.fillRect(x0,y,w,rh);
+    x.fillStyle='#475569'; x.font=`700 13px ${PFONT}`; x.textAlign='left'; x.fillText(r[0],x0+10,y+rh/2);
+    x.fillStyle=r[0]==='含稅估價'?'#15803d':'#0f172a'; x.font=`${r[0]==='含稅估價'?'700 15px':'13px'} ${PFONT}`; x.fillText(fitTxt(x,r[1],w-120),x0+110,y+rh/2); });
+  x.strokeStyle='#cbd5e1'; x.strokeRect(x0,y0,w,rows.length*rh);
+}
+function aluNote(g){ return g.name==='立柱'?(S.base==='none'?'兩端端蓋':'底端攻牙 '+PROFILES[g.series].bolt):g.name==='轉角立柱'?'兩端插入三向角件':g.name==='轉角斜撐'?'兩端 45° 斜切':S.joint==='hidden'?'直角切＋端面攻牙':'兩端直角切 ±0.5'; }
+function pdfTables(pages){
+  const b=BOM, c=b.cost;
+  const secs=[
+    {t:'鋁材裁切清單',cols:[['#',40,'c'],['品名',150],['型材',70],['裁切長度 mm',110,'r'],['數量',60,'r'],['小計長度 m',100,'r'],['小計重量 kg',110,'r'],['顏色／表面處理',190],['加工備註',0]],
+     rows:b.alu.map((g,i)=>[i+1,(g.door?'[門] ':'')+g.name,g.series,fmt(g.len,1),g.qty,fmt(g.len*g.qty/1000,2),fmt(g.len/1000*PROFILES[g.series].kg*g.qty,2),g.color.name,aluNote(g)]),
+     sum:['','合計','','',b.cuts,fmt(b.lenTot/1000,2),fmt(b.kgTot,2),'',`鋸縫 ${S.price.kerf} mm／刀`]},
+    {t:'板材清單',cols:[['#',40,'c'],['品名',120],['材質',200],['下料寬',90,'r'],['下料高',90,'r'],['厚度',60,'r'],['數量',60,'r'],['面積 m²',90,'r'],['單價/m²',90,'r'],['金額',100,'r'],['顏色',0]],
+     rows:b.pan.map((g,i)=>[i+1,g.name,ptLabel(g.ptype),fmt(g.w),fmt(g.h),g.t,g.qty,fmt(g.w*g.h/1e6*g.qty,3),fmt(g.unit),fmt(g.w*g.h/1e6*g.qty*g.unit),panelName(g.color)]),
+     sum:['','合計','','','','',b.pan.reduce((s,g)=>s+g.qty,0),fmt(b.area,3),'',fmt(c.panCost),''],note:`下料尺寸＝開口淨距＋四邊入槽 ${ins()} mm`},
+    {t:'五金配件清單',cols:[['#',40,'c'],['品名',300],['規格',420],['數量',80,'r'],['單位',60,'c'],['單價 NT$',110,'r'],['金額 NT$',0,'r']],
+     rows:b.acc.map((a,i)=>[i+1,a.name,a.spec,a.qty,a.unit,fmt(a.price),fmt(a.qty*a.price)]),sum:['','合計','','','','',fmt(c.accCost)]},
+    {t:'下料排版',cols:[['型材／顏色',220],['長料',70,'c'],['裁切組合 (mm)',0],['餘料 mm',100,'r']],
+     rows:[].concat(...b.nest.map(g=>g.res.bars.map((bar,i)=>[i?'':`${g.series} ${g.color.name}（利用率 ${fmt(g.util*100,1)}%）`,`#${i+1}`,bar.cuts.map(v=>fmt(v)).join(' + '),fmt(bar.rem)]))),
+     note:`長料 ${S.price.stock} mm，鋸縫 ${S.price.kerf} mm`},
+    {t:'估價單',cols:[['項目',200],['計算依據',0],['金額 NT$',160,'r']],
+     rows:[['鋁擠型材料',`${fmt(b.kgTot,1)} kg × NT$${S.price.aluKg}/kg（含表面處理加價）`,fmt(c.aluCost)],['裁切加工',`${b.cuts} 刀 × NT$${S.price.cut}`,fmt(c.cutCost)],
+       ['板材',`${fmt(b.area,2)} m²`,fmt(c.panCost)],['五金配件',`${b.acc.length} 項`,fmt(c.accCost)],['組裝工資',`${fmt(b.hrs,1)} 小時 × NT$${S.price.labor}`,fmt(c.labCost)],
+       ['成本小計','',fmt(c.sub)],['管銷利潤',`${S.price.margin}%`,fmt(c.mg)],['未稅報價','',fmt(c.pre)],['營業稅',`${S.price.tax}%`,fmt(c.tax)]],
+     sum:['含稅總價','',fmt(c.total)],note:'＊單價為參考值，請依實際供應商報價修正。'}
+  ];
+  const X0=40, TW=PW-80, RH=24; let pg=null, y=0;
+  const newPg=t=>{ pg=pdfPage(t,pages.length+1); pages.push(pg.c); y=80; };
+  const header=(s,cont)=>{ const x=pg.x; x.fillStyle='#0f172a'; x.font=`700 17px ${PFONT}`; x.textAlign='left'; x.fillText(s.t+(cont?'（續）':''),X0,y+10); y+=28;
+    x.fillStyle='#1e3a8a'; x.fillRect(X0,y,TW,RH+2); drawRow(s,s.cols.map(c=>c[0]),'#fff',true); y+=RH+2; };
+  const widths=s=>{ const fixed=s.cols.reduce((a,c)=>a+c[1],0), z=s.cols.filter(c=>!c[1]).length; return s.cols.map(c=>c[1]||(TW-fixed)/Math.max(1,z)); };
+  const drawRow=(s,cells,color,bold)=>{ const x=pg.x, ws=widths(s); let cx=X0;
+    x.font=`${bold?'700 ':''}13px ${PFONT}`; x.fillStyle=color;
+    cells.forEach((v,i)=>{ const al=s.cols[i][2]||'l', w=ws[i]; x.textAlign=al==='r'?'right':al==='c'?'center':'left';
+      x.fillText(fitTxt(x,v,w-14),al==='r'?cx+w-7:al==='c'?cx+w/2:cx+7,y+(bold&&color==='#fff'?(RH+2)/2:RH/2)); cx+=w; }); };
+  secs.forEach(s=>{
+    const need=56+(s.rows.length+(s.sum?1:0))*RH+(s.note?22:0), cap=PH-70-80;
+    if(!pg||y>PH-150||(need<=cap&&y+14+need>PH-70)) newPg(s.t); else y+=14;
+    header(s,false);
+    s.rows.forEach((r,i)=>{ if(y>PH-70){ newPg(s.t); header(s,true); }
+      pg.x.fillStyle=i%2?'#f8fafc':'#ffffff'; pg.x.fillRect(X0,y,TW,RH); drawRow(s,r,'#0f172a',false);
+      pg.x.strokeStyle='#e2e8f0'; pg.x.beginPath(); pg.x.moveTo(X0,y+RH); pg.x.lineTo(X0+TW,y+RH); pg.x.stroke(); y+=RH; });
+    if(s.sum){ if(y>PH-70){ newPg(s.t); header(s,true); } pg.x.fillStyle='#e0e7ff'; pg.x.fillRect(X0,y,TW,RH); drawRow(s,s.sum,'#1e1b4b',true); y+=RH; }
+    if(s.note){ pg.x.fillStyle='#64748b'; pg.x.font=`12px ${PFONT}`; pg.x.textAlign='left'; pg.x.fillText(s.note,X0,y+14); y+=22; }
+  });
+}
+function buildPDF(jpegs){
+  const enc=new TextEncoder(), chunks=[], offs=[]; let len=0;
+  const push=b=>{ if(typeof b==='string') b=enc.encode(b); chunks.push(b); len+=b.length; };
+  push(new Uint8Array([37,80,68,70,45,49,46,52,10,37,226,227,207,211,10]));
+  const obj=(id,fn)=>{ offs[id]=len; push(`${id} 0 obj\n`); fn(); push('\nendobj\n'); };
+  const n=jpegs.length;
+  obj(1,()=>push('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2,()=>push(`<< /Type /Pages /Kids [${jpegs.map((_,i)=>`${3+3*i} 0 R`).join(' ')}] /Count ${n} >>`));
+  jpegs.forEach((jp,i)=>{ const p=3+3*i, cs=`q 842 0 0 595 0 0 cm /Im${i} Do Q`;
+    obj(p,()=>push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /XObject << /Im${i} ${p+2} 0 R >> >> /Contents ${p+1} 0 R >>`));
+    obj(p+1,()=>{ push(`<< /Length ${cs.length} >>\nstream\n`); push(cs); push('\nendstream'); });
+    obj(p+2,()=>{ push(`<< /Type /XObject /Subtype /Image /Width ${PPX} /Height ${PPY} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jp.length} >>\nstream\n`); push(jp); push('\nendstream'); });
+  });
+  const total=3+3*n, xref=len;
+  let xr=`xref\n0 ${total}\n0000000000 65535 f \n`; for(let k=1;k<total;k++) xr+=String(offs[k]).padStart(10,'0')+' 00000 n \n';
+  push(xr); push(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(chunks,{type:'application/pdf'});
+}
+async function exportPDF(){
+  toast('PDF 報告產生中…'); await new Promise(r=>setTimeout(r,40));
+  const keep=selectedId; if(keep) select(null);
+  const pages=[];
+  // 第 1 頁：3D 效果圖＋規格
+  { const {c,x}=pdfPage('3D 效果圖與規格',1); pages.push(c);
+    const ix=40, iy=72, iw=890, ih=560;
+    const g=x.createLinearGradient(ix,iy,ix+iw,iy+ih); g.addColorStop(0,'#1d3a63'); g.addColorStop(.5,'#0b1528'); g.addColorStop(1,'#060a13');
+    x.fillStyle=g; x.fillRect(ix,iy,iw,ih);
+    const img=capture3D(1780,1120);
+    if(img) x.drawImage(img,ix,iy,iw,ih);
+    else { x.save(); x.beginPath(); x.rect(ix,iy,iw,ih); x.clip(); x.translate(ix,iy); draw2D({ctx:x,w:iw,h:ih}); x.restore(); }
+    x.fillStyle='#0f172a'; x.font=`700 16px ${PFONT}`; x.textAlign='left'; x.fillText('規格摘要',955,84);
+    const rows=specRows(); pdfKV(x,rows,955,98,405,Math.min(34,(ih+40)/rows.length));
+    // 成本摘要
+    const cc=BOM.cost, cy=iy+ih+26; x.fillStyle='#0f172a'; x.font=`700 16px ${PFONT}`; x.fillText('成本摘要（NT$）',ix,cy);
+    const items=[['鋁材',cc.aluCost],['裁切',cc.cutCost],['板材',cc.panCost],['五金',cc.accCost],['工資',cc.labCost],['管銷',cc.mg],['稅',cc.tax],['含稅總價',cc.total]];
+    const bw=iw/items.length;
+    items.forEach(([k,v],i)=>{ const bx=ix+i*bw; x.fillStyle=k==='含稅總價'?'#dcfce7':'#f1f5f9'; x.fillRect(bx+2,cy+14,bw-4,74);
+      x.fillStyle='#64748b'; x.font=`13px ${PFONT}`; x.textAlign='center'; x.fillText(k,bx+bw/2,cy+34);
+      x.fillStyle=k==='含稅總價'?'#15803d':'#0f172a'; x.font=`700 17px ${PFONT}`; x.fillText(fmt(v),bx+bw/2,cy+64); });
+    x.fillStyle='#94a3b8'; x.font=`12px ${PFONT}`; x.textAlign='left'; x.fillText('＊3D 圖為示意，門扇依目前開啟角度呈現；尺寸以工程三視圖與裁切清單為準。',ix,cy+110);
+  }
+  // 第 2 頁：三視圖
+  { const {c,x}=pdfPage('工程三視圖',2); pages.push(c); x.save(); x.translate(30,64); draw2D({ctx:x,w:PW-60,h:PH-104}); x.restore(); }
+  // 第 3 頁起：清單
+  pdfTables(pages);
+  if(keep) select(keep);
+  const jpgs=pages.map(c=>{ const d=atob(c.toDataURL('image/jpeg',0.9).split(',')[1]), u=new Uint8Array(d.length); for(let i=0;i<d.length;i++) u[i]=d.charCodeAt(i); return u; });
+  const blob=buildPDF(jpgs);
+  download(blob,`圍籬設計報告_${S.w}x${S.d}x${S.h}.pdf`);
+  toast(`PDF 已輸出，共 ${pages.length} 頁`);
+  return {pages:pages.length,size:blob.size};
+}
+$('btn-stp').onclick=()=>{ try{ exportSTEP(); }catch(e){ console.error(e); toast('STEP 輸出失敗：'+e.message); } };
+$('btn-pdf').onclick=()=>{ exportPDF().catch(e=>{ console.error(e); toast('PDF 輸出失敗：'+e.message); }); };
+
 
 /* ================= 頂部工具列 ================= */
 function renderTop(){
@@ -1380,7 +1657,7 @@ function update(){
 }
 function no3DMsg(){
   toast('此電腦瀏覽器無法啟用 WebGL 3D，已改用工程三視圖。請開啟硬體加速後重新整理。');
-  const b=$('errbar'); b.style.display='block'; b.style.background='#78350f';
+  const b=$('errbar'); b.style.display='block'; b.style.background='#78350f'; b.style.position='static'; b.style.flex='none'; document.body.prepend(b);
   b.innerHTML='⚠ 3D 無法顯示（WebGL 未啟用'+(GLERR?'：'+GLERR:'')+'）。三視圖、尺寸修改、BOM、估價仍可正常使用。<br>'+
    '<small>解決方式：Chrome 網址列輸入 <b>chrome://settings/system</b> → 開啟「可用時使用圖形加速功能」→ 重新啟動瀏覽器；或到 <b>chrome://gpu</b> 查看 WebGL 狀態。Edge 為 edge://settings/system。</small>'+
    ' <button class="btn vb" onclick="this.parentNode.style.display=\'none\'" style="margin-left:8px">關閉</button>';
@@ -1393,7 +1670,7 @@ function init(){
   if(HAS3D) fitView('iso'); else { switchView('2d'); no3DMsg(); }
 }
 init();
-window.__fence={S:S,select:select,cam:()=>[camera,controls],get view(){return view;},get HAS3D(){return HAS3D;}};
+window.__fence={S:S,select:select,exportSTEP:exportSTEP,exportPDF:exportPDF,cam:()=>[camera,controls],get view(){return view;},get HAS3D(){return HAS3D;}};
 })();
 </script>
 </body>
