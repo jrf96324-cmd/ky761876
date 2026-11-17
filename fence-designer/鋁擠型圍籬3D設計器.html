@@ -82,6 +82,8 @@ input[type=range]{accent-color:var(--door);width:90px}
 .pc svg{display:block;margin:0 auto 3px}
 .pc.on{border-color:var(--accent);background:rgba(56,189,248,.12);color:var(--accent);box-shadow:0 0 12px rgba(56,189,248,.18)}
 .pc small{display:block;font-weight:400;color:var(--muted);font-size:10px}
+#door-sec.dis .cards,#door-sec.dis .chk{opacity:.4;pointer-events:none}
+.hwinfo{font-size:12px;color:#cbd5e1;line-height:1.6;margin:6px 0}
 .sel-empty{color:var(--muted);font-size:12px;line-height:1.7}
 .kv{display:grid;grid-template-columns:78px 1fr;gap:4px 8px;font-size:12px;margin-bottom:8px}
 .kv b{color:var(--muted);font-weight:600}
@@ -217,7 +219,10 @@ td input[type=number]{height:24px;width:80px}
       <div class="grid2" style="margin-top:8px">
         <div class="f"><label>板厚 / 線徑 (mm)</label><select id="panel-thick"></select></div>
         <div class="f"><label>單價 (NT$/m²)</label><input type="number" id="panel-price" step="50"></div>
+        <div class="f" id="pitch-f"><label id="pitch-l">網目 (mm)</label><select id="panel-pitch"></select></div>
+        <div class="f"><label>快速組合</label><button class="btn vb" id="preset-mix" title="最下層用鋁板，其餘用網格板">下層鋁板＋上層網格</button></div>
       </div>
+      <div class="swname" id="ptype-note"></div>
       <div class="sub">板材顏色</div>
       <div class="sw" id="panel-sw"></div>
     </div>
@@ -225,10 +230,29 @@ td input[type=number]{height:24px;width:80px}
       <h4>底座與接合</h4>
       <div class="cards c3" id="base-cards"></div>
       <div class="grid2" style="margin-top:8px">
-        <div class="f"><label>每接點角座數</label><select id="bpj"><option value="1">1 個</option><option value="2">2 個（雙側）</option></select></div>
+        <div class="f"><label>每接點配件數</label><select id="bpj"><option value="1">1 個（內側）</option><option value="2">2 個（內外雙側）</option></select></div>
         <div class="f"><label>顯示</label>
           <div style="display:flex;gap:8px"><label class="chk"><input type="checkbox" id="show-dims">尺寸</label><label class="chk"><input type="checkbox" id="show-edges">邊線</label></div></div>
       </div>
+    </div>
+    <div class="sec">
+      <h4>接點固定配件 <span class="sp"></span><span class="tag" id="joint-tag"></span></h4>
+      <div class="cards" id="joint-cards"></div>
+      <div class="swname" id="joint-note"></div>
+      <div class="sub">轉角固定配件</div>
+      <div class="cards" id="corner-cards"></div>
+      <div class="swname" id="corner-note"></div>
+    </div>
+    <div class="sec" id="door-sec">
+      <h4>門五金配件 <span class="sp"></span><span class="tag door" id="door-tag"></span></h4>
+      <div class="sub" style="margin-top:0">門把手</div>
+      <div class="cards c3" id="handle-cards"></div>
+      <div class="sub">門鎖／門扣</div>
+      <div class="cards c3" id="latch-cards"></div>
+      <div class="sub">鉸鏈</div>
+      <div class="cards" id="hinge-cards"></div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" id="hw-bump"> 門擋緩衝墊（2 個）</label>
+      <div class="swname" id="door-note"></div>
     </div>
     <div class="sec" id="sel-sec">
       <h4>選取料件 <span class="sp"></span><button class="btn vb" id="sel-clear" style="display:none">取消選取</button></h4>
@@ -1332,17 +1356,82 @@ const ALU_COLORS = [
   {id:'orange',name:'安全橘烤漆',hex:'#f26b1d',metal:.10,rough:.50,up:.20}
 ];
 const PANELS = {
-  mesh:   {name:'焊接鐵網',  short:'鐵網',  price:650,  th:[3,4,5],        tex:'mesh',pitch:50},
-  perf:   {name:'沖孔鐵板',  short:'沖孔板',price:1500, th:[1.0,1.2,1.5,2.0],tex:'perf',pitch:16},
-  acrylic:{name:'透明壓克力',short:'壓克力',price:1800, th:[3,5,8,10],      clear:true},
-  pc:     {name:'PC 耐力板', short:'耐力板',price:1400, th:[3,5,8],         clear:true,frost:true},
-  sheet:  {name:'鈑金烤漆板',short:'鈑金',  price:1200, th:[1.0,1.2,1.5,2.0]},
+  mesh:   {name:'焊接鐵網',  short:'鐵網',  price:650,  th:[3,4,5],          tex:'mesh',pitch:[25,50,75,100],dp:50,pl:'網目'},
+  grid:   {name:'方格網格板',short:'網格板',price:980,  th:[4,5,6],          tex:'grid',pitch:[20,25,30,40], dp:25,pl:'格距'},
+  expd:   {name:'菱形擴張網',short:'擴張網',price:780,  th:[1.6,2.0,3.0],    tex:'expd',pitch:[15,25,35],    dp:25,pl:'菱格長徑'},
+  perf:   {name:'沖孔鐵板',  short:'沖孔板',price:1500, th:[1.0,1.2,1.5,2.0],tex:'perf',pitch:[8,12,16,20],  dp:16,pl:'孔距'},
+  alu:    {name:'鋁板 5052', short:'鋁板',  price:1650, th:[1.5,2,3],         metal:true,defColor:'#c9ced6'},
+  acp:    {name:'鋁複合板',  short:'複合板',price:950,  th:[3,4],             acp:true,defColor:'#dfe3e8'},
+  acrylic:{name:'透明壓克力',short:'壓克力',price:1800, th:[3,5,8,10],        clear:true},
+  pc:     {name:'PC 耐力板', short:'耐力板',price:1400, th:[3,5,8],           clear:true,frost:true},
+  sheet:  {name:'鐵板烤漆',  short:'烤漆板',price:1200, th:[1.0,1.2,1.5,2.0]},
   none:   {name:'無板材',    short:'無',    price:0,    th:[0]}
 };
 const PANEL_COLORS = [
-  {hex:'#1f2328',name:'消光黑'},{hex:'#f2f2f2',name:'白'},{hex:'#f2b705',name:'安全黃'},
+  {hex:'#1f2328',name:'消光黑'},{hex:'#f2f2f2',name:'白'},{hex:'#c9ced6',name:'鋁本色'},{hex:'#f2b705',name:'安全黃'},
   {hex:'#2e7d32',name:'墨綠'},{hex:'#8a9099',name:'淺灰'},{hex:'#9fd3ff',name:'透明藍'},{hex:'#ffffff',name:'透明無色'}
 ];
+/* ---- 配件圖示 ---- */
+const SV=(b)=>`<svg width="40" height="26" viewBox="0 0 40 26">${b}</svg>`;
+const POST='<rect x="7" y="1" width="7" height="24" fill="#64748b"/><rect x="14" y="17" width="25" height="7" fill="#64748b"/>';
+const LTOP='<path d="M6 4V22H36" fill="none" stroke="#64748b" stroke-width="6"/>';
+/* 接點固定 */
+const JOINTS = {
+  bracket:{name:'壓鑄鋁角座',short:'標準角座',spec:'壓鑄鋁 L 型，含螺絲＋T 型螺帽×2',mul:1,  nuts:2,icon:SV(POST+'<path d="M14 5V17H26Z" fill="#cbd5e1"/>')},
+  heavy:  {name:'加強型角座',short:'加強角座',spec:'帶雙肋補強，含螺絲＋T 型螺帽×4',mul:2.2,nuts:4,icon:SV(POST+'<path d="M14 2V17H30Z" fill="#e2e8f0"/><path d="M14 8L23 17M14 12L18 17" stroke="#64748b"/>')},
+  plate:  {name:'平面連接板',short:'連接板',  spec:'鋁合金板 t5 外貼式，含螺絲＋T 型螺帽×4',mul:1.6,nuts:4,icon:SV(POST+'<rect x="4" y="15" width="22" height="11" rx="1" fill="#cbd5e1" fill-opacity=".85"/><circle cx="10" cy="20" r="1.4" fill="#475569"/><circle cx="21" cy="20" r="1.4" fill="#475569"/>')},
+  hidden: {name:'內藏式連接件',short:'內藏式',spec:'隱藏式，需端面攻牙＋側面鑽孔',mul:1.3,nuts:1,proc:20,icon:SV(POST+'<rect x="10" y="18.5" width="9" height="4" fill="none" stroke="#38bdf8" stroke-dasharray="2 1"/>')}
+};
+/* 轉角固定 */
+const CORNERS = {
+  none:  {name:'無轉角配件',short:'無',spec:'僅靠接點配件固定',icon:SV(LTOP)},
+  gusset:{name:'三角補強板',short:'三角板',spec:'鋁板 t5，每轉角上下各 1 片，含螺絲×4',price:85,icon:SV(LTOP+'<path d="M3 1H24L3 22Z" fill="#cbd5e1" fill-opacity=".85"/>')},
+  cube:  {name:'三向立方角件',short:'立方角件',spec:'壓鑄鋁三向接頭，取代轉角立柱上下端',mul:3.2,icon:SV(LTOP+'<rect x="1" y="17" width="10" height="9" fill="#e2e8f0" stroke="#38bdf8"/>')},
+  brace: {name:'45° 轉角斜撐',short:'斜撐',spec:'型材斜撐，兩端 45° 斜切＋角座×2',icon:SV(LTOP+'<path d="M8 8L22 20" stroke="#cbd5e1" stroke-width="4"/>')}
+};
+/* 門五金 */
+const HINGES = {
+  zinc:  {name:'鋅合金鉸鏈',short:'鋅合金',spec:'壓鑄鋅合金，型材專用',price:180,icon:SV('<rect x="13" y="3" width="6" height="20" fill="#64748b"/><rect x="21" y="3" width="6" height="20" fill="#94a3b8"/><rect x="19" y="3" width="2" height="20" fill="#e2e8f0"/>')},
+  lift:  {name:'可拆式鉸鏈',short:'可拆式',spec:'門扇可直接上提卸下',price:220,icon:SV('<rect x="13" y="2" width="6" height="10" fill="#94a3b8"/><rect x="21" y="14" width="6" height="10" fill="#94a3b8"/><rect x="19" y="2" width="2" height="22" fill="#e2e8f0"/>')},
+  damper:{name:'阻尼緩衝鉸鏈',short:'阻尼',spec:'內建阻尼，可定位 90°',price:450,icon:SV('<rect x="11" y="3" width="8" height="20" fill="#334155"/><rect x="21" y="3" width="8" height="20" fill="#475569"/><circle cx="20" cy="13" r="3" fill="#38bdf8"/>')},
+  heavy: {name:'不鏽鋼重型鉸鏈',short:'重型',spec:'SUS304，承重 40kg/對',price:380,icon:SV('<rect x="12" y="1" width="7" height="24" fill="#cbd5e1"/><rect x="21" y="1" width="7" height="24" fill="#e2e8f0"/><rect x="19" y="1" width="2" height="24" fill="#64748b"/>')}
+};
+const HANDLES = {
+  bar:    {name:'U 型拉手',short:'U 型',spec:'L=200 鋁合金',price:150,icon:SV('<path d="M16 4H22V22H16" fill="none" stroke="#e2e8f0" stroke-width="3"/>')},
+  long:   {name:'長型拉手',short:'長型',spec:'L=600 不鏽鋼 Ø20',price:320,icon:SV('<path d="M15 1H21V25H15" fill="none" stroke="#e2e8f0" stroke-width="3"/>')},
+  profile:{name:'鋁擠型把手',short:'型材把手',spec:'L=400 附端座',price:260,icon:SV('<rect x="18" y="3" width="6" height="20" fill="#cbd5e1"/><rect x="13" y="5" width="5" height="4" fill="#64748b"/><rect x="13" y="17" width="5" height="4" fill="#64748b"/>')},
+  lever:  {name:'撥桿把手',short:'撥桿',spec:'含鎖芯座，左右通用',price:350,icon:SV('<circle cx="14" cy="13" r="5" fill="#94a3b8"/><rect x="14" y="11" width="20" height="4" rx="2" fill="#e2e8f0"/>')},
+  knob:   {name:'圓形旋鈕',short:'旋鈕',spec:'Ø45 鋅合金',price:120,icon:SV('<circle cx="20" cy="13" r="8" fill="#e2e8f0"/><circle cx="20" cy="13" r="3" fill="#94a3b8"/>')},
+  recess: {name:'嵌入式拉手',short:'嵌入式',spec:'平面埋入，不凸出',price:180,icon:SV('<rect x="15" y="3" width="10" height="20" rx="2" fill="#e2e8f0"/><rect x="17" y="5" width="6" height="16" rx="1" fill="#1e293b"/>')}
+};
+const LATCHES = {
+  magnet:   {name:'磁吸門扣',short:'磁吸',spec:'吸力 5kg，附對位片',price:120,icon:SV('<path d="M12 5H18V17A4 4 0 0 0 22 17V5H28V17A10 10 0 0 1 12 17Z" fill="#ef4444"/><rect x="12" y="5" width="6" height="4" fill="#e2e8f0"/><rect x="22" y="5" width="6" height="4" fill="#e2e8f0"/>')},
+  bolt:     {name:'插銷門閂',short:'插銷',spec:'不鏽鋼插銷',price:90,icon:SV('<rect x="6" y="9" width="20" height="8" fill="#94a3b8"/><rect x="20" y="11" width="16" height="4" fill="#e2e8f0"/>')},
+  key:      {name:'鑰匙鎖',short:'鑰匙鎖',spec:'快速門鎖，附鑰匙×2',price:380,icon:SV('<circle cx="20" cy="13" r="9" fill="#cbd5e1"/><circle cx="20" cy="11" r="2.5" fill="#1e293b"/><path d="M19 12H21L22 18H18Z" fill="#1e293b"/>')},
+  interlock:{name:'安全門連鎖開關',short:'安全開關',spec:'附操作鍵，串接設備安全迴路',price:2800,icon:SV('<rect x="9" y="3" width="14" height="20" rx="2" fill="#facc15"/><rect x="9" y="3" width="14" height="6" fill="#1e293b"/><rect x="26" y="9" width="8" height="8" fill="#94a3b8"/>')},
+  hasp:     {name:'掛鎖搭扣',short:'搭扣',spec:'可上掛鎖',price:80,icon:SV('<rect x="6" y="9" width="16" height="9" fill="#94a3b8"/><path d="M26 8A5 5 0 0 1 26 19" fill="none" stroke="#e2e8f0" stroke-width="3"/>')}
+};
+const HWG = {
+  joint: {tbl:JOINTS, title:'接點固定配件', get:()=>S.joint,      set:k=>S.joint=k},
+  corner:{tbl:CORNERS,title:'轉角固定配件', get:()=>S.corner,     set:k=>S.corner=k},
+  hinge: {tbl:HINGES, title:'門鉸鏈',       get:()=>S.hw.hinge,   set:k=>S.hw.hinge=k},
+  handle:{tbl:HANDLES,title:'門把手',       get:()=>S.hw.handle,  set:k=>S.hw.handle=k},
+  latch: {tbl:LATCHES,title:'門鎖／門扣',   get:()=>S.hw.latch,   set:k=>S.hw.latch=k}
+};
+function optCards(g){ const G=HWG[g], cur=G.get();
+  return Object.entries(G.tbl).map(([k,v])=>`<div class="pc ${k===cur?'on':''}" data-hw="${g}:${k}" title="${v.name}｜${v.spec}">${v.icon}${v.short}</div>`).join(''); }
+const PICON = {
+  mesh:SV('<defs><pattern id="pm" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 0H6M0 0V6" stroke="#cbd5e1" stroke-width="1.2"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pm)" stroke="#64748b"/>'),
+  grid:SV('<defs><pattern id="pg" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 0H8M0 0V8" stroke="#e2e8f0" stroke-width="2.6"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pg)" stroke="#64748b"/>'),
+  expd:SV('<defs><pattern id="pe" width="10" height="6" patternUnits="userSpaceOnUse"><path d="M0 3L5 0L10 3L5 6Z" fill="none" stroke="#cbd5e1" stroke-width="1.3"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pe)" stroke="#64748b"/>'),
+  perf:SV('<defs><pattern id="pp" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#94a3b8"/><circle cx="3" cy="3" r="1.6" fill="#0a1222"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pp)"/>'),
+  alu:SV('<defs><linearGradient id="pal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".5" stop-color="#b8c2d0"/><stop offset="1" stop-color="#e2e8f0"/></linearGradient></defs><rect width="40" height="26" rx="3" fill="url(#pal)"/><path d="M4 22L16 4M12 24L24 6" stroke="#fff" stroke-opacity=".7"/>'),
+  acp:SV('<rect width="40" height="26" rx="3" fill="#cbd5e1"/><rect y="11" width="40" height="4" fill="#475569"/>'),
+  acrylic:SV('<defs><linearGradient id="pa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0f2fe" stop-opacity=".7"/><stop offset=".5" stop-color="#7dd3fc" stop-opacity=".15"/><stop offset="1" stop-color="#bae6fd" stop-opacity=".5"/></linearGradient></defs><rect width="40" height="26" rx="3" fill="url(#pa)" stroke="#7dd3fc"/><path d="M8 20L18 6M14 22L24 8" stroke="#fff" stroke-opacity=".6"/>'),
+  pc:SV('<rect width="40" height="26" rx="3" fill="#cbd5e1" fill-opacity=".35" stroke="#94a3b8"/><path d="M0 6H40M0 13H40M0 20H40" stroke="#e2e8f0" stroke-opacity=".5"/>'),
+  sheet:SV('<rect width="40" height="26" rx="3" fill="#64748b" stroke="#94a3b8"/><path d="M0 0L40 26" stroke="#94a3b8" stroke-opacity=".3"/>'),
+  none:SV('<rect x=".5" y=".5" width="39" height="25" rx="3" fill="none" stroke="#64748b" stroke-dasharray="3 2"/><path d="M12 7L28 19M28 7L12 19" stroke="#64748b"/>')
+};
 const BASES = {
   none:  {name:'直接落地',  h:0},
   foot:  {name:'調整腳座',  h:60},
@@ -1355,7 +1444,8 @@ const S = {
   spW:[],spD:[],spH:[],
   door:{active:true,idx:1,w:900,h:1800,hinge:'L',angle:35},
   profile:'4040',doorProfile:'3030',alu:'silver',aluCustom:'#8b5cf6',
-  panel:'mesh',panelColor:'#1f2328',panelThick:4,
+  panel:'mesh',panelColor:'#1f2328',ptype:{},thick:{},pitch:{},
+  joint:'bracket',corner:'gusset',hw:{hinge:'zinc',handle:'bar',latch:'magnet',bumper:true},
   base:'foot',bpj:1,showDims:true,showEdges:true,
   overrides:{},
   price:{aluKg:180,cut:15,labor:800,kerf:3,stock:6000,margin:15,tax:5},
@@ -1376,11 +1466,16 @@ function aluDef(key){
 }
 const globalAluKey = () => S.alu==='custom' ? S.aluCustom : S.alu;
 const partAlu = p => aluDef(S.overrides[p.id] || globalAluKey());
-const partPanelColor = p => S.overrides[p.id] || S.panelColor;
-const isAlu = p => p.kind==='post'||p.kind==='beam'||p.kind==='dframe';
+const partPanelColor = p => S.overrides[p.id] || (p.ptype&&p.ptype!==S.panel&&PANELS[p.ptype].defColor) || S.panelColor;
+const isAlu = p => p.kind==='post'||p.kind==='beam'||p.kind==='dframe'||p.kind==='brace';
 const isPanel = p => p.kind==='panel'||p.kind==='dpanel';
 const panelName = hex => (PANEL_COLORS.find(c=>c.hex.toLowerCase()===hex.toLowerCase())||{name:'自訂 '+hex.toUpperCase()}).name;
-const panelPrice = () => (S.panelPrice[S.panel]!=null?S.panelPrice[S.panel]:PANELS[S.panel].price);
+const priceOf = t => (S.panelPrice[t]!=null?S.panelPrice[t]:PANELS[t].price);
+const panelPrice = () => priceOf(S.panel);
+function thickOf(t){ const th=PANELS[t].th, v=S.thick[t]; return th.includes(v)?v:th[Math.min(1,th.length-1)]; }
+function pitchOf(t){ const d=PANELS[t]; if(!d.pitch) return 0; return d.pitch.includes(S.pitch[t])?S.pitch[t]:d.dp; }
+function pFactorOf(t,th){ const d=PANELS[t], i=Math.max(0,d.th.indexOf(th)); return d.clear?th/d.th[0]:1+0.3*i; }
+const ptLabel = t => PANELS[t].name+(PANELS[t].pitch?` ${PANELS[t].pl}${pitchOf(t)}`:'');
 
 /* ================= 型材斷面（T 槽） ================= */
 function profilePts(P, slot){
@@ -1473,15 +1568,31 @@ function doorGeom(){
   return {hasHeader, openTop: hasHeader?S.door.h:S.h-P};
 }
 function buildParts(){
-  const P=P_(), I=ins(), h=S.h, T=PANELS[S.panel].th.includes(S.panelThick)?S.panelThick:PANELS[S.panel].th[0];
+  const P=P_(), I=ins(), h=S.h;
   const out=[], {W,D}=walls();
   const xs=axisPos(S.w,S.spW,P), zs=axisPos(S.d,S.spD,P), ys=axisPos(h,S.spH,P).map(v=>v+h/2);
   GEO={xs,zs,ys,P};
   const posts=new Set();
   W.forEach(r=>{for(let c=0;c<=S.cols;c++) posts.add(c+','+r)});
   D.forEach(c=>{for(let r=0;r<=S.rows;r++) posts.add(c+','+r)});
-  [...posts].sort().forEach(k=>{const [c,r]=k.split(',').map(Number);
-    out.push({id:`P${c}-${r}`,kind:'post',name:'立柱',series:S.profile,len:h,axis:'y',box:B(xs[c],h/2,zs[r],P,h,P),c,r});});
+  // 轉角判定：同時接 W 牆與 D 牆、且各只有一個方向
+  const Wset=new Set(W), Dset=new Set(D), corners=[];
+  [...posts].sort().forEach(k=>{ const [c,r]=k.split(',').map(Number); if(!Wset.has(r)||!Dset.has(c)) return;
+    const xd=[],zd=[]; if(c<S.cols) xd.push(1); if(c>0) xd.push(-1); if(r<S.rows) zd.push(1); if(r>0) zd.push(-1);
+    if(xd.length===1&&zd.length===1) corners.push({c,r,key:k,px:xs[c],pz:zs[r],dx:xd[0],dz:zd[0]}); });
+  GEO.corners=corners;
+  const cubeSet=new Set(S.corner==='cube'?corners.map(o=>o.key):[]);
+  [...posts].sort().forEach(k=>{const [c,r]=k.split(',').map(Number), cube=cubeSet.has(k), L=cube?h-2*P:h;
+    out.push({id:`P${c}-${r}`,kind:'post',name:cube?'轉角立柱':'立柱',series:S.profile,len:L,axis:'y',box:B(xs[c],h/2,zs[r],P,L,P),c,r,cube});});
+  if(S.corner==='brace'){
+    const bs=P>=45?'4040':(P>=30?'3030':'2020'), bz=PROFILES[bs].s;
+    const a=P/2+Math.max(120,Math.min(260,Math.min(...S.spW,...S.spD)*0.35));
+    GEO.brace={series:bs,a};
+    corners.forEach((o,i)=>{ const L=Math.round(a*Math.SQRT2-bz), y=h-P-bz/2;
+      const e1=[o.px+o.dx*a,o.pz], e2=[o.px,o.pz+o.dz*a];
+      out.push({id:`BR${i}`,kind:'brace',name:'轉角斜撐',series:bs,len:L,axis:'diag',rotY:Math.atan2(-o.dx,o.dz),
+        box:B((e1[0]+e2[0])/2,y,(e1[1]+e2[1])/2,a,bz,a),ends:[e1,e2],y}); });
+  }
   const lvName=k=>k==='h'?'門眉橫梁':k===0?'底橫梁':k===ys.length-1?'頂橫梁':'中橫梁';
   function bay(dir,line,b,span,cx,cz,isDoor){
     let lv=ys.map((y,k)=>({y,k})), dg=null;
@@ -1494,9 +1605,10 @@ function buildParts(){
     const tag=`${dir}${line}-${b}`;
     lv.forEach(L=>out.push({id:`B${tag}-${L.k}`,kind:'beam',name:lvName(L.k),series:S.profile,len:span,axis:dir==='W'?'x':'z',
       box:dir==='W'?B(cx,L.y,cz,span,P,P):B(cx,L.y,cz,P,P,span),dir,line,bay:b,lvl:L.k}));
-    if(S.panel!=='none') for(let i=0;i<lv.length-1;i++){
+    for(let i=0;i<lv.length-1;i++){
       const y0=lv[i].y+P/2, y1=lv[i+1].y-P/2, ph=y1-y0; if(ph<5) continue;
-      out.push({id:`N${tag}-${lv[i].k}`,kind:'panel',name:isDoor?'門上氣窗板':'嵌板',w:span+2*I,h:ph+2*I,t:T,dir,line,bay:b,lvl:lv[i].k,
+      const id=`N${tag}-${lv[i].k}`, pt=S.ptype[id]||S.panel; if(pt==='none') continue; const T=thickOf(pt);
+      out.push({id,kind:'panel',ptype:pt,name:isDoor?'門上氣窗板':'嵌板',w:span+2*I,h:ph+2*I,t:T,dir,line,bay:b,lvl:lv[i].k,
         box:dir==='W'?B(cx,(y0+y1)/2,cz,span,ph,T):B(cx,(y0+y1)/2,cz,T,ph,span)});
     }
     if(isDoor){
@@ -1510,7 +1622,8 @@ function buildParts(){
       mk('DV2','dframe','門扇立料',B(x1-dp/2,ym,cz,dp,Lh,dp),{series:S.doorProfile,len:Lh,axis:'y'});
       mk('DH1','dframe','門扇橫料',B((x0+x1)/2,y0+dp/2,cz,Lw-2*dp,dp,dp),{series:S.doorProfile,len:Lw-2*dp,axis:'x'});
       mk('DH2','dframe','門扇橫料',B((x0+x1)/2,y1-dp/2,cz,Lw-2*dp,dp,dp),{series:S.doorProfile,len:Lw-2*dp,axis:'x'});
-      if(S.panel!=='none') mk('DP','dpanel','門扇嵌板',B((x0+x1)/2,ym,cz,Lw-2*dp,Lh-2*dp,T),{w:Lw-2*dp+2*dI,h:Lh-2*dp+2*dI,t:T,dir:'W'});
+      const dpt=S.ptype.DP||S.panel;
+      if(dpt!=='none'){ const T=thickOf(dpt); mk('DP','dpanel','門扇嵌板',B((x0+x1)/2,ym,cz,Lw-2*dp,Lh-2*dp,T),{w:Lw-2*dp+2*dI,h:Lh-2*dp+2*dI,t:T,dir:'W',ptype:dpt}); }
       GEO.door={x0,x1,y0,y1,Lw,Lh,dp,sgn,pv,cz,bay:b,openTop:dg.openTop,hasHeader:dg.hasHeader};
     }
   }
@@ -1546,8 +1659,8 @@ function computeBOM(){
       alu[key].qty++; lenTot+=p.len; kgTot+=p.len/1000*PROFILES[p.series].kg; cuts++;
       const nk=p.series+'|'+c.hex; (nest[nk]=nest[nk]||{series:p.series,color:c,lens:[]}).lens.push(L);
     } else if(isPanel(p)){
-      const col=partPanelColor(p), key=[p.name,Math.round(p.w),Math.round(p.h),p.t,col].join('|');
-      pan[key]=pan[key]||{name:p.name,w:Math.round(p.w),h:Math.round(p.h),t:p.t,color:col,qty:0};
+      const col=partPanelColor(p), key=[p.name,p.ptype,Math.round(p.w),Math.round(p.h),p.t,col].join('|');
+      pan[key]=pan[key]||{name:p.name,ptype:p.ptype,w:Math.round(p.w),h:Math.round(p.h),t:p.t,color:col,qty:0,unit:priceOf(p.ptype)*pFactorOf(p.ptype,p.t)};
       pan[key].qty++;
     }
   });
@@ -1555,21 +1668,28 @@ function computeBOM(){
   Object.values(nest).forEach(g=>{ g.res=pack(g.lens,st.stock,st.kerf); bars+=g.res.bars.length;
     const used=g.lens.reduce((a,b)=>a+b,0); g.util=used/(g.res.bars.length*st.stock); });
   // 五金
-  const PR=PROFILES[S.profile], DP=PROFILES[S.doorProfile];
-  const beams=parts.filter(p=>p.kind==='beam').length, posts=parts.filter(p=>p.kind==='post').length;
-  const joints=beams*2, brk=joints*S.bpj, hasDoor=!!GEO.door;
+  const PR=PROFILES[S.profile], DP=PROFILES[S.doorProfile], J=JOINTS[S.joint], corners=GEO.corners||[], nC=corners.length;
+  const beams=parts.filter(p=>p.kind==='beam').length, posts=parts.filter(p=>p.kind==='post').length, nCube=S.corner==='cube'?nC:0;
+  const joints=beams*2, jEnds=Math.max(0,joints-nCube*4), brk=jEnds*S.bpj, hasDoor=!!GEO.door;
   const A=(key,name,spec,qty,unit,def)=>{ if(qty>0) acc.push({key,name,spec,qty,unit,price:accPrice(key,def)}); };
-  A('brk',`${S.profile} 鋁角座`,`含 ${PR.bolt} 螺絲・T 型螺帽 ×2`,brk,'個',PR.bracket);
-  A('nut',`${PR.bolt} T 型螺帽＋內六角螺絲`,`${S.profile} 槽 ${PR.slot}mm`,brk*2,'組',PR.nut);
-  A('cap',`${S.profile} 端蓋`,'黑色 PA',posts*(S.base==='none'?2:1),'個',PR.cap);
+  A('j_'+S.joint,`${S.profile} ${J.name}`,J.spec,brk,'個',Math.round(PR.bracket*J.mul));
+  if(J.proc) A('jproc','內藏連接件加工','型材端面攻牙＋側面鑽孔',brk,'處',J.proc);
+  let nuts=brk*J.nuts;
+  if(S.corner==='gusset'){ A('c_gusset','轉角三角補強板',CORNERS.gusset.spec,nC*2,'片',CORNERS.gusset.price); nuts+=nC*2*4; }
+  if(S.corner==='cube') A('c_cube',`${S.profile} 三向立方角件`,CORNERS.cube.spec,nC*2,'個',Math.round(PR.bracket*CORNERS.cube.mul));
+  if(S.corner==='brace'&&GEO.brace){ const bp=PROFILES[GEO.brace.series]; A('c_bbrk',`${GEO.brace.series} 斜撐用角座`,'45° 斜撐兩端固定',nC*2,'個',bp.bracket); nuts+=nC*2*2; }
+  A('nut',`${PR.bolt} T 型螺帽＋內六角螺絲`,`${S.profile} 槽 ${PR.slot}mm`,nuts,'組',PR.nut);
+  A('cap',`${S.profile} 端蓋`,'黑色 PA',(posts-nCube)*(S.base==='none'?2:1),'個',PR.cap);
   if(S.base==='foot'){ A('foot','調整腳座',`${PR.bolt}×60 底徑 Ø60`,posts,'個',120); A('fplate',`${S.profile} 腳座連接板`,'鋁擠端面固定',posts,'片',45); }
   if(S.base==='caster'){ A('caster','2.5" 萬向輪（附煞車）','荷重 60kg/輪',posts,'個',380); A('cplate',`${S.profile} 腳輪連接板`,'鋁合金',posts,'片',150); }
   if(hasDoor){
     const n=GEO.door.Lh>1800?3:2;
     A('dbrk',`${S.doorProfile} 門框內角座`,`含 ${DP.bolt} 螺絲`,4,'個',DP.bracket);
-    A('hinge',`${S.doorProfile} 鋁擠型專用鉸鏈`,'壓鑄鋅合金',n,'個',180);
-    A('handle','門把手','L=150 鋁合金',1,'支',150);
-    A('latch','磁吸門扣','附對位片',1,'組',120);
+    const Hh=HINGES[S.hw.hinge], Hd=HANDLES[S.hw.handle], Lt=LATCHES[S.hw.latch];
+    A('h_'+S.hw.hinge,`${S.doorProfile} ${Hh.name}`,Hh.spec,n,'個',Hh.price);
+    A('hd_'+S.hw.handle,`門把手－${Hd.name}`,Hd.spec,1,'支',Hd.price);
+    A('l_'+S.hw.latch,Lt.name,Lt.spec,1,'組',Lt.price);
+    if(S.hw.bumper) A('bump','門擋緩衝墊','矽膠 Ø20',2,'個',25);
   }
   let seal=0; parts.filter(isPanel).forEach(p=>{ seal+=2*(p.w+p.h)/1000; });
   if(seal>0) A('seal','嵌板防震膠條',`入槽 ${ins()} mm`,Math.ceil(seal),'m',12);
@@ -1577,16 +1697,13 @@ function computeBOM(){
   const aluCost=Object.values(alu).reduce((s,g)=>s+g.qty*g.len/1000*PROFILES[g.series].kg*st.aluKg*(1+g.color.up),0);
   const cutCost=cuts*st.cut;
   const accCost=acc.reduce((s,a)=>s+a.qty*a.price,0);
-  const PI=PANELS[S.panel], ti=Math.max(0,PI.th.indexOf(S.panelThick));
-  const pFactor=PI.clear?S.panelThick/PI.th[0]:1+0.3*ti;
-  let area=0; Object.values(pan).forEach(g=>area+=g.qty*g.w*g.h/1e6);
-  const panCost=area*panelPrice()*pFactor;
+  let area=0, panCost=0; Object.values(pan).forEach(g=>{ const a=g.qty*g.w*g.h/1e6; area+=a; panCost+=a*g.unit; });
   const nPanels=Object.values(pan).reduce((s,g)=>s+g.qty,0);
-  const hrs=joints*0.12+nPanels*0.2+(hasDoor?1.5:0)+posts*(S.base==='none'?0:0.1)+1;
+  const hrs=joints*0.12+nPanels*0.2+(hasDoor?1.5:0)+(hasDoor&&S.hw.latch==='interlock'?1:0)+posts*(S.base==='none'?0:0.1)+nC*(S.corner==='none'?0:0.3)+1;
   const labCost=hrs*st.labor;
   const sub=aluCost+cutCost+accCost+panCost+labCost, mg=sub*st.margin/100, pre=sub+mg, tax=pre*st.tax/100;
   return {alu:Object.values(alu).sort((a,b)=>(a.door-b.door)||(b.len-a.len)),pan:Object.values(pan),acc,nest:Object.values(nest),
-    lenTot,kgTot,bars,cuts,area,pFactor,hrs,joints,cost:{aluCost,cutCost,accCost,panCost,labCost,sub,mg,pre,tax,total:pre+tax}};
+    lenTot,kgTot,bars,cuts,area,hrs,joints,cost:{aluCost,cutCost,accCost,panCost,labCost,sub,mg,pre,tax,total:pre+tax}};
 }
 
 /* ================= Three.js 場景 ================= */
@@ -1655,6 +1772,8 @@ function patternTex(kind){
   if(texCache[kind]) return texCache[kind];
   const cv=document.createElement('canvas'); cv.width=cv.height=64; const x=cv.getContext('2d');
   if(kind==='mesh'){ x.fillStyle='#000'; x.fillRect(0,0,64,64); x.fillStyle='#fff'; x.fillRect(0,0,64,6); x.fillRect(0,0,6,64); }
+  else if(kind==='grid'){ x.fillStyle='#000'; x.fillRect(0,0,64,64); x.fillStyle='#fff'; x.fillRect(0,0,64,13); x.fillRect(0,0,13,64); }
+  else if(kind==='expd'){ x.fillStyle='#000'; x.fillRect(0,0,64,64); x.strokeStyle='#fff'; x.lineWidth=10; x.beginPath(); x.moveTo(0,32); x.lineTo(32,0); x.lineTo(64,32); x.lineTo(32,64); x.closePath(); x.stroke(); }
   else { x.fillStyle='#fff'; x.fillRect(0,0,64,64); x.fillStyle='#000'; x.beginPath(); x.arc(32,32,19,0,Math.PI*2); x.fill(); }
   const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8;
   return texCache[kind]=t;
@@ -1662,23 +1781,23 @@ function patternTex(kind){
 
 function makeAlu(p){
   const c=partAlu(p), m=new THREE.Mesh(profileGeo(p.series,p.len),aluMat(c));
-  if(p.axis==='y') m.rotation.x=-Math.PI/2; else if(p.axis==='x') m.rotation.y=Math.PI/2;
+  if(p.axis==='y') m.rotation.x=-Math.PI/2; else if(p.axis==='x') m.rotation.y=Math.PI/2; else if(p.axis==='diag') m.rotation.y=p.rotY;
   m.castShadow=m.receiveShadow=true;
   if(S.showEdges){ const e=new THREE.LineSegments(edgeGeo(p.series,p.len),(new THREE.Color(c.hex).getHSL({}).l<.35)?edgeLight:edgeDark); m.add(e); }
   return m;
 }
 const disposables=[];
 function makePanel(p){
-  const def=PANELS[S.panel], col=partPanelColor(p), vw=p.w, vh=p.h; let m, mat;
+  const def=PANELS[p.ptype], col=partPanelColor(p), vw=p.w, vh=p.h, pit=pitchOf(p.ptype); let m, mat;
   if(def.tex){
-    const t=patternTex(def.tex).clone(); t.needsUpdate=true; t.repeat.set(vw/def.pitch,vh/def.pitch);
+    const t=patternTex(def.tex).clone(); t.needsUpdate=true; t.repeat.set(vw/pit,vh/(def.tex==='expd'?pit*0.5:pit));
     mat=new THREE.MeshStandardMaterial({color:lin(col),alphaMap:t,transparent:true,depthWrite:false,side:THREE.DoubleSide,metalness:.45,roughness:.5});
     m=new THREE.Mesh(new THREE.PlaneGeometry(vw,vh),mat); m.renderOrder=1; disposables.push(t,m.geometry);
   } else if(def.clear){
     mat=new THREE.MeshPhysicalMaterial({color:lin(col),transparent:true,opacity:def.frost?.42:.2,roughness:def.frost?.45:.04,metalness:0,clearcoat:1,depthWrite:false,side:THREE.DoubleSide,envMapIntensity:1.4});
     m=new THREE.Mesh(new THREE.BoxGeometry(vw,vh,p.t),mat); m.renderOrder=2; disposables.push(m.geometry);
   } else {
-    mat=new THREE.MeshStandardMaterial({color:lin(col),metalness:.15,roughness:.55});
+    mat=new THREE.MeshStandardMaterial({color:lin(col),metalness:def.metal?.7:(def.acp?.35:.15),roughness:def.metal?.32:(def.acp?.4:.55),envMapIntensity:def.metal?1.2:1});
     m=new THREE.Mesh(new THREE.BoxGeometry(vw,vh,p.t),mat); m.castShadow=m.receiveShadow=true; disposables.push(m.geometry);
   }
   disposables.push(mat);
@@ -1689,6 +1808,117 @@ function box(w,h,d,mat,x,y,z){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,
 function cyl(r,h,mat,x,y,z,rot){ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,20),mat); m.position.set(x,y,z); if(rot) m.rotation.set(...rot); m.castShadow=true; disposables.push(m.geometry); return m; }
 
 function clearGroup(g){ while(g.children.length) g.remove(g.children[0]); }
+const hwM={
+  cast:new THREE.MeshStandardMaterial({color:lin('#a3abb5'),metalness:.6,roughness:.42}),
+  dark:new THREE.MeshStandardMaterial({color:lin('#2b2f36'),metalness:.45,roughness:.5}),
+  yellow:new THREE.MeshStandardMaterial({color:lin('#facc15'),metalness:.05,roughness:.45}),
+  red:new THREE.MeshStandardMaterial({color:lin('#dc2626'),metalness:.05,roughness:.45,emissive:new THREE.Color(0x400000)}),
+  plate:new THREE.MeshStandardMaterial({color:lin('#c3cad3'),metalness:.75,roughness:.3})
+};
+const hwName = g => g==='joint'?JOINTS[S.joint].name:g==='corner'?CORNERS[S.corner].name:HWG[g].tbl[HWG[g].get()].name;
+function hwTag(o,g){ const tag={id:'HW-'+g,kind:'hw',group:g,name:hwName(g)};
+  o.traverse(m=>{ if(m.isMesh){ m.userData.part=tag; pickables.push(m); } }); return o; }
+/* 接點配件（InstancedMesh，數量大也流暢） */
+const jointGeoCache={};
+function jointGeos(J,P){
+  const k=J+P; if(jointGeoCache[k]) return jointGeoCache[k];
+  let out=[];
+  if(J==='plate'){ out=[new THREE.BoxGeometry(P*2,P*0.92,4)]; }
+  else {
+    const hv=J==='heavy', b=P*(hv?1.5:0.85), t=P*(hv?0.15:0.12), w=P*(hv?0.42:0.36);
+    const g1=new THREE.BoxGeometry(t,b,w).translate(t/2,b/2,0), g2=new THREE.BoxGeometry(b,t,w).translate(b/2,t/2,0);
+    const tri=new THREE.Shape([new THREE.Vector2(t,t),new THREE.Vector2(b*0.9,t),new THREE.Vector2(t,b*0.9)]);
+    const rib=z=>new THREE.ExtrudeGeometry(tri,{depth:w*0.2,bevelEnabled:false}).translate(0,0,z-w*0.1);
+    out=hv?[g1,g2,rib(-w*0.32),rib(w*0.32)]:[g1,g2,rib(0)];
+  }
+  return jointGeoCache[k]=out;
+}
+function buildJoints(){
+  if(S.joint==='hidden') return;
+  const P=P_(), last=GEO.ys.length-1, cubeSet=new Set((S.corner==='cube'?GEO.corners:[]).map(o=>o.key)), mats=[];
+  const up=new THREE.Vector3(0,1,0);
+  parts.filter(p=>p.kind==='beam').forEach(p=>{
+    const ax=p.axis==='x'?new THREE.Vector3(1,0,0):new THREE.Vector3(0,0,1), nv=p.axis==='x'?new THREE.Vector3(0,0,1):new THREE.Vector3(1,0,0);
+    const inner=(p.dir==='W'?p.line===S.rows:p.line===S.cols)?-1:1;
+    const yd=(p.lvl===0||p.lvl==='h')?1:-1, edge=p.lvl===0||p.lvl===last;
+    [[1,p.dir==='W'?[p.bay,p.line]:[p.line,p.bay]],[-1,p.dir==='W'?[p.bay+1,p.line]:[p.line,p.bay+1]]].forEach(([s,post])=>{
+      if(edge&&cubeSet.has(post.join(','))) return;
+      const face=new THREE.Vector3(p.box.cx,p.box.cy,p.box.cz).addScaledVector(ax,-s*p.len/2);
+      (S.bpj===2?[inner,-inner]:[inner]).forEach(sd=>{
+        if(S.joint==='plate'){
+          const pos=face.clone().addScaledVector(nv,sd*(P/2+2)), z=new THREE.Vector3().crossVectors(ax,up);
+          mats.push(new THREE.Matrix4().makeBasis(ax,up,z).setPosition(pos));
+        } else {
+          const X=ax.clone().multiplyScalar(s), Y=new THREE.Vector3(0,yd,0), Z=new THREE.Vector3().crossVectors(X,Y);
+          const pos=face.clone().add(new THREE.Vector3(0,yd*P/2,0)).addScaledVector(nv,sd*P*0.22);
+          mats.push(new THREE.Matrix4().makeBasis(X,Y,Z).setPosition(pos));
+        }
+      });
+    });
+  });
+  if(!mats.length) return;
+  const grp=new THREE.Group();
+  jointGeos(S.joint,P).forEach(g=>{ const im=new THREE.InstancedMesh(g,S.joint==='plate'?hwM.plate:hwM.cast,mats.length);
+    mats.forEach((m,i)=>im.setMatrixAt(i,m)); im.instanceMatrix.needsUpdate=true; im.castShadow=true; grp.add(im); });
+  model.add(hwTag(grp,'joint'));
+}
+/* 轉角配件 */
+function buildCorners(){
+  const P=P_(), h=S.h, grp=new THREE.Group();
+  if(S.corner==='cube') GEO.corners.forEach(o=>{ [P/2,h-P/2].forEach(y=>{ const m=box(P*1.04,P*1.04,P*1.04,hwM.cast,o.px,y,o.pz); grp.add(m);
+      grp.add(box(P*0.3,P*1.06,P*0.3,hwM.dark,o.px,y,o.pz)); }); });
+  if(S.corner==='gusset'){ const Lg=P*3;
+    GEO.corners.forEach(o=>{ const {px,pz,dx,dz}=o;
+      const full=[[px-dx*P/2,pz-dz*P/2],[px+dx*(P/2+Lg),pz-dz*P/2],[px-dx*P/2,pz+dz*(P/2+Lg)]];
+      const notch=[[px+dx*P/2,pz-dz*P/2],[px+dx*(P/2+Lg),pz-dz*P/2],[px-dx*P/2,pz+dz*(P/2+Lg)],[px-dx*P/2,pz+dz*P/2],[px+dx*P/2,pz+dz*P/2]];
+      [[full,h+5],[notch,P+5]].forEach(([pts,y])=>{
+        const g=new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(q=>new THREE.Vector2(q[0],q[1]))),{depth:5,bevelEnabled:false});
+        g.rotateX(Math.PI/2); disposables.push(g); const m=new THREE.Mesh(g,hwM.plate); m.position.y=y; m.castShadow=true; grp.add(m); });
+    }); }
+  if(grp.children.length) model.add(hwTag(grp,'corner'));
+}
+/* 門五金：鉸鏈／把手／門鎖 */
+function buildDoorHW(d,pivot){
+  const s=d.sgn, P=P_(), n=d.Lh>1800?3:2, H=S.hw, dp=d.dp;
+  const hy=n===3?[d.y0+180,(d.y0+d.y1)/2,d.y1-180]:[d.y0+180,d.y1-180];
+  const hyy=Math.min(Math.max(1050,d.y0+350),d.y1-350);
+  // 鉸鏈
+  const gH=new THREE.Group(), HD={zinc:[22,90,steel],lift:[24,120,chromeMat],damper:[32,110,hwM.dark],heavy:[26,150,chromeMat]}[H.hinge];
+  hy.forEach(y=>{
+    if(H.hinge==='lift'){ gH.add(box(HD[0],HD[1]/2-4,dp*0.9,HD[2],-s*4,y+HD[1]/4,-dp/2)); gH.add(box(HD[0],HD[1]/2-4,dp*0.9,steel,-s*4,y-HD[1]/4,-dp/2)); }
+    else gH.add(box(HD[0],HD[1],dp*0.9,HD[2],-s*4,y,-dp/2));
+    gH.add(cyl(H.hinge==='heavy'?7:5,HD[1]+6,chromeMat,-s*8,y,2));
+    if(H.hinge==='damper') gH.add(cyl(9,30,hwM.yellow,-s*8,y+HD[1]/2+12,2));
+  });
+  pivot.add(hwTag(gH,'hinge'));
+  // 把手
+  const gD=new THREE.Group(), hx=s*(d.Lw-dp/2-(H.handle==='lever'?10:0)), RX=[Math.PI/2,0,0];
+  switch(H.handle){
+    case 'bar': gD.add(cyl(9,200,chromeMat,hx,hyy,42)); [-80,80].forEach(o=>gD.add(cyl(6,42,chromeMat,hx,hyy+o,21,RX))); break;
+    case 'long': gD.add(cyl(10,600,chromeMat,hx,hyy,46)); [-270,270].forEach(o=>gD.add(cyl(7,46,chromeMat,hx,hyy+o,23,RX))); break;
+    case 'profile': gD.add(box(20,400,20,aluMat(aluDef(globalAluKey())),hx,hyy,46)); [-170,170].forEach(o=>gD.add(box(22,24,36,hwM.dark,hx,hyy+o,18))); break;
+    case 'lever': gD.add(cyl(26,10,chromeMat,hx,hyy,5,RX)); gD.add(cyl(7,26,chromeMat,hx,hyy,20,RX)); gD.add(box(130,16,16,chromeMat,hx-s*58,hyy,32)); break;
+    case 'knob': gD.add(cyl(24,8,chromeMat,hx,hyy,4,RX)); gD.add(cyl(8,24,chromeMat,hx,hyy,18,RX));
+      { const k=new THREE.Mesh(new THREE.SphereGeometry(24,24,16),chromeMat); k.position.set(hx,hyy,42); k.castShadow=true; disposables.push(k.geometry); gD.add(k); } break;
+    case 'recess': gD.add(box(46,140,3,chromeMat,hx,hyy,1.5)); gD.add(box(34,124,4,hwM.dark,hx,hyy,2.5)); break;
+  }
+  pivot.add(hwTag(gD,'handle'));
+  // 門鎖／門扣（門扇側＋立柱側）
+  const gLp=new THREE.Group(), gLm=new THREE.Group();
+  const xf=s>0?d.x1+4:d.x0-4, postX=s>0?GEO.xs[d.bay+1]:GEO.xs[d.bay], ly=hyy+(H.handle==='long'?380:160);
+  switch(H.latch){
+    case 'magnet': gLm.add(box(14,50,P*0.55,hwM.red,xf-s*7,ly,d.cz)); gLp.add(box(4,44,dp*0.6,steel,s*(d.Lw-2),ly,-dp/2)); break;
+    case 'bolt': gLp.add(box(110,28,10,steel,s*(d.Lw-70),ly,-dp-5)); gLp.add(cyl(5,70,chromeMat,s*(d.Lw-5),ly,-dp-5,[0,0,Math.PI/2])); gLp.add(cyl(6,18,chromeMat,s*(d.Lw-80),ly,-dp-16,RX)); break;
+    case 'key': gLp.add(cyl(15,12,chromeMat,s*(d.Lw-dp/2),ly,6,RX)); gLp.add(box(3,14,2,hwM.dark,s*(d.Lw-dp/2),ly,13)); break;
+    case 'interlock': gLm.add(box(42,95,32,hwM.yellow,postX+s*4,ly,d.cz+P/2+16)); gLm.add(box(42,28,34,hwM.dark,postX+s*4,ly+60,d.cz+P/2+16));
+      gLm.add(cyl(7,6,hwM.red,postX+s*4,ly-20,d.cz+P/2+34,RX)); gLp.add(box(18,50,24,steel,s*(d.Lw-6),ly+60,14)); break;
+    case 'hasp': gLp.add(box(70,40,4,steel,s*(d.Lw-25),ly,2)); gLm.add(box(26,40,4,steel,xf+s*20,ly,d.cz+P/2+2));
+      { const t=new THREE.Mesh(new THREE.TorusGeometry(12,3,8,20),chromeMat); t.position.set(xf+s*20,ly,d.cz+P/2+16); disposables.push(t.geometry); gLm.add(t); } break;
+  }
+  if(H.bumper) [d.y0+d.Lh*0.25,d.y0+d.Lh*0.75].forEach(y=>gLm.add(cyl(10,8,rubber,xf-s*4,y,d.cz,[0,0,Math.PI/2])));
+  if(gLp.children.length) pivot.add(hwTag(gLp,'latch'));
+  if(gLm.children.length) model.add(hwTag(gLm,'latch'));
+}
 function build3D(){
   disposables.splice(0).forEach(o=>o.dispose&&o.dispose());
   clearGroup(model); clearGroup(extras); pickables=[];
@@ -1701,14 +1931,10 @@ function build3D(){
     if(p.door){ o.position.set(p.local.x,p.local.y,p.local.z); pivot.add(o); }
     else { o.position.set(p.box.cx,p.box.cy,p.box.cz); model.add(o); }
   });
+  buildJoints(); buildCorners();
   // 門五金
   if(GEO.door){
-    const d=GEO.door, s=d.sgn, n=d.Lh>1800?3:2;
-    const hy=n===3?[d.y0+180,(d.y0+d.y1)/2,d.y1-180]:[d.y0+180,d.y1-180];
-    hy.forEach(y=>{ pivot.add(box(22,90,d.dp*0.9,steel,-s*4,y,-d.dp/2)); pivot.add(cyl(5,96,chromeMat,-s*8,y,2)); });
-    const hx=s*(d.Lw-d.dp/2), hyy=Math.min(Math.max(1050,d.y0+250),d.y1-250);
-    pivot.add(cyl(9,200,chromeMat,hx,hyy,42));
-    [-80,80].forEach(o=>pivot.add(cyl(6,42,chromeMat,hx,hyy+o,21,[Math.PI/2,0,0])));
+    const d=GEO.door, s=d.sgn; buildDoorHW(d,pivot);
     // 開門軌跡
     const pts=[]; for(let a=0;a<=90;a+=3){ const r=a*Math.PI/180; pts.push(new THREE.Vector3(d.pv.x+s*Math.cos(r)*d.Lw,2,d.pv.z+Math.sin(r)*d.Lw)); }
     const arc=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineDashedMaterial({color:0xfb923c,dashSize:40,gapSize:30,transparent:true,opacity:.8}));
@@ -1793,10 +2019,12 @@ function pick(ev){
 function applySelectionVisual(){
   if(selHelper){ scene.remove(selHelper); selHelper.geometry.dispose(); selHelper=null; }
   pickables.forEach(o=>{ if(o.userData.orig){ o.material=o.userData.orig; delete o.userData.orig; } });
-  const o=pickables.find(o=>o.userData.part.id===selectedId);
-  if(!o){ if(selectedId){ selectedId=null; } renderSel(); return; }
-  o.userData.orig=o.material; const m=o.material.clone(); m.emissive=new THREE.Color(0x1d6fe0); m.emissiveIntensity=.65; o.material=m; disposables.push(m);
-  selHelper=new THREE.BoxHelper(o,0x38bdf8); selHelper.material.depthTest=false; selHelper.renderOrder=11; scene.add(selHelper);
+  const objs=pickables.filter(o=>o.userData.part.id===selectedId);
+  if(!objs.length){ selectedId=null; renderSel(); return; }
+  const hl=new Map();
+  objs.forEach(o=>{ o.userData.orig=o.material; let m=hl.get(o.material);
+    if(!m){ m=o.material.clone(); m.emissive=new THREE.Color(0x1d6fe0); m.emissiveIntensity=.7; hl.set(o.material,m); disposables.push(m); } o.material=m; });
+  if(objs.length===1&&objs[0].userData.part.kind!=='hw'){ selHelper=new THREE.BoxHelper(objs[0],0x38bdf8); selHelper.material.depthTest=false; selHelper.renderOrder=11; scene.add(selHelper); }
   renderSel();
 }
 function select(id){ selectedId=id; applySelectionVisual(); }
@@ -1814,7 +2042,7 @@ function hover(e){
   c3d.style.cursor=o?'pointer':'grab';
   if(!o){ tip.style.display='none'; return; }
   const p=o.userData.part, r=stage.getBoundingClientRect();
-  tip.innerHTML=isAlu(p)?`<b>${p.name}</b>　${p.series}　L=${fmt(p.len)} mm　<span style="color:#94a3b8">${partAlu(p).name}</span>`:`<b>${p.name}</b>　${fmt(p.w)} × ${fmt(p.h)} × t${p.t}`;
+  tip.innerHTML=p.kind==='hw'?`<b>${p.name}</b>　<span style="color:#94a3b8">${HWG[p.group].title}｜點擊可更換型式</span>`:isAlu(p)?`<b>${p.name}</b>　${p.series}　L=${fmt(p.len)} mm　<span style="color:#94a3b8">${partAlu(p).name}</span>`:`<b>${p.name}</b>　${PANELS[p.ptype].short}　${fmt(p.w)} × ${fmt(p.h)} × t${p.t}`;
   tip.style.display='block'; tip.style.left=(e.clientX-r.left+14)+'px'; tip.style.top=(e.clientY-r.top+14)+'px';
 }
 
@@ -1868,12 +2096,15 @@ function draw2D(){
     {name:'俯視圖 TOP',u:p=>[p.cx+W/2,p.sx],v:p=>[D/2-p.cz,p.sz],depth:p=>p.cy,ox:0,oy:H+gap},
     {name:'右側視圖 RIGHT',u:p=>[D/2-p.cz,p.sz],v:p=>[p.cy,p.sy],depth:p=>p.cx,ox:W+gap,oy:0}
   ];
-  const panelFill=p=>{ const def=PANELS[S.panel], c=partPanelColor(p);
+  const panelFill=p=>{ const def=PANELS[p.ptype], c=partPanelColor(p);
     if(def.clear) return 'rgba(125,211,252,.22)';
     if(def.tex){ return hatch(x,c); } return c+'55'; };
   views.forEach(vw=>{
     const list=parts.slice().sort((a,b)=>vw.depth(a.box)-vw.depth(b.box));
     list.forEach(p=>{
+      if(p.kind==='brace'){ const e=p.ends.map(q=>({cx:q[0],cy:p.y,cz:q[1],sx:0,sy:0,sz:0}));
+        x.strokeStyle='#475569'; x.lineWidth=Math.max(2,PROFILES[p.series].s*sc); x.beginPath();
+        e.forEach((b,i)=>{ const px=X(vw.ox+vw.u(b)[0]), py=Y(vw.oy+vw.v(b)[0]); i?x.lineTo(px,py):x.moveTo(px,py); }); x.stroke(); return; }
       const [cu,su]=vw.u(p.box),[cv_,sv]=vw.v(p.box);
       const x0=X(vw.ox+cu-su/2), y0=Y(vw.oy+cv_+sv/2), w=su*sc, h=sv*sc;
       if(isPanel(p)){ x.fillStyle=panelFill(p); x.fillRect(x0,y0,w,h); x.strokeStyle='rgba(15,23,42,.35)'; x.lineWidth=.6; x.strokeRect(x0,y0,w,h); }
@@ -1933,7 +2164,7 @@ function draw2D(){
   x.font='11px "Microsoft JhengHei",sans-serif'; x.fillStyle='#475569'; x.fillText(`${W}×${D}×${H} mm`,tbx+10,tby+40);
   const scaleN=Math.round(96/(sc*25.4));
   const cells=[[`型材 ${S.profile}／${aluDef(globalAluKey()).name}`,150,0],[`單位 mm`,300,0],[`比例 1:${scaleN}`,380,0],
-    [`板材 ${PANELS[S.panel].short} t${S.panelThick}`,150,1],[`第三角法`,300,1],[new Date().toISOString().slice(0,10),380,1]];
+    [`板材 ${PANELS[S.panel].short} t${thickOf(S.panel)}`,150,1],[`第三角法`,300,1],[new Date().toISOString().slice(0,10),380,1]];
   x.fillStyle='#0f172a'; cells.forEach(([t,cx,ry])=>x.fillText(t,tbx+cx+8,tby+ry*tb/2+tb/4));
   x.fillStyle='#64748b'; x.font='11px "Microsoft JhengHei",sans-serif'; x.textAlign='left';
   x.fillText('＊點擊尺寸數字可直接修改',18,CH-20);
@@ -1960,7 +2191,7 @@ function renderStyleUI(){
   $('alu-sw').innerHTML=ALU_COLORS.map(c=>`<div class="swc ${S.alu===c.id?'on':''}" data-a="${c.id}" title="${c.name}" style="background:linear-gradient(135deg,#fff8 0%,${c.hex} 45%,${c.hex} 70%,#0006 100%)"></div>`).join('')
     +`<input type="color" id="alu-custom" value="${S.aluCustom}" title="自訂顏色" style="${S.alu==='custom'?'outline:2px solid #38bdf8':''}">`;
   const ad=aluDef(ak); $('alu-name').textContent=`${ad.name}　${ad.up?'加價 +'+Math.round(ad.up*100)+'%':'標準價'}`;
-  const icon={
+  const icon_unused={
     mesh:'<svg width="40" height="26"><defs><pattern id="pm" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 0H6M0 0V6" stroke="#cbd5e1" stroke-width="1.2"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pm)" stroke="#64748b"/></svg>',
     perf:'<svg width="40" height="26"><defs><pattern id="pp" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#94a3b8"/><circle cx="3" cy="3" r="1.6" fill="#0a1222"/></pattern></defs><rect width="40" height="26" rx="3" fill="url(#pp)"/></svg>',
     acrylic:'<svg width="40" height="26"><defs><linearGradient id="pa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0f2fe" stop-opacity=".7"/><stop offset=".5" stop-color="#7dd3fc" stop-opacity=".15"/><stop offset="1" stop-color="#bae6fd" stop-opacity=".5"/></linearGradient></defs><rect width="40" height="26" rx="3" fill="url(#pa)" stroke="#7dd3fc"/><path d="M8 20L18 6M14 22L24 8" stroke="#fff" stroke-opacity=".6"/></svg>',
@@ -1968,9 +2199,20 @@ function renderStyleUI(){
     sheet:'<svg width="40" height="26"><rect width="40" height="26" rx="3" fill="#64748b" stroke="#94a3b8"/><path d="M0 0L40 26" stroke="#94a3b8" stroke-opacity=".3"/></svg>',
     none:'<svg width="40" height="26"><rect x=".5" y=".5" width="39" height="25" rx="3" fill="none" stroke="#64748b" stroke-dasharray="3 2"/><path d="M12 7L28 19M28 7L12 19" stroke="#64748b"/></svg>'
   };
-  $('panel-cards').innerHTML=Object.entries(PANELS).map(([k,v])=>`<div class="pc ${k===S.panel?'on':''}" data-pn="${k}">${icon[k]}${v.short}</div>`).join('');
-  const th=PANELS[S.panel].th; if(!th.includes(S.panelThick)) S.panelThick=th[Math.min(1,th.length-1)];
-  $('panel-thick').innerHTML=th.map(t=>`<option ${t===S.panelThick?'selected':''}>${t}</option>`).join('');
+  $('panel-cards').innerHTML=Object.entries(PANELS).map(([k,v])=>`<div class="pc ${k===S.panel?'on':''}" data-pn="${k}">${PICON[k]}${v.short}</div>`).join('');
+  const th=PANELS[S.panel].th, ct=thickOf(S.panel), pd=PANELS[S.panel];
+  $('panel-thick').innerHTML=th.map(t=>`<option ${t===ct?'selected':''}>${t}</option>`).join('');
+  $('pitch-f').style.display=pd.pitch?'':'none';
+  if(pd.pitch){ $('pitch-l').textContent=pd.pl+' (mm)'; $('panel-pitch').innerHTML=pd.pitch.map(v=>`<option ${v===pitchOf(S.panel)?'selected':''}>${v}</option>`).join(''); }
+  const nOv=Object.keys(S.ptype).length;
+  $('ptype-note').innerHTML=nOv?`已有 <b style="color:#fdba74">${nOv}</b> 片個別指定材質　<button class="btn vb" id="ptype-reset">全部清除</button>`:'＊點 3D 中任一片板材，可個別改材質（例：下層鋁板、上層網格板）';
+  $('joint-cards').innerHTML=optCards('joint'); $('corner-cards').innerHTML=optCards('corner');
+  $('joint-tag').textContent=`${BOM.acc.filter(a=>a.key.startsWith('j_')).reduce((s,a)=>s+a.qty,0)} 個`;
+  $('joint-note').textContent=JOINTS[S.joint].spec; $('corner-note').textContent=CORNERS[S.corner].spec+((GEO.corners||[]).length?`（轉角 ${GEO.corners.length} 處）`:'（目前結構無 L 型轉角）');
+  ['handle','latch','hinge'].forEach(g=>$(g+'-cards').innerHTML=optCards(g));
+  $('hw-bump').checked=S.hw.bumper;
+  $('door-sec').classList.toggle('dis',!GEO.door); $('door-tag').textContent=GEO.door?'已配置':'未開門';
+  $('door-note').textContent=GEO.door?`${HANDLES[S.hw.handle].name}・${LATCHES[S.hw.latch].name}・${HINGES[S.hw.hinge].name}×${GEO.door.Lh>1800?3:2}`:'請先在上方勾選「正面開門」';
   $('panel-price').value=panelPrice();
   $('panel-sw').innerHTML=PANEL_COLORS.map(c=>`<div class="swc ${c.hex===S.panelColor?'on':''}" data-pc="${c.hex}" title="${c.name}" style="background:${c.hex}"></div>`).join('')
     +`<input type="color" id="panel-custom" value="${S.panelColor}" title="自訂顏色">`;
@@ -1981,12 +2223,17 @@ function renderStyleUI(){
   $('bpj').value=S.bpj; $('show-dims').checked=S.showDims; $('show-edges').checked=S.showEdges;
 }
 document.querySelector('.side').addEventListener('click',e=>{
-  const t=e.target.closest('[data-p],[data-dp],[data-a],[data-pn],[data-pc],[data-b]'); if(!t) return;
+  if(e.target.id==='ptype-reset'){ S.ptype={}; update(); return; }
+  if(e.target.id==='preset-mix'){ parts.filter(isPanel).forEach(p=>{ S.ptype[p.id]=(p.lvl===0)?'alu':'grid'; });
+    if(S.levels<2) toast('目前只有 1 層，請先把「層數」設為 2 以上'); update(); return; }
+  const t=e.target.closest('[data-p],[data-dp],[data-a],[data-pn],[data-pc],[data-b],[data-hw],[data-ppt]'); if(!t) return;
   const d=t.dataset;
+  if(d.ppt) return;
+  if(d.hw){ const [g,k]=d.hw.split(':'); HWG[g].set(k); if(g==='corner'||g==='joint') toast(`已改為：${HWG[g].tbl[k].name}`); update(); return; }
   if(d.p){ S.profile=d.p; ['w','d','h'].forEach(resetSpacing); applyDoorW(); clampDoorH(); }
   if(d.dp) S.doorProfile=d.dp;
   if(d.a) S.alu=d.a;
-  if(d.pn) S.panel=d.pn;
+  if(d.pn){ S.panel=d.pn; if(PANELS[d.pn].defColor) S.panelColor=PANELS[d.pn].defColor; }
   if(d.pc) S.panelColor=d.pc;
   if(d.b){ S.base=d.b; update(); fitView('iso'); return; }
   update();
@@ -1995,14 +2242,25 @@ document.querySelector('.side').addEventListener('input',e=>{
   if(e.target.id==='alu-custom'){ S.aluCustom=e.target.value; S.alu='custom'; update(); }
   if(e.target.id==='panel-custom'){ S.panelColor=e.target.value; update(); }
 });
-$('panel-thick').onchange=e=>{ S.panelThick=parseFloat(e.target.value); update(); };
+$('panel-thick').onchange=e=>{ S.thick[S.panel]=parseFloat(e.target.value); update(); };
+$('panel-pitch').onchange=e=>{ S.pitch[S.panel]=parseFloat(e.target.value); update(); };
+$('hw-bump').onchange=e=>{ S.hw.bumper=e.target.checked; update(); };
 $('panel-price').onchange=e=>{ S.panelPrice[S.panel]=parseFloat(e.target.value)||0; update(); };
 $('bpj').onchange=e=>{ S.bpj=+e.target.value; update(); };
 $('show-dims').onchange=e=>{ S.showDims=e.target.checked; update(); };
 $('show-edges').onchange=e=>{ S.showEdges=e.target.checked; update(); };
 
 /* ---- 選取料件屬性 ---- */
+function renderHwSel(g){
+  const body=$('sel-body'), G=HWG[g], cur=G.tbl[G.get()], rows=BOM.acc.filter(a=>a.key.startsWith({joint:'j_',corner:'c_',hinge:'h_',handle:'hd_',latch:'l_'}[g]));
+  $('sel-clear').style.display='';
+  body.innerHTML=`<div class="kv"><b>類別</b><span><span class="tag">${G.title}</span></span><b>目前型式</b><span style="color:#7dd3fc;font-weight:700">${cur.name}</span><b>規格</b><span>${cur.spec}</span>`+
+    rows.map(a=>`<b>數量</b><span>${a.qty} ${a.unit} × NT$${fmt(a.price)} ＝ <b style="color:#86efac">NT$${fmt(a.qty*a.price)}</b></span>`).join('')+`</div>
+    <div class="sub">點選圖示更換型式</div><div class="cards ${Object.keys(G.tbl).length>4?'c3':''}">${optCards(g)}</div>
+    <div class="hwinfo">${g==='joint'?'「每接點配件數」可在「底座與接合」設定為內外雙側。':g==='corner'?'轉角配件只裝在 L 型轉角立柱（外圍四角）。':'門五金會一起列入五金清單與估價。'}</div>`;
+}
 function renderSel(){
+  if(selectedId&&selectedId.startsWith('HW-')){ renderHwSel(selectedId.slice(3)); return; }
   const body=$('sel-body'), p=parts.find(p=>p.id===selectedId);
   $('sel-clear').style.display=p?'':'none';
   if(!p){ body.innerHTML='<div class="sel-empty">在 3D 視圖<b>點擊任一料件</b>（立柱、橫梁、嵌板、門扇）即可：<br>・修改該料件對應尺寸<br>・個別指定顏色或套用至同類料件<br>點擊<b style="color:#38bdf8">藍色尺寸標籤</b>可直接輸入新尺寸。</div>'; return; }
@@ -2017,13 +2275,15 @@ function renderSel(){
   if(isAlu(p)){ const c=partAlu(p), kg=p.len/1000*PROFILES[p.series].kg;
     spec=`<div class="kv"><b>料件</b><span>${p.name} <span class="tag ${p.door?'door':''}">${p.id}</span></span><b>型材</b><span>${p.series}（槽 ${PROFILES[p.series].slot}）</span><b>裁切長度</b><span style="color:#7dd3fc;font-weight:700">${fmt(p.len,1)} mm</span><b>重量</b><span>${fmt(kg,2)} kg</span><b>顏色</b><span><i class="dot" style="background:${c.hex}"></i>${c.name}</span></div>`;
   } else {
-    spec=`<div class="kv"><b>料件</b><span>${p.name} <span class="tag ${p.door?'door':''}">${p.id}</span></span><b>材質</b><span>${PANELS[S.panel].name} t${p.t}</span><b>下料尺寸</b><span style="color:#7dd3fc;font-weight:700">${fmt(p.w)} × ${fmt(p.h)} mm</span><b>入槽</b><span>四邊各 ${ins(p.door?S.doorProfile:S.profile)} mm</span><b>面積</b><span>${fmt(p.w*p.h/1e6,3)} m²</span><b>顏色</b><span><i class="dot" style="background:${partPanelColor(p)}"></i>${panelName(partPanelColor(p))}</span></div>`;
+    spec=`<div class="kv"><b>料件</b><span>${p.name} <span class="tag ${p.door?'door':''}">${p.id}</span></span><b>材質</b><span>${ptLabel(p.ptype)} t${p.t}${S.ptype[p.id]?' <span class="tag door">個別</span>':''}</span><b>下料尺寸</b><span style="color:#7dd3fc;font-weight:700">${fmt(p.w)} × ${fmt(p.h)} mm</span><b>入槽</b><span>四邊各 ${ins(p.door?S.doorProfile:S.profile)} mm</span><b>面積</b><span>${fmt(p.w*p.h/1e6,3)} m²</span><b>顏色</b><span><i class="dot" style="background:${partPanelColor(p)}"></i>${panelName(partPanelColor(p))}</span></div>`;
   }
   const eds=E.map((e,i)=>`<div class="ed-row"><label>${e[0]}</label><input type="number" data-e="${i}" value="${Math.round(e[1])}"></div>`).join('');
   const sw=isAlu(p)
     ? ALU_COLORS.map(c=>`<div class="swc ${S.overrides[p.id]===c.id?'on':''}" data-oc="${c.id}" title="${c.name}" style="background:linear-gradient(135deg,#fff8,${c.hex} 45%,${c.hex} 70%,#0006)"></div>`).join('')
     : PANEL_COLORS.map(c=>`<div class="swc ${S.overrides[p.id]===c.hex?'on':''}" data-oc="${c.hex}" title="${c.name}" style="background:${c.hex}"></div>`).join('');
-  body.innerHTML=spec+(eds?`<div class="sub">尺寸修改</div>${eds}`:'')+
+  const ptUI=isPanel(p)?`<div class="sub">此片板材材質（可個別指定）</div><div class="cards c3">${Object.entries(PANELS).map(([k,v])=>`<div class="pc ${k===p.ptype?'on':''}" data-ppt="${k}">${PICON[k]}${v.short}</div>`).join('')}</div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">${typeof p.lvl==='number'?'<button class="btn vb" id="pt-level">套用至同一層</button>':''}<button class="btn vb" id="pt-wall">套用至同一面牆</button><button class="btn vb" id="pt-reset">恢復整體設定</button></div>`:'';
+  body.innerHTML=spec+(eds?`<div class="sub">尺寸修改</div>${eds}`:'')+ptUI+
     `<div class="sub">此料件顏色（個別指定）</div><div class="sw">${sw}<input type="color" id="ov-custom" value="${isAlu(p)?partAlu(p).hex:partPanelColor(p)}"></div>
      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn vb" id="ov-same">套用至所有「${p.name}」</button><button class="btn vb" id="ov-reset">恢復預設色</button></div>`;
   body.querySelectorAll('[data-e]').forEach(inp=>inp.onchange=()=>E[+inp.dataset.e][2](parseFloat(inp.value)));
@@ -2032,6 +2292,14 @@ function renderSel(){
   $('ov-custom').oninput=e=>setOv(e.target.value);
   $('ov-same').onclick=()=>setOv(S.overrides[p.id]||(isAlu(p)?globalAluKey():S.panelColor),true);
   $('ov-reset').onclick=()=>setOv(null);
+  if(isPanel(p)){
+    let pend=p.ptype;
+    const setPt=(list,k)=>{ list.forEach(q=>{ if(k==null) delete S.ptype[q.id]; else S.ptype[q.id]=k; }); if(k==='none') selectedId=null; update(); };
+    body.querySelectorAll('[data-ppt]').forEach(el=>el.onclick=()=>{ pend=el.dataset.ppt; setPt([p],pend); });
+    if($('pt-level')) $('pt-level').onclick=()=>setPt(parts.filter(q=>isPanel(q)&&q.lvl===p.lvl),p.ptype);
+    $('pt-wall').onclick=()=>setPt(parts.filter(q=>isPanel(q)&&q.dir===p.dir&&q.line===p.line),p.ptype);
+    $('pt-reset').onclick=()=>setPt([p],null);
+  }
 }
 $('sel-clear').onclick=()=>select(null);
 
@@ -2043,13 +2311,12 @@ function renderBOM(){
   if(bomTab==='alu'){
     el.innerHTML=`<table><thead><tr><th>#</th><th>品名</th><th>型材</th><th class="n">裁切長度 mm</th><th class="n">數量</th><th class="n">小計長度 m</th><th class="n">單重 kg</th><th class="n">小計 kg</th><th>顏色／表面處理</th><th>加工備註</th></tr></thead><tbody>`+
       b.alu.map((g,i)=>{ const kg=g.len/1000*PROFILES[g.series].kg;
-        return `<tr><td>${i+1}</td><td>${g.door?'<span class="tag door">門</span> ':''}${g.name}</td><td>${g.series}</td><td class="n">${fmt(g.len,1)}</td><td class="n">${g.qty}</td><td class="n">${fmt(g.len*g.qty/1000,2)}</td><td class="n">${fmt(kg,2)}</td><td class="n">${fmt(kg*g.qty,2)}</td><td><i class="dot" style="background:${g.color.hex}"></i>${g.color.name}</td><td style="color:#94a3b8">${g.name==='立柱'?(S.base==='none'?'兩端端蓋':'底端攻牙 '+PROFILES[g.series].bolt):'兩端直角切 ±0.5'}</td></tr>`; }).join('')+
+        return `<tr><td>${i+1}</td><td>${g.door?'<span class="tag door">門</span> ':''}${g.name}</td><td>${g.series}</td><td class="n">${fmt(g.len,1)}</td><td class="n">${g.qty}</td><td class="n">${fmt(g.len*g.qty/1000,2)}</td><td class="n">${fmt(kg,2)}</td><td class="n">${fmt(kg*g.qty,2)}</td><td><i class="dot" style="background:${g.color.hex}"></i>${g.color.name}</td><td style="color:#94a3b8">${g.name==='立柱'?(S.base==='none'?'兩端端蓋':'底端攻牙 '+PROFILES[g.series].bolt):g.name==='轉角立柱'?'兩端插入三向角件':g.name==='轉角斜撐'?'兩端 45° 斜切':S.joint==='hidden'?'直角切＋端面攻牙':'兩端直角切 ±0.5'}</td></tr>`; }).join('')+
       `<tr class="sum"><td></td><td>合計</td><td></td><td></td><td class="n">${b.cuts}</td><td class="n">${fmt(b.lenTot/1000,2)}</td><td></td><td class="n">${fmt(b.kgTot,2)}</td><td colspan="2">鋸片損耗 ${st.kerf} mm／刀</td></tr></tbody></table>`;
   }
   if(bomTab==='panel'){
-    const pp=panelPrice()*b.pFactor;
     el.innerHTML=b.pan.length?`<table><thead><tr><th>#</th><th>品名</th><th>材質</th><th class="n">下料寬 mm</th><th class="n">下料高 mm</th><th class="n">厚度</th><th class="n">數量</th><th class="n">面積 m²</th><th class="n">單價/m²</th><th class="n">金額</th><th>顏色</th></tr></thead><tbody>`+
-      b.pan.map((g,i)=>{ const a=g.w*g.h/1e6*g.qty; return `<tr><td>${i+1}</td><td>${g.name}</td><td>${PANELS[S.panel].name}</td><td class="n">${fmt(g.w)}</td><td class="n">${fmt(g.h)}</td><td class="n">${g.t}</td><td class="n">${g.qty}</td><td class="n">${fmt(a,3)}</td><td class="n">${fmt(pp)}</td><td class="n">${fmt(a*pp)}</td><td><i class="dot" style="background:${g.color}"></i>${panelName(g.color)}</td></tr>`; }).join('')+
+      b.pan.map((g,i)=>{ const a=g.w*g.h/1e6*g.qty; return `<tr><td>${i+1}</td><td>${g.name}</td><td>${ptLabel(g.ptype)}</td><td class="n">${fmt(g.w)}</td><td class="n">${fmt(g.h)}</td><td class="n">${g.t}</td><td class="n">${g.qty}</td><td class="n">${fmt(a,3)}</td><td class="n">${fmt(g.unit)}</td><td class="n">${fmt(a*g.unit)}</td><td><i class="dot" style="background:${g.color}"></i>${panelName(g.color)}</td></tr>`; }).join('')+
       `<tr class="sum"><td></td><td>合計</td><td colspan="4"></td><td class="n">${b.pan.reduce((s,g)=>s+g.qty,0)}</td><td class="n">${fmt(b.area,3)}</td><td></td><td class="n">${fmt(b.cost.panCost)}</td><td></td></tr></tbody></table><div class="note">下料尺寸＝開口淨距＋四邊入槽 ${ins()} mm。</div>`
       :'<div class="note">目前未選用板材。</div>';
   }
@@ -2071,13 +2338,13 @@ function renderBOM(){
   if(bomTab==='est'){
     const c=b.cost;
     const rows=[['鋁擠型材料',`${fmt(b.kgTot,1)} kg × NT$${st.aluKg}/kg（含表面處理加價）`,c.aluCost],['裁切加工',`${b.cuts} 刀 × NT$${st.cut}`,c.cutCost],
-      ['板材',`${fmt(b.area,2)} m² × NT$${fmt(panelPrice()*b.pFactor)}/m²（${PANELS[S.panel].name} t${S.panelThick}）`,c.panCost],['五金配件',`${b.acc.length} 項`,c.accCost],['組裝工資',`${fmt(b.hrs,1)} 小時 × NT$${st.labor}`,c.labCost]];
+      ['板材',`${fmt(b.area,2)} m²（${[...new Set(b.pan.map(g=>PANELS[g.ptype].short))].join('、')||'無'}）`,c.panCost],['五金配件',`${b.acc.length} 項`,c.accCost],['組裝工資',`${fmt(b.hrs,1)} 小時 × NT$${st.labor}`,c.labCost]];
     el.innerHTML=`<div class="est"><div><table><thead><tr><th>項目</th><th>計算依據</th><th class="n">金額 NT$</th></tr></thead><tbody>`+
       rows.map(r=>`<tr><td>${r[0]}</td><td style="color:#94a3b8">${r[1]}</td><td class="n">${fmt(r[2])}</td></tr>`).join('')+
       `<tr class="sum"><td>成本小計</td><td></td><td class="n">${fmt(c.sub)}</td></tr><tr><td>管銷利潤</td><td style="color:#94a3b8">${st.margin}%</td><td class="n">${fmt(c.mg)}</td></tr>
        <tr class="sum"><td>未稅報價</td><td></td><td class="n">${fmt(c.pre)}</td></tr><tr><td>營業稅</td><td style="color:#94a3b8">${st.tax}%</td><td class="n">${fmt(c.tax)}</td></tr>
        <tr class="sum"><td style="color:#86efac">含稅總價</td><td></td><td class="n" style="color:#86efac;font-size:14px">${fmt(c.total)}</td></tr></tbody></table>
-       <div class="note">＊單價皆為台灣市場參考值，請依實際供應商報價修改。工時：每接點 0.12h、每片板 0.2h、門 1.5h、腳座 0.1h/支、放樣 1h。</div></div>
+       <div class="note">＊單價皆為台灣市場參考值，請依實際供應商報價修改。工時：每接點 0.12h、每片板 0.2h、門 1.5h、安全開關配線 1h、轉角配件 0.3h/處、腳座 0.1h/支、放樣 1h。</div></div>
        <div class="params"><div class="sub" style="margin-top:0">估價參數</div>`+
       [['aluKg','鋁材單價 NT$/kg'],['cut','裁切費 NT$/刀'],['labor','工資 NT$/小時'],['margin','管銷利潤 %'],['tax','營業稅 %']].map(([k,l])=>`<div class="ed-row"><label>${l}</label><input type="number" data-st="${k}" value="${st[k]}"></div>`).join('')+
       `<div class="ed-row"><label>板材單價 NT$/m²（${PANELS[S.panel].short}）</label><input type="number" id="est-pp" value="${panelPrice()}"></div></div></div>`;
@@ -2093,7 +2360,7 @@ function exportCSV(){
   L.push(['[鋁材裁切]'].join(',')); L.push(['品名','型材','裁切長度mm','數量','顏色','小計kg'].map(q).join(','));
   b.alu.forEach(g=>L.push([g.name,g.series,g.len,g.qty,g.color.name,(g.len/1000*PROFILES[g.series].kg*g.qty).toFixed(2)].map(q).join(',')));
   L.push('','[板材]'); L.push(['品名','材質','寬mm','高mm','厚度','數量','顏色'].map(q).join(','));
-  b.pan.forEach(g=>L.push([g.name,PANELS[S.panel].name,g.w,g.h,g.t,g.qty,panelName(g.color)].map(q).join(',')));
+  b.pan.forEach(g=>L.push([g.name,ptLabel(g.ptype),g.w,g.h,g.t,g.qty,panelName(g.color)].map(q).join(',')));
   L.push('','[五金配件]'); L.push(['品名','規格','數量','單位','單價','金額'].map(q).join(','));
   b.acc.forEach(a=>L.push([a.name,a.spec,a.qty,a.unit,a.price,a.qty*a.price].map(q).join(',')));
   L.push('','[估價]'); const c=b.cost;
@@ -2152,7 +2419,8 @@ function renderHUD(){
   const b=BOM, n=k=>parts.filter(p=>p.kind===k).length;
   $('hud').innerHTML=`<b>${S.w} × ${S.d} × ${S.h}</b> <span class="k">mm${BASES[S.base].h?'（含底座 '+(S.h+BASES[S.base].h)+'）':''}</span><br>
    <span class="k">型材</span> ${S.profile}・${aluDef(globalAluKey()).name}<br>
-   <span class="k">板材</span> ${PANELS[S.panel].name}${S.panel!=='none'?' t'+S.panelThick:''}<br>
+   <span class="k">板材</span> ${PANELS[S.panel].name}${S.panel!=='none'?' t'+thickOf(S.panel):''}${Object.keys(S.ptype).length?' <span class="k">＋個別指定</span>':''}<br>
+   <span class="k">接點</span> ${JOINTS[S.joint].name}　<span class="k">轉角</span> ${CORNERS[S.corner].short}<br>
    <span class="k">立柱</span> ${n('post')}　<span class="k">橫梁</span> ${n('beam')}　<span class="k">嵌板</span> ${n('panel')+n('dpanel')}<br>
    <span class="k">總重</span> <b>${fmt(b.kgTot,1)} kg</b>　<span class="k">估價</span> <b>${money(b.cost.total)}</b>`;
 }
@@ -2176,7 +2444,7 @@ function init(){
   if(HAS3D) fitView('iso'); else { switchView('2d'); no3DMsg(); }
 }
 init();
-window.__fence={S:S,select:select,get view(){return view;},get HAS3D(){return HAS3D;}};
+window.__fence={S:S,select:select,cam:()=>[camera,controls],get view(){return view;},get HAS3D(){return HAS3D;}};
 })();
 </script>
 </body>
