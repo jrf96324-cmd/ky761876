@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>鋁擠型機架設計器</title>
+<style>
+:root{--bg:#070c16;--panel:#0e1524;--panel2:#121b2e;--line:#1f2b43;--line2:#2c3d5c;--text:#e6edf7;--muted:#8fa0ba;--accent:#38bdf8;--ok:#22c55e;--warn:#f59e0b}
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 "Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{background:linear-gradient(180deg,#101c33,#0b1324);border-bottom:1px solid var(--line);padding:8px 12px 6px;flex:none}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin-bottom:6px;flex-wrap:wrap}
+.brand small{color:var(--muted);font-weight:400;font-size:12px} .sp{flex:1}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row+.row{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.f{display:flex;flex-direction:column;gap:2px} .f>label,.lbl{font-size:11px;color:var(--muted);font-weight:600}
+input,select,button{font:inherit;color:var(--text)}
+input[type=number],select{height:28px;background:#0a1222;border:1px solid var(--line2);border-radius:6px;padding:0 8px}
+input[type=number]{width:80px;text-align:right;color:#7dd3fc;font-weight:700}
+input.sm{width:58px} input[type=color]{width:32px;height:28px;padding:0;border:1px solid var(--line2);border-radius:6px;background:none}
+.btn{height:28px;padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:#13203a;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)} .btn.pri{background:linear-gradient(135deg,#0ea5e9,#2563eb);border:none;color:#fff}
+.vb{height:26px;padding:0 9px;font-size:12px}
+.chk{display:flex;align-items:center;gap:6px;height:28px;cursor:pointer;font-size:12px;white-space:nowrap}
+.splist{display:flex;gap:4px;overflow-x:auto;max-width:420px} .splist input{width:66px;height:26px;text-align:center;font-size:12px}
+.main{flex:1;display:flex;min-height:0} .viewport{flex:1;display:flex;flex-direction:column;min-width:0}
+.vtabs{display:flex;align-items:center;gap:4px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.vtab{padding:5px 14px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:700} .vtab.on{background:rgba(56,189,248,.14);color:var(--accent)}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden;background:radial-gradient(ellipse at 30% 0%,#1d3a63 0%,#0b1528 48%,#060a13 100%)}
+#c3d,#c2d{position:absolute;inset:0;width:100%;height:100%;display:block} #c2d{display:none;background:#fff}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.dim{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;background:rgba(8,47,73,.88);border:1px solid #38bdf8;color:#e0f2fe;border-radius:5px;padding:1px 6px;font:700 11px/16px ui-monospace,Consolas,monospace;white-space:nowrap}
+.dim:hover{background:#0284c7} .dim.tot{background:rgba(30,58,138,.92);border-color:#93c5fd} .dim.lv{border-color:#a78bfa;background:rgba(46,16,101,.85)}
+.hud{position:absolute;left:12px;top:12px;background:rgba(2,6,23,.62);border:1px solid rgba(96,165,250,.3);border-radius:12px;padding:10px 12px;font-size:12px;pointer-events:none}
+.hud b{color:#7dd3fc} .hud .k{color:var(--muted)}
+.hint{position:absolute;left:12px;bottom:10px;font-size:11px;color:#9fb3d1;background:rgba(2,6,23,.55);padding:5px 10px;border-radius:8px;pointer-events:none}
+.tip{position:absolute;pointer-events:none;background:#0b1220;border:1px solid var(--accent);color:#e0f2fe;padding:4px 8px;border-radius:6px;font-size:12px;white-space:nowrap;display:none;z-index:6}
+.editor{position:absolute;z-index:9;background:#0d1729;border:1px solid var(--accent);border-radius:10px;padding:10px;box-shadow:0 14px 40px rgba(0,0,0,.55);width:210px}
+.editor .et{font-weight:700;font-size:12px;color:var(--accent);margin-bottom:6px} .editor input{width:100%;height:32px;font-size:15px}
+.editor .eb{display:flex;gap:6px;justify-content:flex-end;margin-top:8px} .editor .eh{font-size:11px;color:var(--muted);margin-top:4px}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#7c2d12;border:1px solid #fb923c;color:#fff;padding:8px 16px;border-radius:8px;z-index:50;display:none}
+.side{width:310px;flex:none;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto}
+.sec{padding:12px 14px;border-bottom:1px solid var(--line)} .sec h4{margin:0 0 10px;font-size:12px;color:var(--accent);display:flex;gap:6px}
+.sub{font-size:11px;color:var(--muted);margin:10px 0 5px;font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:6px} .cards.c3{grid-template-columns:repeat(3,1fr)}
+.pc{border:1px solid var(--line2);border-radius:8px;padding:5px 2px 4px;text-align:center;cursor:pointer;font-size:11px;font-weight:700;background:#0a1222;color:#cbd5e1}
+.pc svg{display:block;margin:0 auto 3px} .pc.on{border-color:var(--accent);background:rgba(56,189,248,.12);color:var(--accent)}
+.pc small{display:block;font-weight:400;color:var(--muted);font-size:10px}
+.sw{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.swc{width:26px;height:26px;border-radius:6px;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)} .swc.on{border-color:var(--accent)}
+.kv{display:grid;grid-template-columns:78px 1fr;gap:4px 8px;font-size:12px;margin-bottom:8px} .kv b{color:var(--muted);font-weight:600}
+.ed-row{display:flex;align-items:center;gap:6px;margin-bottom:6px} .ed-row label{flex:1;font-size:12px} .ed-row input{width:90px}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;background:rgba(56,189,248,.15);color:var(--accent)}
+.bom{height:34vh;flex:none;display:flex;flex-direction:column;background:var(--panel);border-top:1px solid var(--line)}
+.btabs{display:flex;align-items:center;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.btab{padding:6px 14px;cursor:pointer;color:var(--muted);font-weight:700;border-radius:6px 6px 0 0} .btab.on{color:var(--accent);background:var(--panel2)}
+.btabs .tot{font-size:12px;color:var(--muted)} .btabs .tot b{color:#86efac;font-size:14px}
+.bbody{flex:1;overflow:auto;background:var(--panel2)}
+table{width:100%;border-collapse:collapse;font-size:12px} th{position:sticky;top:0;background:#16213a;color:#9fb3d1;text-align:left;padding:7px 8px}
+td{padding:5px 8px;border-bottom:1px solid #1a2540;white-space:nowrap} tr.sum td{font-weight:700;background:#111b30}
+.n{text-align:right;font-variant-numeric:tabular-nums} .dot{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+td input[type=number]{height:24px;width:80px}
+.barrow{display:flex;align-items:center;gap:8px;margin:0 10px 4px} .bar{flex:1;display:flex;height:20px;border-radius:4px;overflow:hidden;background:repeating-linear-gradient(45deg,#1e293b 0 6px,#111827 6px 12px)}
+.seg{height:100%;font-size:10px;color:#0b1220;font-weight:700;border-right:2px solid #0b1220;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.note{font-size:11px;color:var(--muted);padding:6px 10px}
+@media (max-width:980px){ body{height:auto;overflow:auto} .main{flex-direction:column} .viewport{height:62vh} .side{width:auto} .bom{height:auto;min-height:50vh} }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">鋁擠型機架設計器 <small>參數化結構・料件樣式・BOM・下料・估價・STEP／PDF</small><span class="sp"></span>
+    <button class="btn" data-export id="btn-csv">匯出 BOM (CSV)</button>
+    <span style="display:inline-flex"><select id="pdf2d-size" style="border-radius:6px 0 0 6px"><option>A3</option><option>A4</option></select><button class="btn" data-export id="btn-pdf2d" style="border-radius:0 6px 6px 0">匯出 2D 圖面 PDF</button></span>
+    <button class="btn" data-export id="btn-report">匯出 PDF 報告書</button>
+    <button class="btn pri" data-export id="btn-stp">匯出 3D STEP</button>
+  </div>
+  <div class="row">
+    <div class="f"><label>總寬 W</label><input type="number" id="in-w" step="10"></div>
+    <div class="f"><label>總深 D</label><input type="number" id="in-d" step="10"></div>
+    <div class="f"><label>總高 H</label><input type="number" id="in-h" step="10"></div>
+    <div class="f"><label>寬度格數</label><input type="number" class="sm" id="in-cols" min="1" max="8"></div>
+    <div class="f"><label>層數（含底層）</label><input type="number" class="sm" id="in-levels" min="1" max="6"></div>
+    <label class="chk"><input type="checkbox" id="in-lock"> 鎖定總尺寸</label>
+    <div class="f"><label>各格淨距 (mm)</label><div class="splist" id="sp-w"></div></div>
+    <div class="f"><label>各層淨高 (mm，由下而上)</label><div class="splist" id="sp-h"></div></div>
+  </div>
+</header>
+<div class="main">
+  <section class="viewport">
+    <div class="vtabs"><div class="vtab on" id="tab-3d">3D 預覽</div><div class="vtab" id="tab-2d">工程三視圖</div><span class="sp"></span>
+      <button class="btn vb" data-view="iso">等角</button><button class="btn vb" data-view="front">前視</button><button class="btn vb" data-view="right">右視</button><button class="btn vb" data-view="top">俯視</button></div>
+    <div id="stage">
+      <canvas id="c3d"></canvas><canvas id="c2d"></canvas><div id="labels"></div>
+      <div class="hud" id="hud"></div>
+      <div class="hint" id="hint">左鍵旋轉｜右鍵平移｜滾輪縮放｜點料件可改尺寸/顏色｜點藍色尺寸直接修改</div>
+      <div class="tip" id="tip"></div>
+      <div class="editor" id="editor" hidden><div class="et" id="ed-t"></div><input type="number" id="ed-v"><div class="eh" id="ed-h"></div>
+        <div class="eb"><button class="btn" id="ed-c">取消</button><button class="btn pri" id="ed-o">確定</button></div></div>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="sec"><h4>型材系列</h4><div class="cards" id="prof-cards"></div></div>
+    <div class="sec"><h4>型材顏色</h4><div class="sw" id="alu-sw"></div></div>
+    <div class="sec"><h4>側板</h4><div class="cards" id="panel-cards"></div>
+      <div class="sub">安裝面</div><div style="display:flex;gap:10px"><label class="chk"><input type="checkbox" data-side="back">背面</label><label class="chk"><input type="checkbox" data-side="left">左側</label><label class="chk"><input type="checkbox" data-side="right">右側</label></div>
+      <div class="sub">顏色</div><div class="sw" id="panel-sw"></div></div>
+    <div class="sec"><h4>檯面板與底座</h4>
+      <div style="display:flex;gap:10px;align-items:center"><label class="chk"><input type="checkbox" id="top-on">檯面板</label><div class="f"><label>厚度</label><select id="top-t"><option>10</option><option>15</option><option>20</option><option>25</option><option>30</option></select></div><input type="color" id="top-col"></div>
+      <div class="sub">底座</div><div class="cards c3" id="base-cards"></div></div>
+    <div class="sec"><h4>選取料件<span class="sp"></span><button class="btn vb" id="sel-clear" style="display:none">取消選取</button></h4><div id="sel-body"></div></div>
+  </aside>
+</div>
+<section class="bom">
+  <div class="btabs"><div class="btab on" data-t="alu">鋁材裁切</div><div class="btab" data-t="panel">板材</div><div class="btab" data-t="acc">五金配件</div><div class="btab" data-t="nest">下料排版</div><div class="btab" data-t="est">估價</div>
+    <span class="sp"></span><span class="tot">鋁材 <b id="t-len">0</b> m｜重量 <b id="t-kg">0</b> kg｜含稅 <b id="t-cost">0</b></span></div>
+  <div class="bbody" id="bbody"></div>
+</section>
+<div class="toast" id="toast"></div>
+<div id="errbar" style="display:none;position:fixed;left:0;right:0;top:0;z-index:999;background:#7f1d1d;color:#fff;padding:10px 16px;font-size:14px"></div>
+<script>
+window.__errs=[];
+window.onerror=function(m,s,l){ window.__errs.push(m+' (行 '+l+')'); var b=document.getElementById('errbar'); if(b){ b.style.display='block'; b.innerHTML='程式錯誤：'+window.__errs.join('<br>')+'<br><small>請截圖回報；建議使用最新版 Chrome / Edge。</small>'; } };
+</script>
+<script>/*__THREE__*/</script>
+<script>/*__ORBIT__*/</script>
+<script>
+(function(){
+"use strict";
+/*__LIBS__*/
+
+/* ========== 1. 資料表（領域資料：換題目時主要改這裡） ========== */
+const ALU_COLORS=[{id:'silver',name:'銀白陽極',hex:'#c9ced6',metal:.85,rough:.3,up:0},{id:'black',name:'黑色陽極',hex:'#2a2c31',metal:.55,rough:.4,up:.1},
+  {id:'champ',name:'香檳金陽極',hex:'#c9a96e',metal:.85,rough:.3,up:.15},{id:'white',name:'白色烤漆',hex:'#eef0f2',metal:.05,rough:.55,up:.2}];
+const PANELS={sheet:{name:'鋁板 t2',short:'鋁板',price:1650,t:2,metal:true},mesh:{name:'焊接網 50 目',short:'網板',price:650,t:4,tex:true,pitch:50},
+  acrylic:{name:'透明壓克力 t5',short:'壓克力',price:1800,t:5,clear:true},none:{name:'無',short:'無',price:0,t:0}};
+const PANEL_COLORS=['#c9ced6','#1f2328','#f2f2f2','#f2b705','#9fd3ff'];
+const BASES={none:{name:'直接落地',h:0},foot:{name:'調整腳座',h:60},caster:{name:'萬向輪',h:105}};
+
+/* ========== 2. 狀態（單一資料來源） ========== */
+const S={w:1500,d:750,h:900,cols:2,levels:3,lock:true,spW:[],spH:[],profile:'4040',alu:'silver',
+  panel:'sheet',panelColor:'#c9ced6',sides:{back:true,left:true,right:true},top:true,topT:20,topColor:'#d6cfc2',base:'foot',overrides:{},
+  price:{aluKg:180,cut:15,labor:800,kerf:3,stock:6000,margin:15,tax:5,topM2:1800},accPrice:{}};
+let parts=[], GEO={}, BOM=null, selectedId=null, view='3d', bomTab='alu';
+
+const $=id=>document.getElementById(id);
+const fmt=(n,d)=>Number(n).toLocaleString('en-US',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});
+const money=n=>'NT$ '+fmt(Math.round(n));
+const P_=()=>PROFILES[S.profile].s, ins=()=>Math.round(PROFILES[S.profile].slot*0.75);
+function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2800); }
+function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),3000); }
+const aluDef=k=>k&&k[0]==='#'?{name:'自訂 '+k,hex:k,metal:.35,rough:.42,up:.25}:(ALU_COLORS.find(c=>c.id===k)||ALU_COLORS[0]);
+const partAlu=p=>aluDef(S.overrides[p.id]||S.alu), partCol=p=>S.overrides[p.id]||(p.kind==='plate'?S.topColor:S.panelColor);
+const isAlu=p=>p.kind==='post'||p.kind==='beam', isPanel=p=>p.kind==='panel'||p.kind==='plate';
+
+/* ========== 3. 尺寸邏輯：總尺寸 ↔ 各格淨距 ========== */
+const spArr=a=>a==='w'?S.spW:S.spH, cnt=a=>a==='w'?S.cols:S.levels-1;
+function resetSpacing(a){ const P=P_(), n=cnt(a); if(n<1){ if(a==='h') S.spH=[]; return; }
+  const clear=S[a]-(n+1)*P; if(clear<n*10){ toast('總尺寸過小'); S[a]=(n+1)*P+n*100; return resetSpacing(a); }
+  const each=Math.floor(clear/n), arr=Array(n).fill(each); arr[n-1]=clear-each*(n-1); if(a==='w') S.spW=arr; else S.spH=arr; }
+function setSpan(a,i,v){ v=Math.round(+v); if(!(v>=10)) return toast('尺寸需 ≥ 10');
+  const arr=spArr(a);
+  if(!S.lock||arr.length===1){ arr[i]=v; S[a]=arr.reduce((x,y)=>x+y,0)+(arr.length+1)*P_(); }
+  else{ const j=i===arr.length-1?arr.length-2:arr.length-1, pool=arr[i]+arr[j]; if(v>pool-10){ toast('超過總尺寸，可解除「鎖定總尺寸」'); v=pool-10; } arr[i]=v; arr[j]=pool-v; }
+  update(); }
+function setTotal(a,v){ v=Math.round(+v); if(!(v>0)) return; S[a]=v; if(a!=='d') resetSpacing(a); update(); }
+function setCount(k,v){ S[k]=Math.max(k==='levels'?2:1,Math.min(k==='levels'?6:8,Math.round(+v)||1)); resetSpacing(k==='cols'?'w':'h'); update(); }
+
+/* ========== 4. 結構展開 buildParts()：所有輸出（3D/2D/BOM/STEP）都從這份清單來 ========== */
+const B=(cx,cy,cz,sx,sy,sz)=>({cx,cy,cz,sx,sy,sz});
+function axisPos(total,sp,P){ const a=[-total/2+P/2]; let c=a[0]; sp.forEach(s=>{c+=P+s;a.push(c)}); return a; }
+function buildParts(){
+  const P=P_(), I=ins(), h=S.h, out=[];
+  const xs=axisPos(S.w,S.spW,P), zs=[-S.d/2+P/2,S.d/2-P/2], ys=axisPos(h,S.spH,P).map(v=>v+h/2), dspan=S.d-2*P;
+  GEO={xs,zs,ys,P,dspan};
+  xs.forEach((x,c)=>zs.forEach((z,r)=>out.push({id:`P${c}-${r}`,kind:'post',name:'立柱',series:S.profile,len:h,axis:'y',box:B(x,h/2,z,P,h,P),c,r})));
+  const lvName=k=>k===0?'底橫梁':k===ys.length-1?'頂橫梁':'中橫梁';
+  ys.forEach((y,k)=>{
+    zs.forEach((z,r)=>S.spW.forEach((s,c)=>out.push({id:`BW${r}-${c}-${k}`,kind:'beam',name:lvName(k)+'(寬)',series:S.profile,len:s,axis:'x',dir:'W',line:r,bay:c,lvl:k,box:B((xs[c]+xs[c+1])/2,y,z,s,P,P)})));
+    xs.forEach((x,c)=>out.push({id:`BD${c}-${k}`,kind:'beam',name:lvName(k)+'(深)',series:S.profile,len:dspan,axis:'z',dir:'D',line:c,bay:0,lvl:k,box:B(x,y,0,P,P,dspan)}));
+  });
+  if(S.panel!=='none'){ const T=PANELS[S.panel].t;
+    for(let k=0;k<ys.length-1;k++){ const y0=ys[k]+P/2, y1=ys[k+1]-P/2, ph=y1-y0, cy=(y0+y1)/2;
+      if(S.sides.back) S.spW.forEach((s,c)=>out.push({id:`NB${c}-${k}`,kind:'panel',name:'背板',w:s+2*I,h:ph+2*I,t:T,dir:'W',lvl:k,bay:c,box:B((xs[c]+xs[c+1])/2,cy,zs[0],s,ph,T)}));
+      [['left',0],['right',xs.length-1]].forEach(([sd,c])=>{ if(S.sides[sd]) out.push({id:`NS${c}-${k}`,kind:'panel',name:'側板',w:dspan+2*I,h:ph+2*I,t:T,dir:'D',lvl:k,box:B(xs[c],cy,0,T,ph,dspan)}); });
+    } }
+  if(S.top) out.push({id:'TOP',kind:'plate',name:'檯面板',w:S.w,h:S.d,t:S.topT,box:B(0,h+S.topT/2,0,S.w,S.topT,S.d)});
+  return out;
+}
+
+/* ========== 5. BOM / 下料 / 估價 ========== */
+const accP=(k,d)=>S.accPrice[k]!=null?S.accPrice[k]:d;
+function computeBOM(){
+  const alu={}, pan={}, acc=[], nest={}, st=S.price; let lenTot=0,kgTot=0,cuts=0;
+  parts.forEach(p=>{
+    if(isAlu(p)){ const c=partAlu(p), L=Math.round(p.len*10)/10, k=[p.series,L,c.hex,p.name].join('|');
+      (alu[k]=alu[k]||{name:p.name,series:p.series,len:L,color:c,qty:0}).qty++; lenTot+=p.len; kgTot+=p.len/1000*PROFILES[p.series].kg; cuts++;
+      (nest[p.series+c.hex]=nest[p.series+c.hex]||{series:p.series,color:c,lens:[]}).lens.push(L); }
+    else { const col=partCol(p), type=p.kind==='plate'?'檯面板':PANELS[S.panel].name, price=p.kind==='plate'?st.topM2:PANELS[S.panel].price;
+      const k=[p.name,Math.round(p.w),Math.round(p.h),p.t,col].join('|');
+      (pan[k]=pan[k]||{name:p.name,type,w:Math.round(p.w),h:Math.round(p.h),t:p.t,color:col,unit:price,qty:0}).qty++; }
+  });
+  Object.values(nest).forEach(g=>{ g.res=packBars(g.lens,st.stock,st.kerf); g.util=g.lens.reduce((a,b)=>a+b,0)/(g.res.bars.length*st.stock); });
+  const PR=PROFILES[S.profile], beams=parts.filter(p=>p.kind==='beam').length, posts=parts.filter(p=>p.kind==='post').length, joints=beams*2;
+  const A=(key,name,spec,qty,unit,def)=>{ if(qty>0) acc.push({key,name,spec,qty,unit,price:accP(key,def)}); };
+  A('brk',`${S.profile} 壓鑄鋁角座`,`含 ${PR.bolt} 螺絲＋T 型螺帽×2`,joints,'個',PR.bracket);
+  A('nut',`${PR.bolt} T 型螺帽＋內六角螺絲`,`槽 ${PR.slot} mm`,joints*2,'組',PR.nut);
+  A('cap',`${S.profile} 端蓋`,'黑色 PA',posts*(S.base==='none'?2:1),'個',PR.cap);
+  if(S.base==='foot') A('foot','調整腳座',`${PR.bolt}×60 Ø60`,posts,'個',120);
+  if(S.base==='caster') A('caster','2.5" 萬向輪(附煞車)','荷重 60kg',posts,'個',380);
+  const nP=parts.filter(p=>p.kind==='panel').length; if(nP) A('seal','嵌板防震膠條',`入槽 ${ins()} mm`,Math.ceil(parts.filter(p=>p.kind==='panel').reduce((s,p)=>s+2*(p.w+p.h)/1000,0)),'m',12);
+  if(S.top) A('topfix','檯面固定螺絲組','M6 沉頭＋T 型螺帽',posts*2,'組',8);
+  const aluCost=Object.values(alu).reduce((s,g)=>s+g.qty*g.len/1000*PROFILES[g.series].kg*st.aluKg*(1+g.color.up),0);
+  let area=0, panCost=0; Object.values(pan).forEach(g=>{ const a=g.qty*g.w*g.h/1e6; area+=a; panCost+=a*g.unit; });
+  const accCost=acc.reduce((s,a)=>s+a.qty*a.price,0), cutCost=cuts*st.cut, hrs=joints*0.12+nP*0.2+posts*0.1+1, labCost=hrs*st.labor;
+  const sub=aluCost+cutCost+accCost+panCost+labCost, mg=sub*st.margin/100, pre=sub+mg, tax=pre*st.tax/100;
+  return {alu:Object.values(alu).sort((a,b)=>b.len-a.len),pan:Object.values(pan),acc,nest:Object.values(nest),lenTot,kgTot,cuts,area,hrs,joints,
+    bars:Object.values(nest).reduce((s,g)=>s+g.res.bars.length,0),cost:{aluCost,cutCost,accCost,panCost,labCost,sub,mg,pre,tax,total:pre+tax}};
+}
+
+/* ========== 6. Three.js 場景（WebGL 失敗要能降級） ========== */
+const stage=$('stage'), c3d=$('c3d');
+let renderer=null, HAS3D=false, GLERR='';
+function tryGL(o){ try{ return new THREE.WebGLRenderer(Object.assign({canvas:c3d,alpha:true,preserveDrawingBuffer:true},o)); }catch(e){ GLERR=e.message||String(e); return null; } }
+renderer=tryGL({antialias:true})||tryGL({antialias:false,powerPreference:'low-power'});
+if(renderer){ HAS3D=true; renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; }
+const scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(38,1,10,200000), controls=new THREE.OrbitControls(camera,c3d);
+controls.enableDamping=true; controls.screenSpacePanning=true; controls.maxPolarAngle=Math.PI*0.495;
+if(HAS3D){ try{ const pm=new THREE.PMREMGenerator(renderer), es=new THREE.Scene();
+  const g=new THREE.SphereGeometry(100,32,16), col=[], top=new THREE.Color('#e0f2fe'), mid=new THREE.Color('#64748b'), bot=new THREE.Color('#0f172a'), pos=g.attributes.position;
+  for(let i=0;i<pos.count;i++){ const t=pos.getY(i)/100, c=t>0?mid.clone().lerp(top,t):mid.clone().lerp(bot,-t); col.push(c.r,c.g,c.b); }
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3)); es.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+  [[0,80,0],[90,30,20],[-80,40,-40]].forEach(p=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(80,60),new THREE.MeshBasicMaterial({color:new THREE.Color(5,5,5.4),side:THREE.DoubleSide})); m.position.set(...p); m.lookAt(0,0,0); es.add(m); });
+  scene.environment=pm.fromScene(es,0.03).texture; }catch(e){ console.warn(e); } }
+scene.add(new THREE.HemisphereLight(0xdbeafe,0x1e293b,0.55));
+const sun=new THREE.DirectionalLight(0xffffff,1.6); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-0.0004; scene.add(sun,sun.target);
+const fill=new THREE.DirectionalLight(0x93c5fd,0.45); scene.add(fill);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShadowMaterial({opacity:.4})); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+let grid=null; const model=new THREE.Group(), extras=new THREE.Group(), dimGroup=new THREE.Group(); scene.add(model,extras,dimGroup);
+let pickables=[], dimLabels=[]; const disposables=[];
+const lin=h=>new THREE.Color(h).convertSRGBToLinear();
+const matCache={}, geoCache={}, edgeCache={};
+const aluMat=c=>matCache[c.hex]||(matCache[c.hex]=new THREE.MeshStandardMaterial({color:lin(c.hex),metalness:c.metal,roughness:c.rough,envMapIntensity:1.15}));
+const steel=new THREE.MeshStandardMaterial({color:lin('#3b3f46'),metalness:.7,roughness:.35}), rubber=new THREE.MeshStandardMaterial({color:lin('#1a1a1a'),roughness:.85});
+const castM=new THREE.MeshStandardMaterial({color:lin('#a3abb5'),metalness:.6,roughness:.42});
+const edgeMat=new THREE.LineBasicMaterial({color:0x0b1220,transparent:true,opacity:.3});
+const profGeo=(s,l)=>geoCache[s+l.toFixed(1)]||(geoCache[s+l.toFixed(1)]=profileExtrude(s,l));
+function meshTex(){ const cv=document.createElement('canvas'); cv.width=cv.height=64; const x=cv.getContext('2d'); x.fillStyle='#000'; x.fillRect(0,0,64,64); x.fillStyle='#fff'; x.fillRect(0,0,64,6); x.fillRect(0,0,6,64);
+  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t; }
+const MESH_TEX=meshTex();
+function put(m,x,y,z,grp){ m.position.set(x,y,z); m.castShadow=true; (grp||extras).add(m); return m; }
+function makePart(p){
+  if(isAlu(p)){ const c=partAlu(p), m=new THREE.Mesh(profGeo(p.series,p.len),aluMat(c));
+    if(p.axis==='y') m.rotation.x=-Math.PI/2; else if(p.axis==='x') m.rotation.y=Math.PI/2;
+    m.castShadow=m.receiveShadow=true;
+    const ek=p.series+p.len.toFixed(1); m.add(new THREE.LineSegments(edgeCache[ek]||(edgeCache[ek]=new THREE.EdgesGeometry(profGeo(p.series,p.len),30)),edgeMat)); return m; }
+  const col=partCol(p); let g, mat;
+  if(p.kind==='plate'){ g=boxGeo(p.w,p.t,p.h); mat=new THREE.MeshStandardMaterial({color:lin(col),roughness:.6,metalness:.05}); }
+  else { const def=PANELS[S.panel];
+    if(def.tex){ const t=MESH_TEX.clone(); t.needsUpdate=true; t.repeat.set(p.w/def.pitch,p.h/def.pitch); disposables.push(t);
+      g=setPrism(new THREE.PlaneGeometry(p.w,p.h),rect(p.w,p.h),[],-p.t/2,p.t/2); mat=new THREE.MeshStandardMaterial({color:lin(col),alphaMap:t,transparent:true,depthWrite:false,side:THREE.DoubleSide,metalness:.45,roughness:.5}); }
+    else if(def.clear){ g=boxGeo(p.w,p.h,p.t); mat=new THREE.MeshPhysicalMaterial({color:lin(col),transparent:true,opacity:.22,roughness:.05,clearcoat:1,depthWrite:false,side:THREE.DoubleSide}); }
+    else { g=boxGeo(p.w,p.h,p.t); mat=new THREE.MeshStandardMaterial({color:lin(col),metalness:def.metal?.7:.15,roughness:def.metal?.32:.55}); } }
+  disposables.push(g,mat); const m=new THREE.Mesh(g,mat); m.castShadow=m.receiveShadow=!PANELS[S.panel].tex||p.kind==='plate';
+  if(p.dir==='D') m.rotation.y=Math.PI/2; return m;
+}
+/* 接點角座：InstancedMesh（數百個也流暢），基準：X=沿梁離開立柱、Y=離開梁面、Z=X×Y（保持 det=+1，STEP 不會翻面） */
+let bracketGeos=null, bracketP=0;
+function buildBrackets(){
+  const P=P_(); if(bracketP!==P){ const b=P*0.85,t=P*0.12,w=P*0.36;
+    const tri=new THREE.Shape([new THREE.Vector2(t,t),new THREE.Vector2(b*.9,t),new THREE.Vector2(t,b*.9)]);
+    bracketGeos=[setPrism(new THREE.BoxGeometry(t,b,w).translate(t/2,b/2,0),rect(t,b),[],-w/2,w/2,new THREE.Matrix4().makeTranslation(t/2,b/2,0)),
+      setPrism(new THREE.BoxGeometry(b,t,w).translate(b/2,t/2,0),rect(b,t),[],-w/2,w/2,new THREE.Matrix4().makeTranslation(b/2,t/2,0)),
+      setPrism(new THREE.ExtrudeGeometry(tri,{depth:w*.2,bevelEnabled:false}).translate(0,0,-w*.1),[[t,t],[b*.9,t],[t,b*.9]],[],-w*.1,w*.1)]; bracketP=P; }
+  const mats=[], last=GEO.ys.length-1;
+  parts.filter(p=>p.kind==='beam').forEach(p=>{
+    const ax=p.axis==='x'?new THREE.Vector3(1,0,0):new THREE.Vector3(0,0,1), nv=p.axis==='x'?new THREE.Vector3(0,0,1):new THREE.Vector3(1,0,0);
+    const inner=p.dir==='W'?(p.line===0?1:-1):(p.line===0?1:-1), yd=p.lvl===0?1:-1;
+    [1,-1].forEach(s=>{ const face=new THREE.Vector3(p.box.cx,p.box.cy,p.box.cz).addScaledVector(ax,-s*p.len/2);
+      const X=ax.clone().multiplyScalar(s), Y=new THREE.Vector3(0,yd,0), Z=new THREE.Vector3().crossVectors(X,Y);
+      mats.push(new THREE.Matrix4().makeBasis(X,Y,Z).setPosition(face.add(new THREE.Vector3(0,yd*P/2,0)).addScaledVector(nv,inner*P*.22))); });
+  });
+  const grp=new THREE.Group(); grp.userData.hw='角座';
+  bracketGeos.forEach(g=>{ const im=new THREE.InstancedMesh(g,castM,mats.length); mats.forEach((m,i)=>im.setMatrixAt(i,m)); im.castShadow=true; im.userData.part={id:'HW-brk',kind:'hw',name:`${S.profile} 壓鑄鋁角座`}; pickables.push(im); grp.add(im); });
+  model.add(grp);
+}
+function build3D(){
+  disposables.splice(0).forEach(o=>o.dispose&&o.dispose()); [model,extras].forEach(g=>{ while(g.children.length) g.remove(g.children[0]); }); pickables=[];
+  const bh=BASES[S.base].h; model.position.y=bh;
+  parts.forEach(p=>{ const o=makePart(p); o.userData.part=p; o.position.set(p.box.cx,p.box.cy,p.box.cz); model.add(o); pickables.push(o); });
+  buildBrackets();
+  if(S.base!=='none') parts.filter(p=>p.kind==='post').forEach(p=>{ const {cx,cz}=p.box, P=P_();
+    const mk=(g,mat)=>{ disposables.push(g); return new THREE.Mesh(g,mat); };
+    if(S.base==='foot'){ put(mk(boxGeo(P,6,P),steel),cx,bh-3,cz); put(mk(cylGeo(P*.12+3,bh-14),steel),cx,(bh-14)/2+8,cz); put(mk(cylGeo(30,10),rubber),cx,5,cz); }
+    else { put(mk(boxGeo(P*1.6,6,P*1.6),steel),cx,bh-3,cz); const w=put(mk(cylGeo(36,22),rubber),cx,36,cz); w.rotation.x=Math.PI/2; } });
+  const M=Math.max(S.w,S.d,S.h), gs=Math.ceil(Math.max(S.w,S.d)*2.4/500)*500; ground.scale.set(gs*2,gs*2,1);
+  if(grid){ scene.remove(grid); grid.geometry.dispose(); } grid=new THREE.GridHelper(gs,gs/250,0x3b82f6,0x1e3a5f); grid.material.transparent=true; grid.material.opacity=.3; scene.add(grid);
+  sun.position.set(M*.9,M*1.6,M*1.1); const sc=sun.shadow.camera; sc.left=sc.bottom=-M*1.1; sc.right=sc.top=M*1.1; sc.far=M*5; sc.updateProjectionMatrix(); fill.position.set(-M,M*.6,M*.4);
+  buildDims(); applySel();
+}
+/* 3D 尺寸標註（HTML 標籤，可點擊修改） */
+function buildDims(){
+  while(dimGroup.children.length) dimGroup.remove(dimGroup.children[0]); $('labels').innerHTML=''; dimLabels=[];
+  if(view!=='3d') return;
+  const {xs,ys,P}=GEO, W=S.w,D=S.d,H=S.h, M=Math.max(W,D,H), o1=M*.07, bh=BASES[S.base].h, segs=[], V=(x,y,z)=>new THREE.Vector3(x,y+bh,z), tk=M*.012;
+  const dim=(a,b,off,text,cls,ed)=>{ const n=off.clone().normalize(), a2=a.clone().add(off), b2=b.clone().add(off);
+    segs.push(a,a2.clone().addScaledVector(n,tk),b,b2.clone().addScaledVector(n,tk),a2,b2);
+    const el=document.createElement('div'); el.className='dim '+(cls||''); el.textContent=text;
+    el.onclick=e=>{ e.stopPropagation(); openEditor(e.clientX,e.clientY,ed[0],ed[1],ed[2]); }; $('labels').appendChild(el); dimLabels.push({el,pos:a2.clone().lerp(b2,.5)}); };
+  dim(V(-W/2,H,D/2),V(W/2,H,D/2),new THREE.Vector3(0,o1,0),'W '+fmt(W),'tot',['總寬 W',W,v=>setTotal('w',v)]);
+  dim(V(W/2,H,-D/2),V(W/2,H,D/2),new THREE.Vector3(0,o1,0),'D '+fmt(D),'tot',['總深 D',D,v=>setTotal('d',v)]);
+  dim(V(-W/2,0,D/2),V(-W/2,H,D/2),new THREE.Vector3(-o1*2,0,0),'H '+fmt(H),'tot',['總高 H',H,v=>setTotal('h',v)]);
+  if(S.cols>1) S.spW.forEach((s,c)=>dim(V(xs[c]+P/2,0,D/2),V(xs[c+1]-P/2,0,D/2),new THREE.Vector3(0,0,o1),fmt(s),'',[`第 ${c+1} 格淨距`,s,v=>setSpan('w',c,v)]));
+  S.spH.forEach((s,k)=>dim(V(-W/2,ys[k]+P/2,D/2),V(-W/2,ys[k+1]-P/2,D/2),new THREE.Vector3(-o1,0,0),`L${k+1} ${fmt(s)}`,'lv',[`第 ${k+1} 層淨高`,s,v=>setSpan('h',k,v)]));
+  const l=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(segs),new THREE.LineBasicMaterial({color:0x38bdf8,depthTest:false})); l.renderOrder=10; dimGroup.add(l);
+}
+const _v=new THREE.Vector3();
+function updateLabels(){ const w=stage.clientWidth,h=stage.clientHeight; dimLabels.forEach(d=>{ _v.copy(d.pos).project(camera);
+  d.el.style.display=_v.z>1?'none':''; d.el.style.transform=`translate(${(_v.x+1)/2*w}px,${(1-_v.y)/2*h}px) translate(-50%,-50%)`; }); }
+
+/* 選取：同 id 的所有 mesh 一起高亮（含 InstancedMesh） */
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2(); let selHelper=null, downPt=null;
+function pick(e){ const r=c3d.getBoundingClientRect(); mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); ray.setFromCamera(mouse,camera); const h=ray.intersectObjects(pickables,false)[0]; return h?h.object:null; }
+function applySel(){
+  if(selHelper){ scene.remove(selHelper); selHelper=null; }
+  pickables.forEach(o=>{ if(o.userData.orig){ o.material=o.userData.orig; delete o.userData.orig; } });
+  const objs=pickables.filter(o=>o.userData.part.id===selectedId); if(!objs.length) selectedId=null;
+  objs.forEach(o=>{ o.userData.orig=o.material; const m=o.material.clone(); m.emissive=new THREE.Color(0x1d6fe0); m.emissiveIntensity=.7; o.material=m; disposables.push(m); });
+  if(objs.length===1&&objs[0].userData.part.kind!=='hw'){ selHelper=new THREE.BoxHelper(objs[0],0x38bdf8); selHelper.material.depthTest=false; scene.add(selHelper); }
+  renderSel();
+}
+function select(id){ selectedId=id; applySel(); }
+c3d.addEventListener('pointerdown',e=>{ downPt=[e.clientX,e.clientY]; closeEditor(); });
+c3d.addEventListener('pointerup',e=>{ if(!downPt||e.button!==0) return; const mv=Math.hypot(e.clientX-downPt[0],e.clientY-downPt[1]); downPt=null; if(mv<=4){ const o=pick(e); select(o?o.userData.part.id:null); } });
+c3d.addEventListener('pointermove',e=>{ if(e.buttons) return; const o=pick(e), tip=$('tip'); c3d.style.cursor=o?'pointer':'grab'; if(!o){ tip.style.display='none'; return; }
+  const p=o.userData.part, r=stage.getBoundingClientRect();
+  tip.innerHTML=isAlu(p)?`<b>${p.name}</b> ${p.series} L=${fmt(p.len)}`:p.kind==='hw'?`<b>${p.name}</b>`:`<b>${p.name}</b> ${fmt(p.w)}×${fmt(p.h)}×t${p.t}`;
+  tip.style.display='block'; tip.style.left=(e.clientX-r.left+14)+'px'; tip.style.top=(e.clientY-r.top+14)+'px'; });
+let edApply=null;
+function openEditor(cx,cy,t,v,f,h){ const r=stage.getBoundingClientRect(), ed=$('editor'); $('ed-t').textContent=t+' (mm)'; $('ed-v').value=Math.round(v); $('ed-h').textContent=h||'Enter 確定／Esc 取消'; edApply=f; ed.hidden=false;
+  ed.style.left=Math.min(Math.max(8,cx-r.left-105),r.width-218)+'px'; ed.style.top=Math.min(Math.max(8,cy-r.top+14),r.height-140)+'px'; setTimeout(()=>{ $('ed-v').focus(); $('ed-v').select(); },10); }
+function closeEditor(){ $('editor').hidden=true; edApply=null; }
+function commitEditor(){ const v=parseFloat($('ed-v').value), f=edApply; closeEditor(); if(f&&!isNaN(v)) f(v); }
+$('ed-o').onclick=commitEditor; $('ed-c').onclick=closeEditor; $('ed-v').onkeydown=e=>{ if(e.key==='Enter') commitEditor(); if(e.key==='Escape') closeEditor(); };
+function fitView(kind){ const bh=BASES[S.base].h, R=Math.hypot(S.w,S.d,S.h)/2*.95, a=Math.max(.6,c3d.clientWidth/Math.max(1,c3d.clientHeight));
+  const dist=R/Math.sin(camera.fov*Math.PI/360)/Math.min(1,a), dirs={iso:[1.05,.62,1.35],front:[0,.06,1],right:[1,.06,0],top:[0,1,.002]};
+  controls.target.set(0,bh+S.h/2,0); camera.position.copy(controls.target).addScaledVector(new THREE.Vector3(...dirs[kind||'iso']).normalize(),dist); controls.update(); }
+function resize(){ const w=stage.clientWidth,h=stage.clientHeight; if(!w||!h) return; if(renderer) renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); if(view==='2d') draw2D(); }
+if(window.ResizeObserver) new ResizeObserver(resize).observe(stage); else addEventListener('resize',resize);
+(function loop(){ requestAnimationFrame(loop); if(view!=='3d'||!HAS3D) return; controls.update(); if(selHelper) selHelper.update(); renderer.render(scene,camera); updateLabels(); })();
+
+/* ========== 7. 2D 三視圖：只用 PdfCtx 支援的 Canvas API，才能同時畫螢幕與向量 PDF ========== */
+let hits2d=[];
+function draw2D(opt){
+  let x,CW,CH;
+  if(opt){ x=opt.ctx; CW=opt.w; CH=opt.h; }
+  else { const cv=$('c2d'), r=cv.getBoundingClientRect(), dpr=devicePixelRatio||1; if(!r.width) return; cv.width=r.width*dpr; cv.height=r.height*dpr; x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); CW=r.width; CH=r.height; }
+  const saveHits=hits2d; hits2d=[];
+  const W=S.w,D=S.d,H=S.h+(S.top?S.topT:0), M=Math.max(W,D,H), gap=M*.24, P=P_();
+  x.fillStyle='#fff'; x.fillRect(0,0,CW,CH); x.strokeStyle='#0f172a'; x.lineWidth=1.5; x.strokeRect(8.5,8.5,CW-17,CH-17);
+  const xmin=-M*.2, xmax=W+gap+D+M*.08, ymin=-M*.2, ymax=H+gap+D+M*.1, tb=56;
+  let sc=Math.min((CW-40)/(xmax-xmin),(CH-30-tb)/(ymax-ymin));
+  if(opt&&opt.std){ const N0=96/(sc*25.4), STD=[1,2,5,10,15,20,25,30,40,50,75,100,150,200]; sc=96/((STD.find(v=>v>=N0)||Math.ceil(N0/100)*100)*25.4); }
+  const ox=(CW-(xmax-xmin)*sc)/2, oy=CH-tb-12-(CH-tb-12-(ymax-ymin)*sc)/2, X=v=>ox+(v-xmin)*sc, Y=v=>oy-(v-ymin)*sc;
+  const views=[{n:'前視圖 FRONT',u:b=>[b.cx+W/2,b.sx],v:b=>[b.cy,b.sy],d:b=>b.cz,ox:0,oy:0,w:W,h:H},{n:'俯視圖 TOP',u:b=>[b.cx+W/2,b.sx],v:b=>[D/2-b.cz,b.sz],d:b=>b.cy,ox:0,oy:H+gap,w:W,h:D},
+    {n:'右側視圖 RIGHT',u:b=>[D/2-b.cz,b.sz],v:b=>[b.cy,b.sy],d:b=>b.cx,ox:W+gap,oy:0,w:D,h:H}];
+  const hatchFill=c=>x.isPdf?{__hatch:c}:(()=>{ const cv=document.createElement('canvas'); cv.width=cv.height=8; const g=cv.getContext('2d'); g.strokeStyle=c; g.globalAlpha=.55; g.beginPath(); g.moveTo(0,8); g.lineTo(8,0); g.stroke(); return x.createPattern(cv,'repeat'); })();
+  views.forEach(vw=>{
+    parts.slice().sort((a,b)=>vw.d(a.box)-vw.d(b.box)).forEach(p=>{ const [cu,su]=vw.u(p.box),[cv,sv]=vw.v(p.box), x0=X(vw.ox+cu-su/2), y0=Y(vw.oy+cv+sv/2), w=su*sc, h=sv*sc;
+      if(isPanel(p)){ x.fillStyle=p.kind==='plate'?partCol(p):(PANELS[S.panel].tex?hatchFill(partCol(p)):(PANELS[S.panel].clear?'rgba(125,211,252,.25)':partCol(p)+'66')); x.fillRect(x0,y0,w,h); x.strokeStyle='#334155'; x.lineWidth=.6; x.strokeRect(x0,y0,w,h); }
+      else { const c=partAlu(p).hex; x.fillStyle=new THREE.Color(c).getHSL({}).l<.3?'#94a3b8':c; x.fillRect(x0,y0,w,h); x.strokeStyle='#1e293b'; x.lineWidth=.9; x.strokeRect(x0,y0,w,h); } });
+    x.strokeStyle='#64748b'; x.lineWidth=1; if(vw.oy===0){ x.beginPath(); x.moveTo(X(vw.ox-M*.03),Y(0)); x.lineTo(X(vw.ox+vw.w+M*.03),Y(0)); x.stroke(); }
+    x.fillStyle='#0f172a'; x.font='700 13px "Microsoft JhengHei",sans-serif'; x.textAlign='center'; x.textBaseline='alphabetic'; x.fillText(vw.n,X(vw.ox+vw.w/2),Y(vw.oy+vw.h)-10);
+  });
+  const dim=(x1,y1,x2,y2,off,text,ed,color)=>{ const hor=Math.abs(y1-y2)<1e-6; color=color||'#0369a1'; x.strokeStyle=color; x.fillStyle=color; x.lineWidth=.8; x.setLineDash([]);
+    const a=hor?[X(x1),Y(y1+off)]:[X(x1+off),Y(y1)], b=hor?[X(x2),Y(y2+off)]:[X(x2+off),Y(y2)];
+    x.beginPath(); if(hor){ x.moveTo(X(x1),Y(y1)); x.lineTo(a[0],a[1]+(off<0?4:-4)); x.moveTo(X(x2),Y(y2)); x.lineTo(b[0],b[1]+(off<0?4:-4)); } else { x.moveTo(X(x1),Y(y1)); x.lineTo(a[0]+(off<0?-4:4),a[1]); x.moveTo(X(x2),Y(y2)); x.lineTo(b[0]+(off<0?-4:4),b[1]); }
+    x.moveTo(a[0],a[1]); x.lineTo(b[0],b[1]); x.stroke();
+    const an=Math.atan2(b[1]-a[1],b[0]-a[0]); [[a,an],[b,an+Math.PI]].forEach(([p,t])=>{ x.beginPath(); x.moveTo(p[0],p[1]); x.lineTo(p[0]+7*Math.cos(t+.3),p[1]+7*Math.sin(t+.3)); x.lineTo(p[0]+7*Math.cos(t-.3),p[1]+7*Math.sin(t-.3)); x.closePath(); x.fill(); });
+    const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2; x.save(); x.translate(mx,my); if(!hor) x.rotate(-Math.PI/2);
+    x.font='700 11px ui-monospace,Consolas,monospace'; const tw=x.measureText(text).width+8; x.fillStyle='#fff'; x.fillRect(-tw/2,-8,tw,15); x.fillStyle=color; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,0,0); x.restore();
+    if(ed) hits2d.push({x:mx-(hor?tw:15)/2,y:my-(hor?15:tw)/2,w:hor?tw:15,h:hor?15:tw,ed}); };
+  const {xs,ys}=GEO, o1=-M*.07, o2=-M*.14;
+  dim(0,0,W,0,o2,'W '+fmt(W),['總寬 W',W,v=>setTotal('w',v)],'#1e3a8a');
+  S.spW.forEach((s,c)=>dim(xs[c]+P/2+W/2,0,xs[c+1]-P/2+W/2,0,o1,fmt(s),[`第 ${c+1} 格淨距`,s,v=>setSpan('w',c,v)]));
+  dim(0,0,0,S.h,o2,'H '+fmt(S.h),['總高 H',S.h,v=>setTotal('h',v)],'#1e3a8a');
+  S.spH.forEach((s,k)=>dim(0,ys[k]+P/2,0,ys[k+1]-P/2,o1,fmt(s),[`第 ${k+1} 層淨高`,s,v=>setSpan('h',k,v)],'#6d28d9'));
+  dim(0,H+gap,0,H+gap+D,o2,'D '+fmt(D),['總深 D',D,v=>setTotal('d',v)],'#1e3a8a');
+  const tbx=CW-470, tby=CH-tb-10, scaleN=Math.round(96/(sc*25.4));
+  x.strokeStyle='#0f172a'; x.lineWidth=1; x.strokeRect(tbx,tby,460,tb); [150,300,380].forEach(v=>{ x.beginPath(); x.moveTo(tbx+v,tby); x.lineTo(tbx+v,tby+tb); x.stroke(); });
+  x.beginPath(); x.moveTo(tbx+150,tby+tb/2); x.lineTo(tbx+460,tby+tb/2); x.stroke();
+  x.textAlign='left'; x.textBaseline='middle'; x.fillStyle='#0f172a'; x.font='700 14px "Microsoft JhengHei",sans-serif'; x.fillText('鋁擠型機架',tbx+10,tby+20);
+  x.font='11px "Microsoft JhengHei",sans-serif'; x.fillText(`${S.w}×${S.d}×${S.h} mm`,tbx+10,tby+40);
+  [[`型材 ${S.profile}／${aluDef(S.alu).name}`,150,0],[opt&&opt.paper?`單位 mm／${opt.paper}`:'單位 mm',300,0],[`比例 1:${scaleN}`,380,0],[`側板 ${PANELS[S.panel].short}`,150,1],['第三角法',300,1],[new Date().toISOString().slice(0,10),380,1]]
+    .forEach(([t,cx,ry])=>x.fillText(t,tbx+cx+8,tby+ry*tb/2+tb/4));
+  if(opt) hits2d=saveHits;
+  return {scaleN};
+}
+$('c2d').onclick=e=>{ const r=e.target.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, h=hits2d.find(h=>mx>=h.x&&mx<=h.x+h.w&&my>=h.y&&my<=h.y+h.h); if(h) openEditor(e.clientX,e.clientY,...h.ed); else closeEditor(); };
+
+/* ========== 8. UI 渲染 ========== */
+function renderTop(){
+  $('in-w').value=S.w; $('in-d').value=S.d; $('in-h').value=S.h; $('in-cols').value=S.cols; $('in-levels').value=S.levels; $('in-lock').checked=S.lock;
+  const list=(a,id)=>$(id).innerHTML=spArr(a).map((v,i)=>`<input type="number" data-a="${a}" data-i="${i}" value="${Math.round(v)}">`).join('');
+  list('w','sp-w'); list('h','sp-h');
+}
+function renderSide(){
+  $('prof-cards').innerHTML=Object.keys(PROFILES).map(k=>`<div class="pc ${k===S.profile?'on':''}" data-p="${k}">${profileSVG(k,30,k===S.profile?'#7dd3fc':'#cbd5e1')}${k}<small>${PROFILES[k].kg} kg/m</small></div>`).join('');
+  $('alu-sw').innerHTML=ALU_COLORS.map(c=>`<div class="swc ${S.alu===c.id?'on':''}" data-a="${c.id}" title="${c.name}" style="background:linear-gradient(135deg,#fff8,${c.hex} 45%,${c.hex} 70%,#0006)"></div>`).join('');
+  $('panel-cards').innerHTML=Object.entries(PANELS).map(([k,v])=>`<div class="pc ${k===S.panel?'on':''}" data-pn="${k}">${v.short}<small>${v.price?'NT$'+v.price+'/m²':'—'}</small></div>`).join('');
+  document.querySelectorAll('[data-side]').forEach(c=>c.checked=S.sides[c.dataset.side]);
+  $('panel-sw').innerHTML=PANEL_COLORS.map(c=>`<div class="swc ${c===S.panelColor?'on':''}" data-pc="${c}" style="background:${c}"></div>`).join('');
+  $('top-on').checked=S.top; $('top-t').value=S.topT; $('top-col').value=S.topColor;
+  $('base-cards').innerHTML=Object.entries(BASES).map(([k,v])=>`<div class="pc ${k===S.base?'on':''}" data-b="${k}">${v.name}<small>${v.h?'+'+v.h+' mm':'—'}</small></div>`).join('');
+}
+function renderSel(){
+  const body=$('sel-body'), p=selectedId==='HW-brk'?{id:'HW-brk',kind:'hw',name:`${S.profile} 壓鑄鋁角座`}:parts.find(q=>q.id===selectedId);
+  $('sel-clear').style.display=p?'':'none';
+  if(!p){ body.innerHTML='<div class="note" style="padding:0">在 3D 點選任一料件即可修改尺寸或個別指定顏色；點藍色尺寸標籤可直接輸入。</div>'; return; }
+  if(p.kind==='hw'){ const a=BOM.acc.find(a=>a.key==='brk'); body.innerHTML=`<div class="kv"><b>配件</b><span>${p.name}</span><b>數量</b><span>${a?a.qty:0} 個</span><b>單價</b><span>NT$ ${a?a.price:0}（五金配件頁可改）</span></div>`; return; }
+  const E=[];
+  if(p.kind==='post') E.push(['立柱長＝總高 H',S.h,v=>setTotal('h',v)]);
+  if(p.kind==='beam'&&p.dir==='W') E.push(['裁切長度（格淨距）',p.len,v=>setSpan('w',p.bay,v)]);
+  if(p.kind==='beam'&&p.dir==='D') E.push(['總深 D',S.d,v=>setTotal('d',v)]);
+  if(p.kind==='panel'&&typeof p.lvl==='number'&&S.spH[p.lvl]!=null) E.push([`第 ${p.lvl+1} 層淨高`,S.spH[p.lvl],v=>setSpan('h',p.lvl,v)]);
+  const spec=isAlu(p)?`<b>型材</b><span>${p.series}</span><b>裁切長度</b><span style="color:#7dd3fc;font-weight:700">${fmt(p.len,1)} mm</span><b>顏色</b><span>${partAlu(p).name}</span>`
+    :`<b>尺寸</b><span style="color:#7dd3fc;font-weight:700">${fmt(p.w)} × ${fmt(p.h)} × t${p.t}</span><b>顏色</b><span><i class="dot" style="background:${partCol(p)}"></i>${partCol(p)}</span>`;
+  const sw=isAlu(p)?ALU_COLORS.map(c=>`<div class="swc" data-oc="${c.id}" title="${c.name}" style="background:${c.hex}"></div>`).join(''):PANEL_COLORS.map(c=>`<div class="swc" data-oc="${c}" style="background:${c}"></div>`).join('');
+  body.innerHTML=`<div class="kv"><b>料件</b><span>${p.name} <span class="tag">${p.id}</span></span>${spec}</div>`+E.map((e,i)=>`<div class="ed-row"><label>${e[0]}</label><input type="number" data-e="${i}" value="${Math.round(e[1])}"></div>`).join('')+
+    `<div class="sub">此料件顏色</div><div class="sw">${sw}</div><div style="display:flex;gap:6px;margin-top:8px"><button class="btn vb" id="ov-same">套用至所有「${p.name}」</button><button class="btn vb" id="ov-reset">恢復預設</button></div>`;
+  body.querySelectorAll('[data-e]').forEach(i=>i.onchange=()=>E[+i.dataset.e][2](parseFloat(i.value)));
+  const setOv=(v,all)=>{ (all?parts.filter(q=>q.name===p.name):[p]).forEach(q=>{ if(v==null) delete S.overrides[q.id]; else S.overrides[q.id]=v; }); update(); };
+  body.querySelectorAll('[data-oc]').forEach(el=>el.onclick=()=>setOv(el.dataset.oc));
+  $('ov-same').onclick=()=>setOv(S.overrides[p.id]||null,true); $('ov-reset').onclick=()=>setOv(null);
+}
+function renderBOM(){
+  const b=BOM, el=$('bbody'), st=S.price, c=b.cost;
+  $('t-len').textContent=fmt(b.lenTot/1000,1); $('t-kg').textContent=fmt(b.kgTot,1); $('t-cost').textContent=money(c.total);
+  document.querySelectorAll('.btab').forEach(t=>t.classList.toggle('on',t.dataset.t===bomTab));
+  const T=(h,rows)=>`<table><thead><tr>${h.map(x=>`<th class="${/數量|長度|kg|金額|單價|面積|寬|高/.test(x)?'n':''}">${x}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  if(bomTab==='alu') el.innerHTML=T(['#','品名','型材','裁切長度 mm','數量','小計 kg','顏色'],b.alu.map((g,i)=>`<tr><td>${i+1}</td><td>${g.name}</td><td>${g.series}</td><td class="n">${fmt(g.len,1)}</td><td class="n">${g.qty}</td><td class="n">${fmt(g.len/1000*PROFILES[g.series].kg*g.qty,2)}</td><td><i class="dot" style="background:${g.color.hex}"></i>${g.color.name}</td></tr>`).concat([`<tr class="sum"><td></td><td>合計</td><td></td><td></td><td class="n">${b.cuts}</td><td class="n">${fmt(b.kgTot,2)}</td><td></td></tr>`]));
+  if(bomTab==='panel') el.innerHTML=T(['#','品名','材質','寬 mm','高 mm','厚','數量','面積 m²','金額'],b.pan.map((g,i)=>`<tr><td>${i+1}</td><td>${g.name}</td><td>${g.type}</td><td class="n">${fmt(g.w)}</td><td class="n">${fmt(g.h)}</td><td class="n">${g.t}</td><td class="n">${g.qty}</td><td class="n">${fmt(g.w*g.h/1e6*g.qty,3)}</td><td class="n">${fmt(g.w*g.h/1e6*g.qty*g.unit)}</td></tr>`))+`<div class="note">嵌板下料＝開口淨距＋四邊入槽 ${ins()} mm</div>`;
+  if(bomTab==='acc'){ el.innerHTML=T(['#','品名','規格','數量','單位','單價 NT$（可改）','金額'],b.acc.map((a,i)=>`<tr><td>${i+1}</td><td>${a.name}</td><td>${a.spec}</td><td class="n">${a.qty}</td><td>${a.unit}</td><td class="n"><input type="number" data-acc="${a.key}" value="${a.price}"></td><td class="n">${fmt(a.qty*a.price)}</td></tr>`));
+    el.querySelectorAll('[data-acc]').forEach(i=>i.onchange=()=>{ S.accPrice[i.dataset.acc]=parseFloat(i.value)||0; update(); }); }
+  if(bomTab==='nest'){ const pal=['#7dd3fc','#86efac','#fcd34d','#c4b5fd','#fda4af','#5eead4'];
+    el.innerHTML=b.nest.map(g=>{ const cm={}; [...new Set(g.lens)].forEach((l,i)=>cm[l]=pal[i%pal.length]);
+      return `<div class="note">${g.series} ${g.color.name}：${g.res.bars.length} 支 × ${st.stock} mm，利用率 ${fmt(g.util*100,1)}%</div>`+g.res.bars.map((bar,i)=>`<div class="barrow"><span>#${i+1}</span><div class="bar">${bar.cuts.map(c=>`<div class="seg" style="width:${c/st.stock*100}%;background:${cm[c]}">${c/st.stock>.07?fmt(c):''}</div>`).join('')}</div><span>餘 ${fmt(bar.rem)}</span></div>`).join(''); }).join(''); }
+  if(bomTab==='est'){ el.innerHTML=T(['項目','依據','金額 NT$'],[['鋁材',`${fmt(b.kgTot,1)} kg × ${st.aluKg}`,c.aluCost],['裁切',`${b.cuts} 刀 × ${st.cut}`,c.cutCost],['板材',`${fmt(b.area,2)} m²`,c.panCost],['五金','',c.accCost],['工資',`${fmt(b.hrs,1)} h × ${st.labor}`,c.labCost],['管銷利潤',`${st.margin}%`,c.mg],['營業稅',`${st.tax}%`,c.tax]].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td class="n">${fmt(r[2])}</td></tr>`).concat([`<tr class="sum"><td>含稅總價</td><td></td><td class="n">${fmt(c.total)}</td></tr>`]))+
+      `<div class="note">${[['aluKg','鋁材 NT$/kg'],['cut','裁切 NT$/刀'],['labor','工資 NT$/h'],['margin','利潤 %'],['topM2','檯面 NT$/m²']].map(([k,l])=>`${l} <input type="number" data-st="${k}" value="${st[k]}">`).join('　')}<br>＊單價為參考值，請依實際報價修改。</div>`;
+    el.querySelectorAll('[data-st]').forEach(i=>i.onchange=()=>{ st[i.dataset.st]=parseFloat(i.value)||0; update(); }); }
+}
+function renderHUD(){ const n=k=>parts.filter(p=>p.kind===k).length;
+  $('hud').innerHTML=`<b>${S.w} × ${S.d} × ${S.h}</b> <span class="k">mm</span><br><span class="k">型材</span> ${S.profile}・${aluDef(S.alu).name}<br><span class="k">立柱</span> ${n('post')}　<span class="k">橫梁</span> ${n('beam')}　<span class="k">板</span> ${n('panel')+n('plate')}<br><span class="k">重量</span> <b>${fmt(BOM.kgTot,1)} kg</b>　<span class="k">估價</span> <b>${money(BOM.cost.total)}</b>`; }
+function update(){ parts=buildParts(); BOM=computeBOM(); build3D(); renderTop(); renderSide(); renderBOM(); renderHUD(); if(view==='2d') draw2D(); }
+
+/* ========== 9. 事件 ========== */
+document.querySelector('.topbar').addEventListener('change',e=>{ const t=e.target, v=parseFloat(t.value);
+  if(t.dataset.a) return setSpan(t.dataset.a,+t.dataset.i,v);
+  ({'in-w':()=>setTotal('w',v),'in-d':()=>setTotal('d',v),'in-h':()=>setTotal('h',v),'in-cols':()=>setCount('cols',v),'in-levels':()=>setCount('levels',v),'in-lock':()=>{S.lock=t.checked;}}[t.id]||(()=>{}))(); });
+document.querySelector('.side').addEventListener('click',e=>{ const t=e.target.closest('[data-p],[data-a],[data-pn],[data-pc],[data-b]'); if(!t) return; const d=t.dataset;
+  if(d.p){ S.profile=d.p; resetSpacing('w'); resetSpacing('h'); } if(d.a) S.alu=d.a; if(d.pn) S.panel=d.pn; if(d.pc) S.panelColor=d.pc; if(d.b) S.base=d.b; update(); });
+document.querySelectorAll('[data-side]').forEach(c=>c.onchange=()=>{ S.sides[c.dataset.side]=c.checked; update(); });
+$('top-on').onchange=e=>{ S.top=e.target.checked; update(); }; $('top-t').onchange=e=>{ S.topT=+e.target.value; update(); }; $('top-col').oninput=e=>{ S.topColor=e.target.value; update(); };
+$('sel-clear').onclick=()=>select(null);
+document.querySelectorAll('.btab').forEach(t=>t.onclick=()=>{ bomTab=t.dataset.t; renderBOM(); });
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>fitView(b.dataset.view));
+function switchView(v){ view=v; $('tab-3d').classList.toggle('on',v==='3d'); $('tab-2d').classList.toggle('on',v==='2d'); c3d.style.display=v==='3d'?'block':'none'; $('c2d').style.display=v==='2d'?'block':'none';
+  ['hud','hint'].forEach(i=>$(i).style.display=v==='3d'?'':'none'); closeEditor(); buildDims(); if(v==='2d') draw2D(); else resize(); }
+$('tab-3d').onclick=()=>{ if(HAS3D) switchView('3d'); else no3D(); }; $('tab-2d').onclick=()=>switchView('2d');
+
+/* ========== 10. 匯出 ========== */
+const baseName=()=>`機架_${S.w}x${S.d}x${S.h}`;
+$('btn-csv').onclick=()=>{ const q=v=>`"${String(v).replace(/"/g,'""')}"`, L=[['品名','型材/材質','長度或尺寸','數量','顏色'].map(q).join(',')];
+  BOM.alu.forEach(g=>L.push([g.name,g.series,g.len,g.qty,g.color.name].map(q).join(','))); BOM.pan.forEach(g=>L.push([g.name,g.type,`${g.w}x${g.h}x${g.t}`,g.qty,g.color].map(q).join(',')));
+  BOM.acc.forEach(a=>L.push([a.name,a.spec,'',a.qty,''].map(q).join(','))); L.push(['含稅總價','','','',Math.round(BOM.cost.total)].map(q).join(','));
+  download(new Blob(['﻿'+L.join('\r\n')],{type:'text/csv'}),baseName()+'_BOM.csv'); };
+$('btn-stp').onclick=()=>{ const keep=selectedId; if(keep) select(null);
+  const solids=collectSolids([model,extras],scene,o=>{ const p=o.userData.part; if(!p) return BASES[S.base].name; if(p.kind==='hw') return p.name; if(isAlu(p)) return `${p.name}_${p.series}_L${Math.round(p.len*10)/10}`; return `${p.name}_${Math.round(p.w)}x${Math.round(p.h)}x${p.t}`; });
+  const r=buildStepAssembly(solids,{asmName:baseName(),fileName:'frame.stp'}); if(keep) select(keep);
+  download(new Blob([r.text],{type:'application/step'}),baseName()+'.stp'); toast(`STEP 已輸出：${r.solids} 個實體／${r.defs} 種零件`); };
+$('btn-pdf2d').onclick=async()=>{ const size=$('pdf2d-size').value, [Wp,Hp]=PDF_PAPER[size], ctx=new PdfCtx(Hp,0.75);
+  const info=draw2D({ctx,w:Wp/0.75,h:Hp/0.75,std:true,paper:size}); download(await vectorPDF(ctx,Wp,Hp,baseName()),`${baseName()}_2D_${size}.pdf`); toast(`2D 圖面已輸出（${size}，1:${info.scaleN}）`); };
+$('btn-report').onclick=()=>{ const PW=1400,PH=990,PX=2339,PY=1654,F='"Microsoft JhengHei","PingFang TC",sans-serif', pages=[];
+  const page=(title)=>{ const c=document.createElement('canvas'); c.width=PX; c.height=PY; const x=c.getContext('2d'); x.scale(PX/PW,PY/PH); x.fillStyle='#fff'; x.fillRect(0,0,PW,PH);
+    x.fillStyle='#0f172a'; x.font=`700 22px ${F}`; x.textBaseline='middle'; x.fillText('鋁擠型機架 設計報告',40,34); x.textAlign='right'; x.fillStyle='#1d4ed8'; x.font=`700 18px ${F}`; x.fillText(title,PW-40,34);
+    x.strokeStyle='#1d4ed8'; x.lineWidth=2; x.beginPath(); x.moveTo(40,56); x.lineTo(PW-40,56); x.stroke(); x.textAlign='right'; x.font=`12px ${F}`; x.fillStyle='#64748b'; x.fillText(`第 ${pages.length+1} 頁`,PW-40,PH-18); x.textAlign='left'; pages.push(c); return x; };
+  const keep=selectedId; if(keep) select(null);
+  let x=page('3D 效果圖'); const g=x.createLinearGradient(40,72,930,632); g.addColorStop(0,'#1d3a63'); g.addColorStop(1,'#060a13'); x.fillStyle=g; x.fillRect(40,72,890,560);
+  if(HAS3D){ const pr=renderer.getPixelRatio(); renderer.setPixelRatio(1); renderer.setSize(1780,1120,false); camera.aspect=1780/1120; camera.updateProjectionMatrix(); dimGroup.visible=false; renderer.render(scene,camera); dimGroup.visible=true; x.drawImage(renderer.domElement,40,72,890,560); renderer.setPixelRatio(pr); resize(); }
+  [['外形',`${S.w}×${S.d}×${S.h} mm`],['型材',`${S.profile} ${aluDef(S.alu).name}`],['側板',PANELS[S.panel].name],['檯面',S.top?`t${S.topT}`:'無'],['底座',BASES[S.base].name],['鋁材',`${fmt(BOM.lenTot/1000,2)} m／${fmt(BOM.kgTot,1)} kg`],['含稅估價',money(BOM.cost.total)]]
+    .forEach((r,i)=>{ x.fillStyle=i%2?'#fff':'#f1f5f9'; x.fillRect(955,98+i*34,405,34); x.fillStyle='#475569'; x.font=`700 13px ${F}`; x.fillText(r[0],965,115+i*34); x.fillStyle='#0f172a'; x.font=`13px ${F}`; x.fillText(r[1],1060,115+i*34); });
+  x=page('工程三視圖'); x.save(); x.translate(30,64); draw2D({ctx:x,w:PW-60,h:PH-104}); x.restore();
+  x=page('鋁材裁切清單'); x.font=`13px ${F}`; let y=90; [['品名','型材','長度 mm','數量','顏色'],...BOM.alu.map(g=>[g.name,g.series,fmt(g.len,1),g.qty,g.color.name])].forEach((r,i)=>{ x.fillStyle=i?(i%2?'#f8fafc':'#fff'):'#1e3a8a'; x.fillRect(40,y,PW-80,24); x.fillStyle=i?'#0f172a':'#fff'; r.forEach((v,j)=>x.fillText(String(v),50+j*250,y+12)); y+=24; });
+  if(keep) select(keep);
+  download(buildRasterPDF(pages.map(c=>canvasJpegBytes(c)),PX,PY),baseName()+'_報告.pdf'); toast(`報告已輸出，共 ${pages.length} 頁`); };
+
+/* ========== 11. 啟動（WebGL 失敗→自動改三視圖，提示列不可擋住按鈕） ========== */
+function no3D(){ const b=$('errbar'); b.style.cssText='display:block;position:static;flex:none;background:#78350f;color:#fff;padding:8px 16px;font-size:13px'; document.body.prepend(b);
+  b.innerHTML=`⚠ 3D 無法顯示（WebGL 未啟用${GLERR?'：'+GLERR:''}），三視圖、BOM、匯出仍可使用。請在 chrome://settings/system 開啟「圖形加速」後重新啟動瀏覽器。`; }
+['w','h'].forEach(resetSpacing);
+try{ update(); }catch(e){ console.error(e); window.onerror(e.message,'',0); }
+resize(); if(HAS3D) fitView('iso'); else { switchView('2d'); no3D(); }
+window.__app={S,select,get HAS3D(){return HAS3D;},get view(){return view;}};
+})();
+</script>
+</body>
+</html>
