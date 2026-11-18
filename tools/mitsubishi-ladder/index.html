@@ -68,6 +68,9 @@ table.grid td.n { font-family: var(--mono); color: var(--muted); padding-top: 8p
 .exp h3 { margin: 0; font-size: 13.5px; }
 .exp p { margin: 0; color: var(--muted); font-size: 12.5px; }
 .exp .ctl button { padding: 4px 10px; font-size: 13px; }
+.fmt { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.fmt h3 { margin: 0; font-size: 13.5px; }
+.fmt input[type=file], .exp input[type=file] { max-width: 210px; font-size: 12px; }
 details.guide { font-size: 13px; }
 details.guide summary { cursor: pointer; font-weight: 600; }
 details.guide ol { padding-left: 20px; margin: 6px 0; display: grid; gap: 4px; }
@@ -165,20 +168,50 @@ svg .cm { font-family: var(--sans); }
             <div class="ctl"><button data-exp="svg" data-act="save" type="button">下載</button></div>
           </article>
           <article>
+            <h3>自動鍵入腳本（AutoHotkey v2）</h3>
+            <p>在 GX Works2 / GX Developer 清單模式自動逐行輸入指令，等同人工鍵入，所有軟體版本都能用。</p>
+            <div class="ctl"><button data-exp="ahk" data-act="save" type="button">下載 .ahk</button></div>
+          </article>
+          <article>
             <h3>專案資料 JSON</h3>
             <p>I/O 表 + 步序表，可存檔後再載入繼續編輯。</p>
             <div class="ctl"><button data-exp="json" data-act="save" type="button">下載</button><label class="inline" for="loadJson"><span>載入</span><input id="loadJson" type="file" accept=".json,application/json"></label></div>
           </article>
         </div>
+        <section class="fmt">
+          <h3>匯入檔案格式（程式 CSV / 裝置註解 CSV）</h3>
+          <div class="cfg">
+            <label for="fPreset">格式預設
+              <select id="fPreset">
+                <option value="gxd">GX Developer（逗號、Big5）</option>
+                <option value="gxw2">GX Works2 Unicode（Tab、UTF-16）</option>
+                <option value="utf8">Excel 檢視用（逗號、UTF-8）</option>
+                <option value="custom">自訂</option>
+              </select></label>
+            <label for="fDelim">分隔符號<select id="fDelim"><option value=",">逗號 ,</option><option value="&#9;">Tab</option></select></label>
+            <label for="fEnc">文字編碼<select id="fEnc"><option value="big5">Big5（繁中 Windows）</option><option value="shift_jis">Shift-JIS（日文 Windows）</option><option value="utf16le">UTF-16 LE（Unicode）</option><option value="utf8bom">UTF-8（含 BOM）</option><option value="utf8">UTF-8（無 BOM）</option></select></label>
+            <label for="fPad">FX 裝置補零<select id="fPad"><option value="1">X000 / Y000</option><option value="0">X0 / Y0</option></select></label>
+            <label for="fName">程式名稱<input id="fName" class="mono"></label>
+            <label for="fPlc">PLC 型號字串<input id="fPlc" class="mono"></label>
+            <label for="fDelay">自動鍵入間隔 ms<input id="fDelay" class="mono" inputmode="numeric"></label>
+          </div>
+          <div class="ctl">
+            <label class="inline" for="calProg">用 GX 匯出的程式 CSV 校準<input id="calProg" type="file" accept=".csv,.txt"></label>
+            <label class="inline" for="calCmt">用 GX 匯出的註解 CSV 校準<input id="calCmt" type="file" accept=".csv,.txt"></label>
+            <button id="calClear" type="button">清除校準</button>
+          </div>
+          <p class="hint" id="calInfo"></p>
+        </section>
         <details class="guide" open>
-          <summary>匯入 GX Works 的建議流程</summary>
+          <summary>導入 PLC 的建議流程</summary>
           <ol>
-            <li><b>裝置註解</b>：GX Works2 / GX Works3 開啟「裝置註解」編輯畫面 → 從 CSV 讀取（選單名稱依版本略有不同），選本頁的裝置註解 CSV。</li>
-            <li><b>程式（GX Works2，FX3U / Q）</b>：階梯圖畫面按 <code>Alt+F1</code> 切成清單（List）顯示，依指令表輸入；或用 GX Developer「專案 → 匯入檔案 → 從 TEXT / CSV 格式檔案」讀入程式 CSV，再以 GX Works2 開啟該專案。</li>
-            <li><b>程式（GX Works3，FX5U / iQ-R）</b>：在階梯圖編輯器直接鍵入每行指令（例 <code>LD X0</code> Enter），階梯會自動成形；或先在 GX Works2 建好再用 GX Works3「開啟其他格式專案」轉換。</li>
-            <li>匯入後執行「轉換（F4）」與「程式檢查」，確認無雙線圈、步號與裝置範圍正確，再寫入 PLC。</li>
+            <li><b>先校準一次</b>：在您的 GX Works2 / GX Developer 隨便寫兩行（<code>LD X0</code>、<code>OUT Y0</code>），用軟體的「匯出 CSV / 寫入 CSV 檔案」存檔，再用上方「校準」讀入。之後本工具產生的 CSV 會完全照該版本的欄位、編碼、分隔符號輸出。裝置註解也照此做一次。</li>
+            <li><b>方法 A：CSV 匯入</b>：GX Works2 / GX Developer 以「從 CSV 檔讀取」（GX Developer 為「專案 → 匯入檔案 → 從 TEXT/CSV 格式檔案匯入」）讀入程式 CSV 與註解 CSV。</li>
+            <li><b>方法 B：自動鍵入（最通用）</b>：安裝 AutoHotkey v2，執行下載的 .ahk → GX Works2 開新程式 → <code>Alt+F1</code> 切清單模式，游標放在第 0 步 → 腳本提示後 5 秒內點選 GX Works2 視窗，程式會逐行自動輸入；按住 <code>Esc</code> 可中止。</li>
+            <li><b>GX Works3（FX5U / iQ-R）</b>：無清單模式。先在 GX Works2（機種選 FX3U 或 Q）以 A/B 方法建好，再用 GX Works3「專案 → 開啟其他格式檔案 → GX Works2 格式」轉換並變更機種；註解 CSV 可直接讀入。</li>
+            <li>導入後執行「轉換（F4）」與「程式檢查」，確認無雙線圈、裝置範圍正確，再「寫入 PLC」。</li>
           </ol>
-          <p class="hint">CSV 匯入格式會隨 GX Works / GX Developer 版本變動，首次使用請先用一段小程式確認可讀入。安全迴路（緊急停止、光柵）必須以硬體配線實現，PLC 程式只作狀態監控。</p>
+          <p class="hint">選單名稱依軟體版本與語系略有不同。安全迴路（緊急停止、光柵）必須以硬體配線實現，PLC 程式只作狀態監控。</p>
         </details>
       </div>
     </section>
@@ -557,48 +590,220 @@ function runGenerate() {
 }
 function commentMapFromIO() { const p = readProject(); const m = new Map(st.cm); p.io.forEach(([d, c]) => m.set(normDev(d), c)); return m; }
 
-/* ---------- 匯出 ---------- */
-function exportText(kind) {
-  const p = readProject();
-  if (kind === "il") return { name: `PLC_${p.series}_IL.txt`, data: st.il.split(/\r?\n/).filter((l) => l.trim()).join("\r\n") + "\r\n" };
+/* ---------- 匯出格式 / 編碼 ---------- */
+const PRESETS = {
+  gxd:  { delim: ",", enc: "big5", pad: "1" },
+  gxw2: { delim: "\t", enc: "utf16le", pad: "1" },
+  utf8: { delim: ",", enc: "utf8bom", pad: "0" }
+};
+const PLC_INFO = { FX3U: "FX3U/FX3UC", FX5U: "FX5U", Q: "QCPU (Q mode)", R: "R04CPU" };
+const fmt = { preset: "gxd", delim: ",", enc: "big5", pad: "1", name: "MAIN", plc: "", delay: "120", tpl: null, ctpl: null };
+function loadFmt() { try { Object.assign(fmt, JSON.parse(localStorage.getItem("mlg-fmt") || "{}")); } catch {} }
+function saveFmt() { try { localStorage.setItem("mlg-fmt", JSON.stringify(fmt)); } catch {} }
+function showFmt() {
+  $("#fPreset").value = fmt.preset; $("#fDelim").value = fmt.delim; $("#fEnc").value = fmt.enc; $("#fPad").value = fmt.pad;
+  $("#fName").value = fmt.name; $("#fPlc").value = fmt.plc || PLC_INFO[$("#series").value]; $("#fDelay").value = fmt.delay;
+  const t = [];
+  if (fmt.tpl) t.push(`程式 CSV 已校準：${fmt.tpl.delim === "\t" ? "Tab" : "逗號"}分隔、${ENC_NAME[fmt.tpl.enc]}、${fmt.tpl.pad ? "X000 補零" : "不補零"}、前置 ${fmt.tpl.pre.length} 行、${fmt.tpl.cols} 欄`);
+  if (fmt.ctpl) t.push(`註解 CSV 已校準：${fmt.ctpl.delim === "\t" ? "Tab" : "逗號"}分隔、${ENC_NAME[fmt.ctpl.enc]}、前置 ${fmt.ctpl.pre.length} 行`);
+  $("#calInfo").textContent = t.length ? t.join("；") : "尚未校準：使用上方格式設定輸出。";
+}
+const ENC_NAME = { big5: "Big5", shift_jis: "Shift-JIS", utf16le: "UTF-16", utf8bom: "UTF-8(BOM)", utf8: "UTF-8" };
+["fPreset", "fDelim", "fEnc", "fPad", "fName", "fPlc", "fDelay"].forEach((id) => ($("#" + id).onchange = () => {
+  if (id === "fPreset" && PRESETS[$("#fPreset").value]) Object.assign(fmt, PRESETS[$("#fPreset").value], { preset: $("#fPreset").value });
+  else {
+    fmt.delim = $("#fDelim").value; fmt.enc = $("#fEnc").value; fmt.pad = $("#fPad").value;
+    fmt.name = $("#fName").value.trim() || "MAIN"; fmt.plc = $("#fPlc").value.trim(); fmt.delay = $("#fDelay").value.trim() || "120";
+    if (["fDelim", "fEnc", "fPad"].includes(id)) fmt.preset = "custom";
+  }
+  saveFmt(); showFmt();
+}));
+
+const mbMaps = {};
+function mbMap(enc) {
+  // 以瀏覽器內建解碼器反推 Big5 / Shift-JIS 編碼表（離線可用）
+  if (mbMaps[enc]) return mbMaps[enc];
+  const dec = new TextDecoder(enc), map = new Map(), pair = new Uint8Array(2);
+  const leads = enc === "big5" ? [[0x81, 0xfe]] : [[0x81, 0x9f], [0xe0, 0xfc]];
+  for (const [a, b] of leads) for (let l = a; l <= b; l++) for (let t = 0x40; t <= 0xfe; t++) {
+    if (t === 0x7f) continue; pair[0] = l; pair[1] = t;
+    const ch = dec.decode(pair); if (ch.length === 1 && ch !== "�" && !map.has(ch)) map.set(ch, (l << 8) | t);
+  }
+  return (mbMaps[enc] = map);
+}
+function encodeText(text, enc) {
+  if (enc === "utf8bom" || enc === "utf8") { const b = new TextEncoder().encode(text); if (enc === "utf8") return b; const o = new Uint8Array(b.length + 3); o.set([0xef, 0xbb, 0xbf]); o.set(b, 3); return o; }
+  if (enc === "utf16le") { const o = new Uint8Array(2 + text.length * 2); o[0] = 0xff; o[1] = 0xfe; for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); o[2 + i * 2] = c & 255; o[3 + i * 2] = c >> 8; } return o; }
+  const map = mbMap(enc), out = []; let miss = 0;
+  for (const ch of text) { const c = ch.codePointAt(0); if (c < 0x80) out.push(c); else { const v = map.get(ch); if (v) out.push(v >> 8, v & 255); else { out.push(0x3f); miss++; } } }
+  if (miss) toast(`有 ${miss} 個字元無法以 ${ENC_NAME[enc]} 表示，已改為 ?`);
+  return new Uint8Array(out);
+}
+function decodeBytes(buf) {
+  const b = new Uint8Array(buf);
+  if (b[0] === 0xff && b[1] === 0xfe) return { text: new TextDecoder("utf-16le").decode(b.subarray(2)), enc: "utf16le" };
+  if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return { text: new TextDecoder("utf-8").decode(b.subarray(3)), enc: "utf8bom" };
+  try { return { text: new TextDecoder("utf-8", { fatal: true }).decode(b), enc: "utf8" }; } catch {}
+  const big5 = new TextDecoder("big5").decode(b), sj = new TextDecoder("shift_jis").decode(b);
+  const bad = (s) => (s.match(/�/g) || []).length;
+  return bad(sj) < bad(big5) ? { text: sj, enc: "shift_jis" } : { text: big5, enc: "big5" };
+}
+function splitCsv(line, delim) {
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true; else if (ch === delim) { out.push(cur); cur = ""; } else cur += ch;
+  }
+  out.push(cur); return out;
+}
+function detectDelim(lines) { const s = lines.slice(0, 10).join("\n"); return (s.match(/\t/g) || []).length > (s.match(/,/g) || []).length ? "\t" : ","; }
+function calibrate(buf, kind) {
+  const { text, enc } = decodeBytes(buf);
+  const lines = text.split(/\r?\n/); while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  const delim = detectDelim(lines);
+  const rows = lines.map((l) => splitCsv(l, delim));
+  const isDev = (s) => /^(X|Y|M|L|S|B|F|SM|D|T|C|SD|W|R|ZR)[0-9A-F]+$/i.test(String(s).trim());
+  let di;
   if (kind === "prog") {
-    const rows = [['"Step No."', '"Line Statement"', '"Instruction"', '"I/O(Device)"', '"Blank"', '"PI Statement"', '"Note"'].join(",")];
-    const q = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
-    let step = 0, stmt = "";
-    st.il.split(/\r?\n/).forEach((raw) => {
-      const t = raw.trim(); if (!t) return;
-      const c = t.match(/^;\s*(?:──\s*)?(.+)$/); if (c) { stmt = c[1]; return; }
-      const parts = t.replace(/(;|\/\/).*$/, "").trim().split(/[\s,]+/); const op = parts[0].toUpperCase(); const ops = parts.slice(1).map((o) => o.toUpperCase());
-      const cm = st.cm.get(normDev(ops[0])) || "";
-      rows.push([q(step), q(stmt), q(op), q(ops[0] || ""), q(""), q(""), q(cm)].join(","));
-      ops.slice(1).forEach((o) => rows.push([q(""), q(""), q(""), q(o), q(""), q(""), q("")].join(",")));
-      stmt = ""; step += fxSteps(op, ops);
-    });
-    return { name: `PLC_${p.series}_Program.csv`, data: "﻿" + rows.join("\r\n") + "\r\n" };
+    di = rows.findIndex((r) => r.some((c) => /^(LD|LDI|LDP|LDF)$/i.test(c.trim())));
+    if (di < 0) throw new Error("找不到 LD 指令列，請匯出含 LD 指令的程式");
+    const r = rows[di], ins = r.findIndex((c) => /^(LD|LDI|LDP|LDF)$/i.test(c.trim()));
+    const hdr = di > 0 ? rows[di - 1].map((h) => h.toLowerCase()) : [];
+    const find = (re, dflt) => { const k = hdr.findIndex((h) => re.test(h)); return k >= 0 ? k : dflt; };
+    const idx = { step: find(/step|ステップ|步/, ins > 0 && /^\d+$/.test(r[0].trim()) ? 0 : -1), stmt: find(/line|statement|ステートメント|陳述|行間/, -1), ins, dev: ins + 1, note: find(/note|ノート|注/, -1) };
+    if (idx.stmt === ins || idx.stmt === idx.dev) idx.stmt = -1;
+    if (idx.note === ins || idx.note === idx.dev) idx.note = -1;
+    return { delim, enc, quote: lines[di].trim().startsWith('"'), cols: r.length, idx, pre: lines.slice(0, Math.max(0, di - 1)), header: di > 0 ? lines[di - 1] : null, pad: /^[XY]0\d\d$/i.test(r[ins + 1].trim()) };
   }
-  if (kind === "cmt") {
-    const m = commentMapFromIO();
-    const order = (d) => { const x = d.match(/^([A-Z]+)([0-9A-F]+)$/); const pri = "XYMSTCD".indexOf(x ? x[1][0] : "Z"); return [pri < 0 ? 9 : pri, x ? x[1] : d, x ? parseInt(x[2], /^[XY]$/.test(x[1]) ? SERIES[p.series].base : 10) : 0]; };
-    const list = [...m.entries()].filter(([, c]) => c).sort((a, b) => { const A = order(a[0]), B = order(b[0]); return A[0] - B[0] || A[1].localeCompare(B[1]) || A[2] - B[2]; });
-    return { name: `PLC_${p.series}_DeviceComment.csv`, data: "﻿" + ['"Device Name","Comment"', ...list.map(([d, c]) => `"${d}","${String(c).replace(/"/g, '""')}"`)].join("\r\n") + "\r\n" };
+  di = rows.findIndex((r) => isDev(r[0]) && r.length >= 2);
+  if (di < 0) throw new Error("找不到「裝置, 註解」資料列");
+  const r = rows[di];
+  return { delim, enc, quote: lines[di].trim().startsWith('"'), cols: r.length, idx: { dev: 0, cmt: 1 }, pre: lines.slice(0, Math.max(0, di - 1)), header: di > 0 ? lines[di - 1] : null, pad: /^[XY]0\d\d$/i.test(r[0].trim()) };
+}
+async function onCal(e, kind) {
+  const f = e.target.files[0]; if (!f) return;
+  try { const t = calibrate(await f.arrayBuffer(), kind); if (kind === "prog") fmt.tpl = t; else fmt.ctpl = t; saveFmt(); showFmt(); toast("已校準格式"); }
+  catch (err) { toast(`無法校準：${err.message}`); }
+  e.target.value = "";
+}
+$("#calProg").onchange = (e) => onCal(e, "prog");
+$("#calCmt").onchange = (e) => onCal(e, "cmt");
+$("#calClear").onclick = () => { fmt.tpl = fmt.ctpl = null; saveFmt(); showFmt(); toast("已清除校準"); };
+
+function padDev(d, pad) {
+  if (!pad || SERIES[$("#series").value].base !== 8) return d;
+  const m = String(d).match(/^([XY])([0-7]+)$/); return m ? m[1] + m[2].padStart(3, "0") : d;
+}
+function ilItems() {
+  const out = []; let stmt = "";
+  st.il.split(/\r?\n/).forEach((raw) => {
+    const t = raw.trim(); if (!t) return;
+    const c = t.match(/^;\s*(?:──\s*)?(.+)$/); if (c) { stmt = c[1]; return; }
+    const parts = t.replace(/(;|\/\/).*$/, "").trim().split(/[\s,]+/).filter(Boolean); if (!parts.length) return;
+    out.push({ op: parts[0].toUpperCase(), ops: parts.slice(1).map((o) => o.toUpperCase()), stmt }); stmt = "";
+  });
+  return out;
+}
+function joinRow(cells, delim, quote) { return cells.map((c) => { c = String(c ?? ""); return quote || c.includes(delim) || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c; }).join(delim); }
+function buildProgCsv() {
+  const t = fmt.tpl; const delim = t ? t.delim : fmt.delim; const quote = t ? t.quote : true; const pad = t ? t.pad : fmt.pad === "1";
+  const cols = t ? t.cols : 7; const idx = t ? t.idx : { step: 0, stmt: 1, ins: 2, dev: 3, note: 6 };
+  const lines = t ? [...t.pre, ...(t.header != null ? [t.header] : [])]
+    : [joinRow([fmt.name || "MAIN"], delim, true), joinRow(["PLC Information:", fmt.plc || PLC_INFO[$("#series").value]], delim, true),
+       joinRow(["Step No.", "Line Statement", "Instruction", "I/O(Device)", "Blank", "PI Statement", "Note"], delim, true)];
+  let step = 0;
+  const row = (o) => { const r = new Array(cols).fill(""); for (const [k, v] of Object.entries(o)) if (idx[k] >= 0 && v != null) r[idx[k]] = v; return joinRow(r, delim, quote); };
+  ilItems().forEach((it) => {
+    const dev = it.ops[0] ? padDev(normDev(it.ops[0]), pad) : "";
+    lines.push(row({ step: String(step), stmt: it.stmt, ins: it.op, dev: /^[KH"]/.test(it.ops[0] || "") ? it.ops[0] : dev, note: "" }));
+    it.ops.slice(1).forEach((o) => lines.push(row({ dev: /^[KH"]/.test(o) ? o : padDev(normDev(o), pad) })));
+    step += fxSteps(it.op, it.ops);
+  });
+  return { text: lines.join("\r\n") + "\r\n", enc: t ? t.enc : fmt.enc };
+}
+function sortedComments() {
+  const p = readProject(); const m = commentMapFromIO();
+  const order = (d) => { const x = d.match(/^([A-Z]+)([0-9A-F]+)$/); const pri = "XYMSTCD".indexOf(x ? x[1][0] : "Z"); return [pri < 0 ? 9 : pri, x ? x[1] : d, x ? parseInt(x[2], /^[XY]$/.test(x[1]) ? SERIES[p.series].base : 10) : 0]; };
+  return [...m.entries()].filter(([, c]) => c).sort((a, b) => { const A = order(a[0]), B = order(b[0]); return A[0] - B[0] || A[1].localeCompare(B[1]) || A[2] - B[2]; });
+}
+function buildCmtCsv() {
+  const t = fmt.ctpl; const delim = t ? t.delim : fmt.delim; const quote = t ? t.quote : true; const pad = t ? t.pad : fmt.pad === "1";
+  const lines = t ? [...t.pre, ...(t.header != null ? [t.header] : [])] : [joinRow(["Device Name", "Comment"], delim, true)];
+  sortedComments().forEach(([d, c]) => { const r = new Array(t ? t.cols : 2).fill(""); r[0] = padDev(d, pad); r[1] = c; lines.push(joinRow(r, delim, quote)); });
+  return { text: lines.join("\r\n") + "\r\n", enc: t ? t.enc : fmt.enc };
+}
+function buildAhk() {
+  const items = ilItems(); const delay = Math.max(30, Number(fmt.delay) || 120);
+  const q = (s) => `"${s.replace(/`/g, "``").replace(/"/g, '`"')}"`;
+  const lines = items.map((it) => `  ${q([it.op, ...it.ops].join(" "))},`).join("\n");
+  return `#Requires AutoHotkey v2.0
+; 三菱 PLC 指令表自動鍵入腳本（由「三菱 PLC 階梯圖產生器」產生）
+; 機種：${$("#series").value}　指令數：${items.length}
+; 使用方式：GX Works2 / GX Developer 開啟程式 → Alt+F1 切換清單模式 → 游標放在第 0 步
+;           執行本腳本 → 按「確定」後 5 秒內點選 GX Works 視窗。按住 Esc 可中止。
+#SingleInstance Force
+SetKeyDelay 20, 20
+Delay := ${delay}
+Lines := [
+${lines}
+]
+r := MsgBox("即將輸入 " Lines.Length " 行指令。\`n\`n1. GX Works2 已切換到清單模式（Alt+F1）\`n2. 游標在第 0 步\`n\`n按「確定」後 5 秒內點選 GX Works 視窗；按住 Esc 可中止。", "三菱 PLC 自動鍵入", "OKCancel")
+if (r != "OK")
+  ExitApp
+Sleep 5000
+target := WinExist("A")
+for i, L in Lines {
+  if GetKeyState("Esc", "P") {
+    MsgBox "已中止，完成 " (i - 1) " / " Lines.Length " 行"
+    ExitApp
   }
-  if (kind === "svg") return { name: `PLC_${p.series}_Ladder.svg`, data: renderLadder(st.parsed, st.cm, remarksOf(st.il), true) };
-  if (kind === "json") return { name: `PLC_${p.series}_Project.json`, data: JSON.stringify(p, null, 2) };
+  if !WinActive("ahk_id " target) {
+    MsgBox "GX Works 視窗失去焦點，已暫停於第 " i " 行。\`n請點回 GX Works 原游標位置後按「確定」繼續。"
+    WinActivate "ahk_id " target
+    Sleep 800
+  }
+  SendText L
+  Sleep Delay
+  Send "{Enter}"
+  Sleep Delay
+}
+MsgBox "輸入完成，共 " Lines.Length " 行。請執行轉換（F4）與程式檢查。"
+`;
+}
+
+/* ---------- 匯出 ---------- */
+function exportFile(kind) {
+  const p = readProject(); const base = `PLC_${p.series}`;
+  if (kind === "il") return { name: `${base}_IL.txt`, text: st.il.split(/\r?\n/).filter((l) => l.trim()).join("\r\n") + "\r\n", enc: "utf8bom" };
+  if (kind === "prog") return { name: `${base}_Program.csv`, ...buildProgCsv() };
+  if (kind === "cmt") return { name: `${base}_DeviceComment.csv`, ...buildCmtCsv() };
+  if (kind === "ahk") return { name: `${base}_AutoInput.ahk`, text: buildAhk(), enc: "utf8bom" };
+  if (kind === "svg") return { name: `${base}_Ladder.svg`, text: renderLadder(st.parsed, st.cm, remarksOf(st.il), true), enc: "utf8" };
+  if (kind === "json") return { name: `${base}_Project.json`, text: JSON.stringify(p, null, 2), enc: "utf8" };
 }
 let downloadsNs;
 async function saveFile(kind) {
-  const f = exportText(kind);
+  const f = exportFile(kind); const bytes = encodeText(f.text, f.enc);
   try {
     if (downloadsNs === undefined && window.claude?.use) downloadsNs = await window.claude.use("downloads");
-    if (downloadsNs) { await downloadsNs.save({ filename: f.name, data: f.data }); toast(`已下載 ${f.name}`); return; }
+    if (downloadsNs) {
+      try { await downloadsNs.save({ filename: f.name, data: bytes.slice() }); toast(`已下載 ${f.name}`); }
+      catch (e) {
+        if (e?.code === "rejected_extension") { await downloadsNs.save({ filename: f.name + ".txt", data: bytes.slice() }); toast(`已下載，請把副檔名 .txt 刪除改回 ${f.name}`); }
+        else throw e;
+      }
+      return;
+    }
   } catch (e) { if (e?.code === "declined") return; if (e?.code && e.code !== "unavailable") { toast(`無法下載：${e.message || e.code}`); return; } }
   try {
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([f.data], { type: "text/plain;charset=utf-8" })); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" })); a.download = f.name;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1500);
   } catch { toast("此環境無法下載，請改用「複製」"); }
 }
 async function copyText(kind) {
-  const f = exportText(kind);
-  try { await navigator.clipboard.writeText(f.data.replace(/^﻿/, "")); toast("已複製到剪貼簿"); }
+  const f = exportFile(kind);
+  try { await navigator.clipboard.writeText(f.text); toast("已複製到剪貼簿"); }
   catch { selectTab("il"); $("#il").select(); toast("無法存取剪貼簿，已選取指令表文字，請按 Ctrl+C"); }
 }
 
@@ -613,7 +818,7 @@ $("#addStep").onclick = () => stepRow();
 $("#gen").onclick = () => { runGenerate(); selectTab("ladder"); toast("已產生階梯圖"); };
 $("#redraw").onclick = () => { analyze(); selectTab("ladder"); };
 $("#loadSample").onclick = () => { loadProject(SAMPLE); runGenerate(); toast("已載入範例"); };
-$("#series").onchange = () => runGenerate();
+$("#series").onchange = () => { runGenerate(); showFmt(); };
 document.querySelectorAll("[data-exp]").forEach((b) => (b.onclick = () => (b.dataset.act === "save" ? saveFile(b.dataset.exp) : copyText(b.dataset.exp))));
 $("#loadJson").onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
@@ -625,6 +830,6 @@ document.addEventListener("change", (e) => { if (e.target.closest("main") && e.t
 
 let initial = SAMPLE;
 try { const s = localStorage.getItem("mlg-project"); if (s) initial = JSON.parse(s); } catch {}
-loadProject(initial); runGenerate();
+loadFmt(); loadProject(initial); runGenerate(); showFmt();
 try { const t = localStorage.getItem("mlg-tab"); if (t) selectTab(t); } catch {}
 </script>

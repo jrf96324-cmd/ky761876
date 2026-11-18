@@ -1,6 +1,11 @@
 # 三菱 PLC 階梯圖產生器
 
-單一 HTML 工具（`index.html`），用瀏覽器直接開啟即可使用，不需安裝。
+## 單機版
+
+直接用瀏覽器（Chrome / Edge）開啟 **`三菱PLC階梯圖產生器_單機版.html`**，不需安裝、不需網路。
+資料自動保存在瀏覽器本機；可用「專案資料 JSON」存檔 / 載入。
+
+修改 `index.html` 後執行 `node build-offline.mjs` 重新產生單機版。
 
 ## 功能
 
@@ -13,7 +18,12 @@
 2. **指令表 → 階梯圖 (SVG)**：支援 LD/LDI/LDP/LDF、AND/ANI/ANDP/ANDF、OR/ORI/ORP/ORF、
    ANB/ORB、MPS/MRD/MPP、比較接點（LD= 等）、INV/MEP/MEF、OUT/SET/RST/PLS/PLF 與應用指令
 3. **檢查**：雙線圈、FX 系列 X/Y 8 進位位址、未定義 I/O、ANB/ORB/MPS 配對
-4. **匯出**：IL 文字檔、GX Developer 清單格式程式 CSV、裝置註解 CSV、階梯圖 SVG、專案 JSON
+4. **匯出**：IL 文字檔、程式 CSV、裝置註解 CSV、階梯圖 SVG、專案 JSON
+5. **導入 PLC 軟體**
+   - CSV 編碼可選 Big5 / Shift-JIS / UTF-16 / UTF-8，分隔符號逗號 / Tab，FX 裝置 X000 補零
+   - **格式校準**：讀入一份由您的 GX Works2 / GX Developer 匯出的 CSV，自動偵測編碼、分隔符號、前置行與欄位位置，之後照同一格式輸出
+   - **AutoHotkey v2 自動鍵入腳本**：在 GX Works2 / GX Developer 清單模式（Alt+F1）逐行自動輸入，Esc 中止、失去焦點自動暫停
+   - GX Works3（FX5U / iQ-R）：先在 GX Works2 建立，再以「開啟其他格式檔案」轉換
 
 ## 機種
 

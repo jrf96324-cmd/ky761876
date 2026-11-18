@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>html{color-scheme:light}[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>三菱 PLC 階梯圖產生器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: 左側輸入（I/O 表、步序表），右側輸出（IL / 階梯圖 / 匯出）；窄螢幕上下堆疊 */
+:root {
+  --bg: #eef1ef; --panel: #ffffff; --ink: #18211d; --muted: #5b6a63; --line: #cdd6d1;
+  --rail: #24312b; --accent: #0b7a57; --accent-ink: #ffffff; --warn: #a15c00; --warn-bg: #fff3df;
+  --err: #b42318; --err-bg: #fdecea; --soft: #e3ebe7; --wire: #1d2a24; --cmt: #3d6b8f;
+  --sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121815; --panel: #1a221e; --ink: #e3ebe6; --muted: #92a39a; --line: #2f3c35;
+  --rail: #c9d6cf; --accent: #3fc596; --accent-ink: #08130e; --warn: #f0b45c; --warn-bg: #33270f;
+  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121815; --panel: #1a221e; --ink: #e3ebe6; --muted: #92a39a; --line: #2f3c35;
+  --rail: #c9d6cf; --accent: #3fc596; --accent-ink: #08130e; --warn: #f0b45c; --warn-bg: #33270f;
+  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; max-width: 1500px; margin: 0 auto 16px; }
+h1 { font-size: 22px; margin: 0; text-wrap: balance; }
+h1 small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: .08em; }
+h2 { font-size: 15px; margin: 0; }
+.ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+label.inline { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+select, input, textarea { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; min-width: 0; }
+input.mono, textarea.mono, .mono { font-family: var(--mono); }
+textarea { width: 100%; resize: vertical; }
+button { font: inherit; cursor: pointer; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.x { padding: 2px 8px; color: var(--muted); }
+main { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 16px; max-width: 1500px; margin: 0 auto; align-items: start; }
+@media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); } }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.col { display: grid; gap: 16px; min-width: 0; }
+.head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+.tw { overflow-x: auto; }
+table.grid { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.grid th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.grid td { padding: 3px 4px; border-bottom: 1px solid var(--soft); vertical-align: top; }
+table.grid input { width: 100%; }
+table.grid td.n { font-family: var(--mono); color: var(--muted); padding-top: 8px; white-space: nowrap; }
+.w-dev { width: 78px; } .w-num { width: 64px; }
+.cfg { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.cfg label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: 6px 10px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+#il { min-height: 360px; font-size: 13px; line-height: 1.55; tab-size: 8; }
+.ladder-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); max-height: 78vh; }
+.msgs { display: grid; gap: 4px; font-size: 12.5px; }
+.msg { padding: 5px 8px; border-radius: 4px; }
+.msg.warn { background: var(--warn-bg); color: var(--warn); }
+.msg.err { background: var(--err-bg); color: var(--err); }
+.msg.ok { background: var(--soft); color: var(--muted); }
+.stats { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--ink); font-family: var(--mono); }
+.exp { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.exp article { border: 1px solid var(--line); border-radius: 4px; padding: 10px; display: grid; gap: 6px; align-content: start; }
+.exp h3 { margin: 0; font-size: 13.5px; }
+.exp p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.exp .ctl button { padding: 4px 10px; font-size: 13px; }
+.fmt { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.fmt h3 { margin: 0; font-size: 13.5px; }
+.fmt input[type=file], .exp input[type=file] { max-width: 210px; font-size: 12px; }
+details.guide { font-size: 13px; }
+details.guide summary { cursor: pointer; font-weight: 600; }
+details.guide ol { padding-left: 20px; margin: 6px 0; display: grid; gap: 4px; }
+code { font-family: var(--mono); font-size: 12.5px; background: var(--soft); padding: 0 4px; border-radius: 3px; }
+#toast { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); background: var(--rail); color: var(--bg); padding: 8px 14px; border-radius: 4px; font-size: 13px; }
+svg text { font-family: var(--mono); }
+svg .cm { font-family: var(--sans); }
+</style>
+
+<header>
+  <h1><small>MITSUBISHI MELSEC · LADDER GENERATOR</small>三菱 PLC 階梯圖產生器</h1>
+  <div class="ctl">
+    <label class="inline" for="series">機種
+      <select id="series">
+        <option value="FX3U">FX3U / FX3G（GX Works2）</option>
+        <option value="FX5U">FX5U / FX5UC（GX Works3）</option>
+        <option value="Q">Q 系列（GX Works2）</option>
+        <option value="R">iQ-R（GX Works3）</option>
+      </select>
+    </label>
+    <button id="loadSample" type="button">載入範例（取放機構）</button>
+    <button id="gen" class="primary" type="button">產生階梯圖 ▶</button>
+  </div>
+</header>
+
+<main>
+  <div class="col">
+    <section class="card">
+      <div class="head"><h2>① I/O 配置表</h2><button id="addIo" type="button">＋ 新增點位</button></div>
+      <p class="hint">FX 系列 X/Y 為 8 進位（X7 之後是 X10）；Q / iQ-R 為 16 進位。註解會帶入階梯圖與裝置註解 CSV。</p>
+      <div class="tw"><table class="grid"><thead><tr><th>裝置</th><th>註解</th><th></th></tr></thead><tbody id="ioBody"></tbody></table></div>
+    </section>
+
+    <section class="card">
+      <div class="head"><h2>② 運轉條件</h2></div>
+      <div class="cfg">
+        <label for="cStart">啟動按鈕<input id="cStart" class="mono"></label>
+        <label for="cStop">停止按鈕<input id="cStop" class="mono"></label>
+        <label for="cEmg">緊急停止（B 接點配線）<input id="cEmg" class="mono"></label>
+        <label for="cReset">復歸按鈕<input id="cReset" class="mono"></label>
+        <label for="cRunLamp">運轉燈<input id="cRunLamp" class="mono"></label>
+        <label for="cAlmLamp">異常燈（閃爍）<input id="cAlmLamp" class="mono"></label>
+        <label for="cMode">循環模式<select id="cMode"><option value="loop">連續循環</option><option value="single">單循環</option></select></label>
+        <label for="cStepBase">步序繼電器起始<input id="cStepBase" class="mono"></label>
+        <label for="cStartCond" style="grid-column: 1 / -1">起動條件（原點／工件到位）<input id="cStartCond" class="mono" placeholder="例：X4 &amp; X10 &amp; X12"></label>
+      </div>
+      <p class="hint">內部繼電器固定：M0 運轉中、M1 單循環結束、M50 異常。延時計時器 T1～，逾時計時器 T101～（K 值以 0.1 秒為單位）。</p>
+    </section>
+
+    <section class="card">
+      <div class="head"><h2>③ 動作步序（時序）</h2><button id="addStep" type="button">＋ 新增步序</button></div>
+      <p class="hint">輸出欄：<code>Y1</code> 僅此步 ON、<code>+Y2</code> 進入此步時 SET 保持、<code>-Y2</code> RST。完成條件：<code>&amp;</code> 串聯、<code>|</code> 並聯、<code>!</code> B 接點，如 <code>X13 &amp; !X14 | X5</code>。</p>
+      <div class="tw"><table class="grid"><thead><tr><th>步</th><th>動作說明</th><th>輸出</th><th>完成條件</th><th>延時 s</th><th>逾時 s</th><th></th></tr></thead><tbody id="stepBody"></tbody></table></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-ladder" aria-selected="true">階梯圖</button>
+        <button type="button" role="tab" id="tab-il" aria-selected="false">指令表 IL（可手動編輯）</button>
+        <button type="button" role="tab" id="tab-export" aria-selected="false">匯出 / 匯入 GX Works</button>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="msgs" id="msgs"></div>
+
+      <div id="pane-ladder"><div class="ladder-wrap" id="ladder"></div></div>
+
+      <div id="pane-il" hidden>
+        <p class="hint">可直接貼上或修改三菱指令表（LD/LDI/LDP/AND/ANI/OR/ORI/ANB/ORB/MPS/MRD/MPP/OUT/SET/RST/PLS/PLF/比較接點/應用指令…），修改後按「重繪階梯圖」。<code>;</code> 之後為註解。</p>
+        <textarea id="il" class="mono" spellcheck="false"></textarea>
+        <div class="ctl"><button id="redraw" class="primary" type="button">重繪階梯圖</button></div>
+      </div>
+
+      <div id="pane-export" hidden>
+        <div class="exp">
+          <article>
+            <h3>指令表 IL（.txt）</h3>
+            <p>Tab 分隔「指令 裝置」，適合 GX Works2 清單模式輸入或對照鍵入。</p>
+            <div class="ctl"><button data-exp="il" data-act="save" type="button">下載</button><button data-exp="il" data-act="copy" type="button">複製</button></div>
+          </article>
+          <article>
+            <h3>程式 CSV（GX Developer 清單格式）</h3>
+            <p>步號 / 指令 / 裝置 / 註記欄位。步號為 FX 系列估算，匯入後以軟體重新轉換為準。</p>
+            <div class="ctl"><button data-exp="prog" data-act="save" type="button">下載</button><button data-exp="prog" data-act="copy" type="button">複製</button></div>
+          </article>
+          <article>
+            <h3>裝置註解 CSV</h3>
+            <p>「裝置, 註解」兩欄，含 I/O 與自動產生的 M / T 註解。</p>
+            <div class="ctl"><button data-exp="cmt" data-act="save" type="button">下載</button><button data-exp="cmt" data-act="copy" type="button">複製</button></div>
+          </article>
+          <article>
+            <h3>階梯圖 SVG</h3>
+            <p>向量圖，可插入規劃評估報告、Word / PPT 或列印。</p>
+            <div class="ctl"><button data-exp="svg" data-act="save" type="button">下載</button></div>
+          </article>
+          <article>
+            <h3>自動鍵入腳本（AutoHotkey v2）</h3>
+            <p>在 GX Works2 / GX Developer 清單模式自動逐行輸入指令，等同人工鍵入，所有軟體版本都能用。</p>
+            <div class="ctl"><button data-exp="ahk" data-act="save" type="button">下載 .ahk</button></div>
+          </article>
+          <article>
+            <h3>專案資料 JSON</h3>
+            <p>I/O 表 + 步序表，可存檔後再載入繼續編輯。</p>
+            <div class="ctl"><button data-exp="json" data-act="save" type="button">下載</button><label class="inline" for="loadJson"><span>載入</span><input id="loadJson" type="file" accept=".json,application/json"></label></div>
+          </article>
+        </div>
+        <section class="fmt">
+          <h3>匯入檔案格式（程式 CSV / 裝置註解 CSV）</h3>
+          <div class="cfg">
+            <label for="fPreset">格式預設
+              <select id="fPreset">
+                <option value="gxd">GX Developer（逗號、Big5）</option>
+                <option value="gxw2">GX Works2 Unicode（Tab、UTF-16）</option>
+                <option value="utf8">Excel 檢視用（逗號、UTF-8）</option>
+                <option value="custom">自訂</option>
+              </select></label>
+            <label for="fDelim">分隔符號<select id="fDelim"><option value=",">逗號 ,</option><option value="&#9;">Tab</option></select></label>
+            <label for="fEnc">文字編碼<select id="fEnc"><option value="big5">Big5（繁中 Windows）</option><option value="shift_jis">Shift-JIS（日文 Windows）</option><option value="utf16le">UTF-16 LE（Unicode）</option><option value="utf8bom">UTF-8（含 BOM）</option><option value="utf8">UTF-8（無 BOM）</option></select></label>
+            <label for="fPad">FX 裝置補零<select id="fPad"><option value="1">X000 / Y000</option><option value="0">X0 / Y0</option></select></label>
+            <label for="fName">程式名稱<input id="fName" class="mono"></label>
+            <label for="fPlc">PLC 型號字串<input id="fPlc" class="mono"></label>
+            <label for="fDelay">自動鍵入間隔 ms<input id="fDelay" class="mono" inputmode="numeric"></label>
+          </div>
+          <div class="ctl">
+            <label class="inline" for="calProg">用 GX 匯出的程式 CSV 校準<input id="calProg" type="file" accept=".csv,.txt"></label>
+            <label class="inline" for="calCmt">用 GX 匯出的註解 CSV 校準<input id="calCmt" type="file" accept=".csv,.txt"></label>
+            <button id="calClear" type="button">清除校準</button>
+          </div>
+          <p class="hint" id="calInfo"></p>
+        </section>
+        <details class="guide" open>
+          <summary>導入 PLC 的建議流程</summary>
+          <ol>
+            <li><b>先校準一次</b>：在您的 GX Works2 / GX Developer 隨便寫兩行（<code>LD X0</code>、<code>OUT Y0</code>），用軟體的「匯出 CSV / 寫入 CSV 檔案」存檔，再用上方「校準」讀入。之後本工具產生的 CSV 會完全照該版本的欄位、編碼、分隔符號輸出。裝置註解也照此做一次。</li>
+            <li><b>方法 A：CSV 匯入</b>：GX Works2 / GX Developer 以「從 CSV 檔讀取」（GX Developer 為「專案 → 匯入檔案 → 從 TEXT/CSV 格式檔案匯入」）讀入程式 CSV 與註解 CSV。</li>
+            <li><b>方法 B：自動鍵入（最通用）</b>：安裝 AutoHotkey v2，執行下載的 .ahk → GX Works2 開新程式 → <code>Alt+F1</code> 切清單模式，游標放在第 0 步 → 腳本提示後 5 秒內點選 GX Works2 視窗，程式會逐行自動輸入；按住 <code>Esc</code> 可中止。</li>
+            <li><b>GX Works3（FX5U / iQ-R）</b>：無清單模式。先在 GX Works2（機種選 FX3U 或 Q）以 A/B 方法建好，再用 GX Works3「專案 → 開啟其他格式檔案 → GX Works2 格式」轉換並變更機種；註解 CSV 可直接讀入。</li>
+            <li>導入後執行「轉換（F4）」與「程式檢查」，確認無雙線圈、裝置範圍正確，再「寫入 PLC」。</li>
+          </ol>
+          <p class="hint">選單名稱依軟體版本與語系略有不同。安全迴路（緊急停止、光柵）必須以硬體配線實現，PLC 程式只作狀態監控。</p>
+        </details>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="toast" hidden></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const SERIES = {
+  FX3U: { base: 8, pulse: "M8002", clk: "M8013", sw: "GX Works2" },
+  FX5U: { base: 8, pulse: "SM402", clk: "SM412", sw: "GX Works3" },
+  Q:    { base: 16, pulse: "SM402", clk: "SM412", sw: "GX Works2" },
+  R:    { base: 16, pulse: "SM402", clk: "SM412", sw: "GX Works3" }
+};
+const SAMPLE = {
+  series: "FX3U",
+  io: [
+    ["X0", "啟動按鈕"], ["X1", "停止按鈕"], ["X2", "緊急停止(B)"], ["X3", "復歸按鈕"], ["X4", "工件到位感測"],
+    ["X10", "橫移缸 後退端"], ["X11", "橫移缸 前進端"], ["X12", "升降缸 上升端"], ["X13", "升降缸 下降端"], ["X14", "夾爪 夾持確認"],
+    ["Y0", "橫移缸 前進SOL"], ["Y1", "升降缸 下降SOL"], ["Y2", "夾爪 夾持SOL"], ["Y10", "運轉指示燈"], ["Y11", "異常指示燈"]
+  ],
+  cfg: { start: "X0", stop: "X1", emg: "X2", reset: "X3", runLamp: "Y10", almLamp: "Y11", mode: "loop", stepBase: "M100", startCond: "X4 & X10 & X12" },
+  steps: [
+    ["取料下降", "Y1", "X13", "", "3"],
+    ["夾爪夾持", "Y1,+Y2", "X14", "0.3", "2"],
+    ["取料上升", "", "X12", "", "3"],
+    ["橫移前進", "+Y0", "X11", "", "3"],
+    ["放料下降", "Y1", "X13", "", "3"],
+    ["夾爪放開", "Y1,-Y2", "!X14", "0.3", "2"],
+    ["放料上升", "", "X12", "", "3"],
+    ["橫移後退", "-Y0", "X10", "", "3"]
+  ]
+};
+
+/* ---------- 小工具 ---------- */
+function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 2200); }
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function normDev(d) {
+  d = String(d || "").trim().toUpperCase();
+  let m = d.match(/^(X|Y)([0-9A-F]+)$/); if (m) return m[1] + (m[2].replace(/^0+(?=.)/, ""));
+  m = d.match(/^([A-Z]+)(\d+)$/); if (m) return m[1] + String(Number(m[2]));
+  return d;
+}
+function devNum(d) { const m = String(d).match(/^([A-Z]+)(\d+)$/); return m ? { p: m[1], n: Number(m[2]) } : null; }
+
+/* ---------- 表格 UI ---------- */
+let uid = 0;
+function ioRow(dev = "", cmt = "") {
+  const tr = document.createElement("tr"); const i = ++uid;
+  tr.innerHTML = `<td class="w-dev"><input id="io-d-${i}" class="mono io-d" value="${esc(dev)}" aria-label="裝置"></td><td><input id="io-c-${i}" class="io-c" value="${esc(cmt)}" aria-label="註解"></td><td><button class="x" type="button" title="刪除">×</button></td>`;
+  tr.querySelector("button").onclick = () => tr.remove();
+  $("#ioBody").append(tr);
+}
+function stepRow(v = ["", "", "", "", ""]) {
+  const tr = document.createElement("tr"); const i = ++uid;
+  tr.innerHTML = `<td class="n"></td>
+    <td><input id="s-n-${i}" class="s-n" value="${esc(v[0])}" aria-label="動作說明"></td>
+    <td><input id="s-o-${i}" class="mono s-o" value="${esc(v[1])}" aria-label="輸出"></td>
+    <td><input id="s-t-${i}" class="mono s-t" value="${esc(v[2])}" aria-label="完成條件"></td>
+    <td class="w-num"><input id="s-d-${i}" class="mono s-d" value="${esc(v[3])}" inputmode="decimal" aria-label="延時"></td>
+    <td class="w-num"><input id="s-to-${i}" class="mono s-to" value="${esc(v[4])}" inputmode="decimal" aria-label="逾時"></td>
+    <td><button class="x" type="button" title="刪除">×</button></td>`;
+  tr.querySelector("button").onclick = () => { tr.remove(); renumber(); };
+  $("#stepBody").append(tr); renumber();
+}
+function renumber() { [...$("#stepBody").children].forEach((tr, k) => (tr.querySelector(".n").textContent = k + 1)); }
+const CFG_IDS = { start: "cStart", stop: "cStop", emg: "cEmg", reset: "cReset", runLamp: "cRunLamp", almLamp: "cAlmLamp", mode: "cMode", stepBase: "cStepBase", startCond: "cStartCond" };
+function loadProject(p) {
+  $("#series").value = p.series || "FX3U";
+  $("#ioBody").innerHTML = ""; p.io.forEach(([d, c]) => ioRow(d, c));
+  for (const [k, id] of Object.entries(CFG_IDS)) $("#" + id).value = p.cfg[k] ?? "";
+  $("#stepBody").innerHTML = ""; p.steps.forEach((s) => stepRow(s));
+}
+function readProject() {
+  const io = [...$("#ioBody").children].map((tr) => [tr.querySelector(".io-d").value.trim(), tr.querySelector(".io-c").value.trim()]).filter((r) => r[0]);
+  const cfg = {}; for (const [k, id] of Object.entries(CFG_IDS)) cfg[k] = $("#" + id).value.trim();
+  const steps = [...$("#stepBody").children].map((tr) => [".s-n", ".s-o", ".s-t", ".s-d", ".s-to"].map((c) => tr.querySelector(c).value.trim()));
+  return { series: $("#series").value, io, cfg, steps };
+}
+
+/* ---------- 時序 → 指令表 產生器 ---------- */
+function parseCond(expr) {
+  // 回傳 OR 群組陣列，每群為 [{dev, nc}]
+  if (!expr || !expr.trim()) return [];
+  return expr.split("|").map((g) => g.split("&").map((t) => t.trim()).filter(Boolean).map((t) => {
+    const nc = t.startsWith("!") || t.startsWith("/");
+    return { dev: normDev(nc ? t.slice(1) : t), nc };
+  })).filter((g) => g.length);
+}
+function generate(p) {
+  const S = SERIES[p.series]; const c = p.cfg; const L = []; const warn = [];
+  const cm = new Map(p.io.map(([d, t]) => [normDev(d), t]));
+  const sb = devNum(normDev(c.stepBase || "M100")) || { p: "M", n: 100 };
+  const M = (k) => `${sb.p}${sb.n + k}`;
+  const n = p.steps.length;
+  if (!n) { warn.push(["err", "至少需要一個步序"]); return { il: "", cm, warn }; }
+  if (n > 99) warn.push(["err", "步序超過 99 步，計時器編號會重疊"]);
+  const emit = (ins, ops = "", note = "") => L.push({ ins, ops, note });
+  const rem = (t) => L.push({ rem: t });
+  const conds = (groups) => {
+    if (!groups.length) return;
+    if (groups.length === 1) { groups[0].forEach((t) => emit(t.nc ? "ANI" : "AND", t.dev)); return; }
+    groups.forEach((g, gi) => { g.forEach((t, k) => emit(k === 0 ? (t.nc ? "LDI" : "LD") : (t.nc ? "ANI" : "AND"), t.dev)); if (gi > 0) emit("ORB"); });
+    emit("ANB");
+  };
+  const steps = p.steps.map((s, k) => {
+    const outs = s[1].split(/[,\s、，]+/).filter(Boolean).map((o) => {
+      const mode = o[0] === "+" ? "SET" : o[0] === "-" ? "RST" : "OUT";
+      return { mode, dev: normDev(mode === "OUT" ? o : o.slice(1)) };
+    });
+    return { k: k + 1, name: s[0] || `步序${k + 1}`, outs, cond: parseCond(s[2]), delay: Number(s[3]) || 0, timeout: Number(s[4]) || 0 };
+  });
+  const start = normDev(c.start), stop = normDev(c.stop), emg = normDev(c.emg), reset = normDev(c.reset);
+  // 自動註解
+  cm.set("M0", "自動運轉中"); cm.set("M1", "單循環結束"); cm.set("M50", "異常發生");
+  cm.set(M(0), "STEP0 待機/原點"); steps.forEach((s) => cm.set(M(s.k), `STEP${s.k} ${s.name}`));
+  steps.forEach((s) => { if (s.delay) cm.set(`T${s.k}`, `S${s.k} 延時`); if (s.timeout) cm.set(`T${100 + s.k}`, `S${s.k} 逾時`); });
+  const latched = [...new Set(steps.flatMap((s) => s.outs.filter((o) => o.mode !== "OUT").map((o) => o.dev)))];
+
+  rem("初始化 / 復歸：步序清除，回到 STEP0");
+  if (reset) { emit("LDP", reset); emit("ANI", "M0"); emit("OR", S.pulse); } else emit("LD", S.pulse);
+  emit("ZRST", `${M(0)} ${M(n)}`); emit("RST", "M50"); latched.forEach((d) => emit("RST", d)); emit("SET", M(0));
+
+  if (emg) { rem("緊急停止（B 接點：按下時輸入 OFF）"); emit("LDI", emg); emit("ZRST", `${M(0)} ${M(n)}`); latched.forEach((d) => emit("RST", d)); }
+
+  rem("自動運轉自保持");
+  if (start) emit("LD", start); else { emit("LD", "M0"); warn.push(["warn", "未設定啟動按鈕"]); }
+  if (start) emit("OR", "M0");
+  if (stop) emit("ANI", stop);
+  if (emg) emit("AND", emg);
+  emit("ANI", "M50"); emit("ANI", "M1"); emit("OUT", "M0");
+
+  rem("STEP0 → STEP1 起動條件");
+  emit("LD", M(0)); emit("AND", "M0"); conds(parseCond(c.startCond)); emit("SET", M(1)); emit("RST", M(0));
+
+  steps.forEach((s) => {
+    rem(`STEP${s.k} ${s.name}`);
+    if (s.delay) { emit("LD", M(s.k)); emit("OUT", `T${s.k} K${Math.max(1, Math.round(s.delay * 10))}`); }
+    if (s.timeout) { emit("LD", M(s.k)); emit("AND", "M0"); emit("OUT", `T${100 + s.k} K${Math.max(1, Math.round(s.timeout * 10))}`); }
+    s.outs.filter((o) => o.mode !== "OUT").forEach((o) => { emit("LD", M(s.k)); emit(o.mode, o.dev); });
+    emit("LD", M(s.k)); emit("AND", "M0");
+    if (s.delay) emit("AND", `T${s.k}`);
+    conds(s.cond);
+    if (!s.cond.length && !s.delay) warn.push(["warn", `STEP${s.k} 沒有完成條件，會在一個掃描內跳下一步`]);
+    if (s.k === n) { emit("SET", M(0)); if (c.mode === "single") emit("OUT", "M1"); }
+    else emit("SET", M(s.k + 1));
+    emit("RST", M(s.k));
+  });
+
+  const tos = steps.filter((s) => s.timeout);
+  if (tos.length) { rem("動作逾時 → 異常"); tos.forEach((s, i) => emit(i ? "OR" : "LD", `T${100 + s.k}`)); emit("SET", "M50"); }
+
+  rem("輸出（僅在步序中 ON 的線圈）");
+  const outMap = new Map();
+  steps.forEach((s) => s.outs.filter((o) => o.mode === "OUT").forEach((o) => { if (!outMap.has(o.dev)) outMap.set(o.dev, []); outMap.get(o.dev).push(M(s.k)); }));
+  for (const [dev, ms] of outMap) {
+    if (latched.includes(dev)) warn.push(["err", `${dev} 同時用於一般輸出與 SET/RST，會造成雙線圈`]);
+    ms.forEach((m, i) => emit(i ? "OR" : "LD", m)); emit("OUT", dev);
+  }
+  const runLamp = normDev(c.runLamp), almLamp = normDev(c.almLamp);
+  if (runLamp || almLamp) rem("指示燈");
+  if (runLamp) { emit("LD", "M0"); emit("OUT", runLamp); }
+  if (almLamp) { emit("LD", "M50"); emit("AND", S.clk); emit("OUT", almLamp); }
+  emit("END");
+
+  // 檢查 I/O 是否已定義
+  const used = new Set();
+  steps.forEach((s) => { s.outs.forEach((o) => used.add(o.dev)); s.cond.flat().forEach((t) => used.add(t.dev)); });
+  parseCond(c.startCond).flat().forEach((t) => used.add(t.dev));
+  [start, stop, emg, reset, runLamp, almLamp].filter(Boolean).forEach((d) => used.add(d));
+  for (const d of used) if (/^[XY]/.test(d) && !p.io.some(([x]) => normDev(x) === d)) warn.push(["warn", `${d} 未列在 I/O 配置表`]);
+
+  const il = L.map((r) => r.rem ? `; ── ${r.rem}` : `${r.ins}${r.ops ? "\t" + r.ops : ""}`).join("\n");
+  return { il, cm, warn };
+}
+
+/* ---------- 指令表解析 → 階梯樹 ---------- */
+const CMP = /^(LD|AND|OR)(D?)(<>|<=|>=|=|<|>)$/;
+function classify(ins) {
+  if (CMP.test(ins)) { const m = ins.match(CMP); return { cls: { LD: "load", AND: "and", OR: "or" }[m[1]], kind: "CMP", op: m[2] + m[3] }; }
+  const t = {
+    LD: ["load", "NO"], LDI: ["load", "NC"], LDP: ["load", "P"], LDF: ["load", "F"],
+    AND: ["and", "NO"], ANI: ["and", "NC"], ANDP: ["and", "P"], ANDF: ["and", "F"],
+    OR: ["or", "NO"], ORI: ["or", "NC"], ORP: ["or", "P"], ORF: ["or", "F"],
+    INV: ["and", "INV"], MEP: ["and", "MEP"], MEF: ["and", "MEF"],
+    ANB: ["anb"], ORB: ["orb"], MPS: ["mps"], MRD: ["mrd"], MPP: ["mpp"],
+    END: ["end"], FEND: ["end"], NOP: ["nop"]
+  }[ins];
+  if (t) return { cls: t[0], kind: t[1] };
+  return { cls: "out" };
+}
+function fxSteps(ins, ops) {
+  const d = ops[0] || "";
+  if (CMP.test(ins)) return /D/.test(ins.replace(/^(LD|AND|OR)/, "")) ? 9 : 5;
+  if (/^(LD|AND|OR)[IPF]?$|^ANI$|^ANDP$|^ANDF$|^ORP$|^ORF$/.test(ins)) return (/P|F$/.test(ins) && ins !== "ANI" && ins !== "ORI" && ins !== "LDI") ? 2 : (/^M(8\d{3})$/.test(d) ? 2 : 1);
+  if (["ANB", "ORB", "MPS", "MRD", "MPP", "INV", "END", "NOP"].includes(ins)) return 1;
+  if (ins === "OUT") return /^[TC]/.test(d) ? 3 : (/^M8\d{3}$/.test(d) ? 2 : 1);
+  if (ins === "SET" || ins === "RST") return /^[TCD]/.test(d) || /^M8\d{3}$/.test(d) ? 2 : 1;
+  if (ins === "PLS" || ins === "PLF") return 2;
+  return 1 + 2 * ops.length;
+}
+function parseIL(text) {
+  const lines = text.split(/\r?\n/); const ins = []; const errs = [];
+  lines.forEach((raw, li) => {
+    const s = raw.replace(/(;|\/\/).*$/, "").trim(); if (!s) return;
+    const parts = s.split(/[\s,]+/).filter(Boolean);
+    let [op, ...ops] = parts; op = op.toUpperCase(); ops = ops.map((o) => o.toUpperCase());
+    ins.push({ op, ops, line: li + 1 });
+  });
+  const rungs = []; let step = 0;
+  let r = null;
+  const newRung = (at) => { r = { step: at, cur: null, bstack: [], mstack: [], root: null, node: null, lastOut: false, ins: [] }; rungs.push(r); };
+  const ser = (a, b) => !a ? b : { t: "ser", items: [...(a.t === "ser" ? a.items : [a]), ...(b.t === "ser" ? b.items : [b])] };
+  const par = (a, b) => ({ t: "par", items: [...(a.t === "par" ? a.items : [a]), ...(b.t === "par" ? b.items : [b])] });
+  const mkNode = (cond) => ({ cond, items: [], fin: cond !== undefined });
+  for (const it of ins) {
+    const c = classify(it.op);
+    if (c.cls === "nop") continue;
+    const stepHere = step; step += fxSteps(it.op, it.ops);
+    if (!r || ((c.cls === "load" || c.cls === "end") && r.lastOut && !r.mstack.length) || (r && r.end)) newRung(stepHere);
+    r.ins.push(it);
+    const contact = () => ({ t: "c", kind: c.kind, dev: c.kind === "CMP" ? it.ops.join(" ") : normDev(it.ops[0]), op: c.op });
+    if (!r.root) { r.root = mkNode(); r.root.fin = false; r.node = r.root; }
+    switch (c.cls) {
+      case "load": if (r.cur) r.bstack.push(r.cur); r.cur = contact(); r.lastOut = false; break;
+      case "and": r.cur = ser(r.cur, contact()); r.lastOut = false; break;
+      case "or": if (!r.cur) { errs.push(`第 ${it.line} 行：${it.op} 前沒有接點`); r.cur = contact(); } else r.cur = par(r.cur, contact()); break;
+      case "anb": case "orb": {
+        const b = r.bstack.pop(); if (!b || !r.cur) { errs.push(`第 ${it.line} 行：${it.op} 缺少區塊`); break; }
+        r.cur = c.cls === "anb" ? ser(b, r.cur) : par(b, r.cur); break; }
+      case "mps": case "mrd": case "mpp": {
+        if (!r.node.fin) { r.node.cond = r.cur; r.node.fin = true; } else if (r.cur) { const ch = mkNode(r.cur); r.node.items.push({ t: "n", n: ch }); r.node = ch; }
+        r.cur = null;
+        let parent;
+        if (c.cls === "mps") { r.mstack.push(r.node); parent = r.node; }
+        else { parent = r.mstack[r.mstack.length - 1]; if (!parent) { errs.push(`第 ${it.line} 行：${it.op} 前沒有 MPS`); parent = r.node; } if (c.cls === "mpp") r.mstack.pop(); }
+        const ch = mkNode(null); ch.fin = false; parent.items.push({ t: "n", n: ch }); r.node = ch; r.lastOut = false; break; }
+      case "end": r.node.cond = null; r.node.fin = true; r.node.items.push({ t: "o", ins: it.op, ops: [] }); r.end = true; break;
+      default: {
+        if (!r.node.fin) { r.node.cond = r.cur; r.node.fin = true; }
+        else if (r.cur) { const ch = mkNode(r.cur); r.node.items.push({ t: "n", n: ch }); r.node = ch; }
+        r.cur = null; r.node.items.push({ t: "o", ins: it.op, ops: it.ops.map((o) => (/^[KHE"]/.test(o) ? o : normDev(o))) }); r.lastOut = true;
+      }
+    }
+  }
+  rungs.forEach((g, i) => { if (g.bstack.length) errs.push(`第 ${i + 1} 個迴路：LD 區塊未以 ANB/ORB 合併`); if (g.mstack.length) errs.push(`第 ${i + 1} 個迴路：MPS 未以 MPP 結束`); if (!g.end && !g.lastOut) errs.push(`第 ${i + 1} 個迴路沒有輸出指令`); });
+  return { rungs, errs, steps: step, count: ins.length };
+}
+
+/* ---------- 階梯圖繪製（SVG） ---------- */
+const CW = 92, RH = 62, COILW = 210, X0 = 64;
+function measure(b) {
+  if (!b) return { w: 0, h: 1 };
+  if (b.t === "c") return { w: 1, h: 1 };
+  const ms = b.items.map(measure);
+  return b.t === "ser" ? { w: ms.reduce((a, m) => a + m.w, 0), h: Math.max(...ms.map((m) => m.h)) } : { w: Math.max(...ms.map((m) => m.w)), h: ms.reduce((a, m) => a + m.h, 0) };
+}
+function layBlock(b, col, row, w, P) {
+  if (!b) return;
+  if (b.t === "c") { P.push({ t: "c", c: col, r: row, el: b }); if (w > 1) P.push({ t: "h", c1: col + 1, c2: col + w, r: row }); return; }
+  if (b.t === "ser") {
+    let c = col; b.items.forEach((it) => { const m = measure(it); layBlock(it, c, row, m.w, P); c += m.w; });
+    if (c < col + w) P.push({ t: "h", c1: c, c2: col + w, r: row }); return;
+  }
+  let r = row, last = row;
+  b.items.forEach((it) => { last = r; layBlock(it, col, r, w, P); r += measure(it).h; });
+  P.push({ t: "v", c: col, r1: row, r2: last }); P.push({ t: "v", c: col + w, r1: row, r2: last });
+}
+function nodeH(n) { const ih = n.items.reduce((a, it) => a + (it.t === "o" ? 1 : nodeH(it.n)), 0); return Math.max(measure(n.cond).h, ih, 1); }
+function layNode(n, col, row, P, coils) {
+  const m = measure(n.cond); layBlock(n.cond, col, row, m.w, P);
+  const bx = col + m.w; let r = row, last = row;
+  n.items.forEach((it) => { last = r; if (it.t === "o") { coils.push({ c: bx, r, el: it }); r += 1; } else { layNode(it.n, bx, r, P, coils); r += nodeH(it.n); } });
+  if (last > row) P.push({ t: "v", c: bx, r1: row, r2: last });
+}
+function contactSVG(x, y, el, cm) {
+  const cx = x + CW / 2; let s = "";
+  const lbl = el.kind === "CMP" ? `[${el.op} ${el.dev}]` : el.dev;
+  if (el.kind === "CMP") {
+    s += `<line x1="${x}" y1="${y}" x2="${x + 6}" y2="${y}" class="w"/><rect x="${x + 6}" y="${y - 11}" width="${CW - 12}" height="22" class="box"/><line x1="${x + CW - 6}" y1="${y}" x2="${x + CW}" y2="${y}" class="w"/>`;
+    s += `<text x="${cx}" y="${y + 4}" text-anchor="middle" class="t sm">${esc(el.op + " " + el.dev)}</text>`;
+    return s;
+  }
+  if (el.kind === "INV" || el.kind === "MEP" || el.kind === "MEF") {
+    s += `<line x1="${x}" y1="${y}" x2="${x + CW}" y2="${y}" class="w"/>`;
+    if (el.kind === "INV") s += `<line x1="${cx - 7}" y1="${y + 9}" x2="${cx + 7}" y2="${y - 9}" class="w"/>`;
+    else s += `<line x1="${cx}" y1="${y + 9}" x2="${cx}" y2="${y - 9}" class="w"/><path d="M${cx - 4} ${el.kind === "MEP" ? y - 4 : y + 4} L${cx} ${el.kind === "MEP" ? y - 9 : y + 9} L${cx + 4} ${el.kind === "MEP" ? y - 4 : y + 4}" class="w f0"/>`;
+    s += `<text x="${cx}" y="${y - 16}" text-anchor="middle" class="t">${el.kind}</text>`; return s;
+  }
+  s += `<line x1="${x}" y1="${y}" x2="${cx - 7}" y2="${y}" class="w"/><line x1="${cx + 7}" y1="${y}" x2="${x + CW}" y2="${y}" class="w"/>`;
+  s += `<line x1="${cx - 7}" y1="${y - 11}" x2="${cx - 7}" y2="${y + 11}" class="w b"/><line x1="${cx + 7}" y1="${y - 11}" x2="${cx + 7}" y2="${y + 11}" class="w b"/>`;
+  if (el.kind === "NC") s += `<line x1="${cx - 11}" y1="${y + 11}" x2="${cx + 11}" y2="${y - 11}" class="w"/>`;
+  if (el.kind === "P" || el.kind === "F") { const up = el.kind === "P"; s += `<line x1="${cx}" y1="${y + 8}" x2="${cx}" y2="${y - 8}" class="w"/><path d="M${cx - 3.5} ${up ? y - 3 : y + 3} L${cx} ${up ? y - 8 : y + 8} L${cx + 3.5} ${up ? y - 3 : y + 3}" class="w f0"/>`; }
+  s += `<text x="${cx}" y="${y - 16}" text-anchor="middle" class="t">${esc(lbl)}</text>`;
+  const c = cm.get(el.dev); if (c) s += `<text x="${cx}" y="${y + 25}" text-anchor="middle" class="cm">${esc(trunc(c, 7))}</text>`;
+  return s;
+}
+function trunc(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+function coilSVG(x, y, el, cm) {
+  const ops = el.ops; let s = "";
+  if (el.ins === "OUT" && !/^[TC]/.test(ops[0] || "")) {
+    const cx = x + COILW / 2;
+    s += `<line x1="${x}" y1="${y}" x2="${cx - 13}" y2="${y}" class="w"/><line x1="${cx + 13}" y1="${y}" x2="${x + COILW}" y2="${y}" class="w"/>`;
+    s += `<path d="M${cx - 6} ${y - 12} Q${cx - 16} ${y} ${cx - 6} ${y + 12}" class="w f0 b"/><path d="M${cx + 6} ${y - 12} Q${cx + 16} ${y} ${cx + 6} ${y + 12}" class="w f0 b"/>`;
+    s += `<text x="${cx}" y="${y - 16}" text-anchor="middle" class="t">${esc(ops[0] || "")}</text>`;
+    const c = cm.get(ops[0]); if (c) s += `<text x="${cx}" y="${y + 26}" text-anchor="middle" class="cm">${esc(trunc(c, 14))}</text>`;
+    return s;
+  }
+  const txt = [el.ins, ...ops].join(" ");
+  s += `<line x1="${x}" y1="${y}" x2="${x + 10}" y2="${y}" class="w"/><line x1="${x + COILW - 10}" y1="${y}" x2="${x + COILW}" y2="${y}" class="w"/>`;
+  s += `<path d="M${x + 16} ${y - 13} H${x + 10} V${y + 13} H${x + 16} M${x + COILW - 16} ${y - 13} H${x + COILW - 10} V${y + 13} H${x + COILW - 16}" class="w f0 b"/>`;
+  s += `<text x="${x + COILW / 2}" y="${y + 4}" text-anchor="middle" class="t">${esc(trunc(txt, 22))}</text>`;
+  const c = cm.get(ops[0]); if (c && el.ins !== "END") s += `<text x="${x + COILW / 2}" y="${y + 27}" text-anchor="middle" class="cm">${esc(trunc(c, 14))}</text>`;
+  return s;
+}
+function renderLadder(parsed, cm, remarks, forExport = false) {
+  const blocks = []; let maxC = 4;
+  parsed.rungs.forEach((g) => { const P = [], coils = []; if (g.root) layNode(g.root, 0, 0, P, coils); coils.forEach((k) => (maxC = Math.max(maxC, k.c))); blocks.push({ g, P, coils, h: g.root ? nodeH(g.root) : 1 }); });
+  const coilX = X0 + maxC * CW + 24, W = coilX + COILW + 20;
+  let y = 14, body = "";
+  blocks.forEach((b, i) => {
+    const rm = remarks.get(b.g.ins[0]?.line);
+    if (rm) { body += `<text x="${X0 + 6}" y="${y + 12}" class="cm rem">${esc(rm)}</text>`; y += 22; }
+    const top = y, Y = (r) => top + r * RH + RH / 2, X = (c) => X0 + c * CW;
+    body += `<text x="${X0 - 8}" y="${Y(0) + 4}" text-anchor="end" class="t step">${b.g.step}</text>`;
+    b.P.forEach((p) => {
+      if (p.t === "h") body += `<line x1="${X(p.c1)}" y1="${Y(p.r)}" x2="${X(p.c2)}" y2="${Y(p.r)}" class="w"/>`;
+      else if (p.t === "v") body += `<line x1="${X(p.c)}" y1="${Y(p.r1)}" x2="${X(p.c)}" y2="${Y(p.r2)}" class="w"/>`;
+      else body += contactSVG(X(p.c), Y(p.r), p.el, cm);
+    });
+    b.coils.forEach((k) => { if (X(k.c) < coilX) body += `<line x1="${X(k.c)}" y1="${Y(k.r)}" x2="${coilX}" y2="${Y(k.r)}" class="w"/>`; body += coilSVG(coilX, Y(k.r), k.el, cm); });
+    y = top + b.h * RH + 8;
+    if (i < blocks.length - 1) body += `<line x1="${X0}" y1="${y - 4}" x2="${W - 20}" y2="${y - 4}" class="sep"/>`;
+  });
+  const H = y + 10;
+  const css = forExport
+    ? `.w{stroke:#1d2a24;stroke-width:1.6;fill:none}.b{stroke-width:2.2}.f0{fill:none}.box{fill:#fff;stroke:#1d2a24;stroke-width:1.4}.t{font:12px Consolas,monospace;fill:#18211d}.sm{font-size:11px}.cm{font:11px "Microsoft JhengHei",sans-serif;fill:#3d6b8f}.rem{fill:#0b7a57;font-weight:600}.step{fill:#5b6a63;font-size:11px}.rail{stroke:#24312b;stroke-width:3}.sep{stroke:#cdd6d1;stroke-dasharray:3 4}`
+    : `.w{stroke:var(--wire);stroke-width:1.6;fill:none}.b{stroke-width:2.2}.f0{fill:none}.box{fill:var(--panel);stroke:var(--wire);stroke-width:1.4}.t{font-size:12px;fill:var(--ink)}.sm{font-size:11px}.cm{font-size:11px;fill:var(--cmt)}.rem{fill:var(--accent);font-weight:600}.step{fill:var(--muted);font-size:11px}.rail{stroke:var(--rail);stroke-width:3}.sep{stroke:var(--line);stroke-dasharray:3 4}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${css}</style>${forExport ? `<rect width="${W}" height="${H}" fill="#fff"/>` : ""}<line x1="${X0}" y1="6" x2="${X0}" y2="${H - 6}" class="rail"/><line x1="${coilX + COILW}" y1="6" x2="${coilX + COILW}" y2="${H - 6}" class="rail"/>${body}</svg>`;
+}
+
+/* ---------- 狀態與輸出 ---------- */
+const st = { il: "", cm: new Map(), parsed: null, genWarn: [] };
+function remarksOf(text) {
+  // 把「; ── 說明」對應到下一行指令的行號
+  const m = new Map(); let pending = null;
+  text.split(/\r?\n/).forEach((raw, i) => {
+    const t = raw.trim(); const cmt = t.match(/^;\s*(?:──\s*)?(.+)$/);
+    if (cmt) pending = cmt[1]; else if (t) { if (pending) m.set(i + 1, pending); pending = null; }
+  });
+  return m;
+}
+function analyze() {
+  const text = $("#il").value; st.il = text;
+  const p = readProject(); const S = SERIES[p.series];
+  st.parsed = parseIL(text);
+  const msgs = [...st.genWarn];
+  st.parsed.errs.forEach((e) => msgs.push(["err", e]));
+  // 雙線圈 / 位址檢查
+  const outs = new Map();
+  st.parsed.rungs.forEach((g) => g.ins.forEach((it) => {
+    if (it.op === "OUT" && it.ops[0]) { const d = normDev(it.ops[0]); outs.set(d, (outs.get(d) || 0) + 1); }
+    it.ops.forEach((o) => { if (S.base === 8 && /^[XY]\d*[89]\d*$/.test(normDev(o))) msgs.push(["err", `第 ${it.line} 行 ${o}：FX 系列 X/Y 為 8 進位，不可含 8、9`]); });
+  }));
+  for (const [d, n] of outs) if (n > 1) msgs.push(["warn", `${d} 有 ${n} 個 OUT 線圈（雙線圈）`]);
+  if (!msgs.length) msgs.push(["ok", `檢查通過：${S.sw} 可用的指令表已就緒`]);
+  $("#msgs").innerHTML = msgs.map(([k, t]) => `<div class="msg ${k}">${esc(t)}</div>`).join("");
+  $("#stats").innerHTML = `<span>迴路 <b>${st.parsed.rungs.length}</b></span><span>指令 <b>${st.parsed.count}</b></span><span>步數(FX 估算) <b>${st.parsed.steps}</b></span><span>機種 <b>${p.series}</b></span>`;
+  $("#ladder").innerHTML = renderLadder(st.parsed, st.cm, remarksOf(text));
+}
+function runGenerate() {
+  const p = readProject(); const g = generate(p);
+  st.genWarn = g.warn; st.cm = g.cm; $("#il").value = g.il; analyze(); saveLocal();
+}
+function commentMapFromIO() { const p = readProject(); const m = new Map(st.cm); p.io.forEach(([d, c]) => m.set(normDev(d), c)); return m; }
+
+/* ---------- 匯出格式 / 編碼 ---------- */
+const PRESETS = {
+  gxd:  { delim: ",", enc: "big5", pad: "1" },
+  gxw2: { delim: "\t", enc: "utf16le", pad: "1" },
+  utf8: { delim: ",", enc: "utf8bom", pad: "0" }
+};
+const PLC_INFO = { FX3U: "FX3U/FX3UC", FX5U: "FX5U", Q: "QCPU (Q mode)", R: "R04CPU" };
+const fmt = { preset: "gxd", delim: ",", enc: "big5", pad: "1", name: "MAIN", plc: "", delay: "120", tpl: null, ctpl: null };
+function loadFmt() { try { Object.assign(fmt, JSON.parse(localStorage.getItem("mlg-fmt") || "{}")); } catch {} }
+function saveFmt() { try { localStorage.setItem("mlg-fmt", JSON.stringify(fmt)); } catch {} }
+function showFmt() {
+  $("#fPreset").value = fmt.preset; $("#fDelim").value = fmt.delim; $("#fEnc").value = fmt.enc; $("#fPad").value = fmt.pad;
+  $("#fName").value = fmt.name; $("#fPlc").value = fmt.plc || PLC_INFO[$("#series").value]; $("#fDelay").value = fmt.delay;
+  const t = [];
+  if (fmt.tpl) t.push(`程式 CSV 已校準：${fmt.tpl.delim === "\t" ? "Tab" : "逗號"}分隔、${ENC_NAME[fmt.tpl.enc]}、${fmt.tpl.pad ? "X000 補零" : "不補零"}、前置 ${fmt.tpl.pre.length} 行、${fmt.tpl.cols} 欄`);
+  if (fmt.ctpl) t.push(`註解 CSV 已校準：${fmt.ctpl.delim === "\t" ? "Tab" : "逗號"}分隔、${ENC_NAME[fmt.ctpl.enc]}、前置 ${fmt.ctpl.pre.length} 行`);
+  $("#calInfo").textContent = t.length ? t.join("；") : "尚未校準：使用上方格式設定輸出。";
+}
+const ENC_NAME = { big5: "Big5", shift_jis: "Shift-JIS", utf16le: "UTF-16", utf8bom: "UTF-8(BOM)", utf8: "UTF-8" };
+["fPreset", "fDelim", "fEnc", "fPad", "fName", "fPlc", "fDelay"].forEach((id) => ($("#" + id).onchange = () => {
+  if (id === "fPreset" && PRESETS[$("#fPreset").value]) Object.assign(fmt, PRESETS[$("#fPreset").value], { preset: $("#fPreset").value });
+  else {
+    fmt.delim = $("#fDelim").value; fmt.enc = $("#fEnc").value; fmt.pad = $("#fPad").value;
+    fmt.name = $("#fName").value.trim() || "MAIN"; fmt.plc = $("#fPlc").value.trim(); fmt.delay = $("#fDelay").value.trim() || "120";
+    if (["fDelim", "fEnc", "fPad"].includes(id)) fmt.preset = "custom";
+  }
+  saveFmt(); showFmt();
+}));
+
+const mbMaps = {};
+function mbMap(enc) {
+  // 以瀏覽器內建解碼器反推 Big5 / Shift-JIS 編碼表（離線可用）
+  if (mbMaps[enc]) return mbMaps[enc];
+  const dec = new TextDecoder(enc), map = new Map(), pair = new Uint8Array(2);
+  const leads = enc === "big5" ? [[0x81, 0xfe]] : [[0x81, 0x9f], [0xe0, 0xfc]];
+  for (const [a, b] of leads) for (let l = a; l <= b; l++) for (let t = 0x40; t <= 0xfe; t++) {
+    if (t === 0x7f) continue; pair[0] = l; pair[1] = t;
+    const ch = dec.decode(pair); if (ch.length === 1 && ch !== "�" && !map.has(ch)) map.set(ch, (l << 8) | t);
+  }
+  return (mbMaps[enc] = map);
+}
+function encodeText(text, enc) {
+  if (enc === "utf8bom" || enc === "utf8") { const b = new TextEncoder().encode(text); if (enc === "utf8") return b; const o = new Uint8Array(b.length + 3); o.set([0xef, 0xbb, 0xbf]); o.set(b, 3); return o; }
+  if (enc === "utf16le") { const o = new Uint8Array(2 + text.length * 2); o[0] = 0xff; o[1] = 0xfe; for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); o[2 + i * 2] = c & 255; o[3 + i * 2] = c >> 8; } return o; }
+  const map = mbMap(enc), out = []; let miss = 0;
+  for (const ch of text) { const c = ch.codePointAt(0); if (c < 0x80) out.push(c); else { const v = map.get(ch); if (v) out.push(v >> 8, v & 255); else { out.push(0x3f); miss++; } } }
+  if (miss) toast(`有 ${miss} 個字元無法以 ${ENC_NAME[enc]} 表示，已改為 ?`);
+  return new Uint8Array(out);
+}
+function decodeBytes(buf) {
+  const b = new Uint8Array(buf);
+  if (b[0] === 0xff && b[1] === 0xfe) return { text: new TextDecoder("utf-16le").decode(b.subarray(2)), enc: "utf16le" };
+  if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return { text: new TextDecoder("utf-8").decode(b.subarray(3)), enc: "utf8bom" };
+  try { return { text: new TextDecoder("utf-8", { fatal: true }).decode(b), enc: "utf8" }; } catch {}
+  const big5 = new TextDecoder("big5").decode(b), sj = new TextDecoder("shift_jis").decode(b);
+  const bad = (s) => (s.match(/�/g) || []).length;
+  return bad(sj) < bad(big5) ? { text: sj, enc: "shift_jis" } : { text: big5, enc: "big5" };
+}
+function splitCsv(line, delim) {
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true; else if (ch === delim) { out.push(cur); cur = ""; } else cur += ch;
+  }
+  out.push(cur); return out;
+}
+function detectDelim(lines) { const s = lines.slice(0, 10).join("\n"); return (s.match(/\t/g) || []).length > (s.match(/,/g) || []).length ? "\t" : ","; }
+function calibrate(buf, kind) {
+  const { text, enc } = decodeBytes(buf);
+  const lines = text.split(/\r?\n/); while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  const delim = detectDelim(lines);
+  const rows = lines.map((l) => splitCsv(l, delim));
+  const isDev = (s) => /^(X|Y|M|L|S|B|F|SM|D|T|C|SD|W|R|ZR)[0-9A-F]+$/i.test(String(s).trim());
+  let di;
+  if (kind === "prog") {
+    di = rows.findIndex((r) => r.some((c) => /^(LD|LDI|LDP|LDF)$/i.test(c.trim())));
+    if (di < 0) throw new Error("找不到 LD 指令列，請匯出含 LD 指令的程式");
+    const r = rows[di], ins = r.findIndex((c) => /^(LD|LDI|LDP|LDF)$/i.test(c.trim()));
+    const hdr = di > 0 ? rows[di - 1].map((h) => h.toLowerCase()) : [];
+    const find = (re, dflt) => { const k = hdr.findIndex((h) => re.test(h)); return k >= 0 ? k : dflt; };
+    const idx = { step: find(/step|ステップ|步/, ins > 0 && /^\d+$/.test(r[0].trim()) ? 0 : -1), stmt: find(/line|statement|ステートメント|陳述|行間/, -1), ins, dev: ins + 1, note: find(/note|ノート|注/, -1) };
+    if (idx.stmt === ins || idx.stmt === idx.dev) idx.stmt = -1;
+    if (idx.note === ins || idx.note === idx.dev) idx.note = -1;
+    return { delim, enc, quote: lines[di].trim().startsWith('"'), cols: r.length, idx, pre: lines.slice(0, Math.max(0, di - 1)), header: di > 0 ? lines[di - 1] : null, pad: /^[XY]0\d\d$/i.test(r[ins + 1].trim()) };
+  }
+  di = rows.findIndex((r) => isDev(r[0]) && r.length >= 2);
+  if (di < 0) throw new Error("找不到「裝置, 註解」資料列");
+  const r = rows[di];
+  return { delim, enc, quote: lines[di].trim().startsWith('"'), cols: r.length, idx: { dev: 0, cmt: 1 }, pre: lines.slice(0, Math.max(0, di - 1)), header: di > 0 ? lines[di - 1] : null, pad: /^[XY]0\d\d$/i.test(r[0].trim()) };
+}
+async function onCal(e, kind) {
+  const f = e.target.files[0]; if (!f) return;
+  try { const t = calibrate(await f.arrayBuffer(), kind); if (kind === "prog") fmt.tpl = t; else fmt.ctpl = t; saveFmt(); showFmt(); toast("已校準格式"); }
+  catch (err) { toast(`無法校準：${err.message}`); }
+  e.target.value = "";
+}
+$("#calProg").onchange = (e) => onCal(e, "prog");
+$("#calCmt").onchange = (e) => onCal(e, "cmt");
+$("#calClear").onclick = () => { fmt.tpl = fmt.ctpl = null; saveFmt(); showFmt(); toast("已清除校準"); };
+
+function padDev(d, pad) {
+  if (!pad || SERIES[$("#series").value].base !== 8) return d;
+  const m = String(d).match(/^([XY])([0-7]+)$/); return m ? m[1] + m[2].padStart(3, "0") : d;
+}
+function ilItems() {
+  const out = []; let stmt = "";
+  st.il.split(/\r?\n/).forEach((raw) => {
+    const t = raw.trim(); if (!t) return;
+    const c = t.match(/^;\s*(?:──\s*)?(.+)$/); if (c) { stmt = c[1]; return; }
+    const parts = t.replace(/(;|\/\/).*$/, "").trim().split(/[\s,]+/).filter(Boolean); if (!parts.length) return;
+    out.push({ op: parts[0].toUpperCase(), ops: parts.slice(1).map((o) => o.toUpperCase()), stmt }); stmt = "";
+  });
+  return out;
+}
+function joinRow(cells, delim, quote) { return cells.map((c) => { c = String(c ?? ""); return quote || c.includes(delim) || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c; }).join(delim); }
+function buildProgCsv() {
+  const t = fmt.tpl; const delim = t ? t.delim : fmt.delim; const quote = t ? t.quote : true; const pad = t ? t.pad : fmt.pad === "1";
+  const cols = t ? t.cols : 7; const idx = t ? t.idx : { step: 0, stmt: 1, ins: 2, dev: 3, note: 6 };
+  const lines = t ? [...t.pre, ...(t.header != null ? [t.header] : [])]
+    : [joinRow([fmt.name || "MAIN"], delim, true), joinRow(["PLC Information:", fmt.plc || PLC_INFO[$("#series").value]], delim, true),
+       joinRow(["Step No.", "Line Statement", "Instruction", "I/O(Device)", "Blank", "PI Statement", "Note"], delim, true)];
+  let step = 0;
+  const row = (o) => { const r = new Array(cols).fill(""); for (const [k, v] of Object.entries(o)) if (idx[k] >= 0 && v != null) r[idx[k]] = v; return joinRow(r, delim, quote); };
+  ilItems().forEach((it) => {
+    const dev = it.ops[0] ? padDev(normDev(it.ops[0]), pad) : "";
+    lines.push(row({ step: String(step), stmt: it.stmt, ins: it.op, dev: /^[KH"]/.test(it.ops[0] || "") ? it.ops[0] : dev, note: "" }));
+    it.ops.slice(1).forEach((o) => lines.push(row({ dev: /^[KH"]/.test(o) ? o : padDev(normDev(o), pad) })));
+    step += fxSteps(it.op, it.ops);
+  });
+  return { text: lines.join("\r\n") + "\r\n", enc: t ? t.enc : fmt.enc };
+}
+function sortedComments() {
+  const p = readProject(); const m = commentMapFromIO();
+  const order = (d) => { const x = d.match(/^([A-Z]+)([0-9A-F]+)$/); const pri = "XYMSTCD".indexOf(x ? x[1][0] : "Z"); return [pri < 0 ? 9 : pri, x ? x[1] : d, x ? parseInt(x[2], /^[XY]$/.test(x[1]) ? SERIES[p.series].base : 10) : 0]; };
+  return [...m.entries()].filter(([, c]) => c).sort((a, b) => { const A = order(a[0]), B = order(b[0]); return A[0] - B[0] || A[1].localeCompare(B[1]) || A[2] - B[2]; });
+}
+function buildCmtCsv() {
+  const t = fmt.ctpl; const delim = t ? t.delim : fmt.delim; const quote = t ? t.quote : true; const pad = t ? t.pad : fmt.pad === "1";
+  const lines = t ? [...t.pre, ...(t.header != null ? [t.header] : [])] : [joinRow(["Device Name", "Comment"], delim, true)];
+  sortedComments().forEach(([d, c]) => { const r = new Array(t ? t.cols : 2).fill(""); r[0] = padDev(d, pad); r[1] = c; lines.push(joinRow(r, delim, quote)); });
+  return { text: lines.join("\r\n") + "\r\n", enc: t ? t.enc : fmt.enc };
+}
+function buildAhk() {
+  const items = ilItems(); const delay = Math.max(30, Number(fmt.delay) || 120);
+  const q = (s) => `"${s.replace(/`/g, "``").replace(/"/g, '`"')}"`;
+  const lines = items.map((it) => `  ${q([it.op, ...it.ops].join(" "))},`).join("\n");
+  return `#Requires AutoHotkey v2.0
+; 三菱 PLC 指令表自動鍵入腳本（由「三菱 PLC 階梯圖產生器」產生）
+; 機種：${$("#series").value}　指令數：${items.length}
+; 使用方式：GX Works2 / GX Developer 開啟程式 → Alt+F1 切換清單模式 → 游標放在第 0 步
+;           執行本腳本 → 按「確定」後 5 秒內點選 GX Works 視窗。按住 Esc 可中止。
+#SingleInstance Force
+SetKeyDelay 20, 20
+Delay := ${delay}
+Lines := [
+${lines}
+]
+r := MsgBox("即將輸入 " Lines.Length " 行指令。\`n\`n1. GX Works2 已切換到清單模式（Alt+F1）\`n2. 游標在第 0 步\`n\`n按「確定」後 5 秒內點選 GX Works 視窗；按住 Esc 可中止。", "三菱 PLC 自動鍵入", "OKCancel")
+if (r != "OK")
+  ExitApp
+Sleep 5000
+target := WinExist("A")
+for i, L in Lines {
+  if GetKeyState("Esc", "P") {
+    MsgBox "已中止，完成 " (i - 1) " / " Lines.Length " 行"
+    ExitApp
+  }
+  if !WinActive("ahk_id " target) {
+    MsgBox "GX Works 視窗失去焦點，已暫停於第 " i " 行。\`n請點回 GX Works 原游標位置後按「確定」繼續。"
+    WinActivate "ahk_id " target
+    Sleep 800
+  }
+  SendText L
+  Sleep Delay
+  Send "{Enter}"
+  Sleep Delay
+}
+MsgBox "輸入完成，共 " Lines.Length " 行。請執行轉換（F4）與程式檢查。"
+`;
+}
+
+/* ---------- 匯出 ---------- */
+function exportFile(kind) {
+  const p = readProject(); const base = `PLC_${p.series}`;
+  if (kind === "il") return { name: `${base}_IL.txt`, text: st.il.split(/\r?\n/).filter((l) => l.trim()).join("\r\n") + "\r\n", enc: "utf8bom" };
+  if (kind === "prog") return { name: `${base}_Program.csv`, ...buildProgCsv() };
+  if (kind === "cmt") return { name: `${base}_DeviceComment.csv`, ...buildCmtCsv() };
+  if (kind === "ahk") return { name: `${base}_AutoInput.ahk`, text: buildAhk(), enc: "utf8bom" };
+  if (kind === "svg") return { name: `${base}_Ladder.svg`, text: renderLadder(st.parsed, st.cm, remarksOf(st.il), true), enc: "utf8" };
+  if (kind === "json") return { name: `${base}_Project.json`, text: JSON.stringify(p, null, 2), enc: "utf8" };
+}
+let downloadsNs;
+async function saveFile(kind) {
+  const f = exportFile(kind); const bytes = encodeText(f.text, f.enc);
+  try {
+    if (downloadsNs === undefined && window.claude?.use) downloadsNs = await window.claude.use("downloads");
+    if (downloadsNs) {
+      try { await downloadsNs.save({ filename: f.name, data: bytes.slice() }); toast(`已下載 ${f.name}`); }
+      catch (e) {
+        if (e?.code === "rejected_extension") { await downloadsNs.save({ filename: f.name + ".txt", data: bytes.slice() }); toast(`已下載，請把副檔名 .txt 刪除改回 ${f.name}`); }
+        else throw e;
+      }
+      return;
+    }
+  } catch (e) { if (e?.code === "declined") return; if (e?.code && e.code !== "unavailable") { toast(`無法下載：${e.message || e.code}`); return; } }
+  try {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" })); a.download = f.name;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  } catch { toast("此環境無法下載，請改用「複製」"); }
+}
+async function copyText(kind) {
+  const f = exportFile(kind);
+  try { await navigator.clipboard.writeText(f.text); toast("已複製到剪貼簿"); }
+  catch { selectTab("il"); $("#il").select(); toast("無法存取剪貼簿，已選取指令表文字，請按 Ctrl+C"); }
+}
+
+/* ---------- 分頁 / 事件 ---------- */
+function selectTab(name) {
+  ["ladder", "il", "export"].forEach((t) => { $("#tab-" + t).setAttribute("aria-selected", String(t === name)); $("#pane-" + t).hidden = t !== name; });
+  try { localStorage.setItem("mlg-tab", name); } catch {}
+}
+["ladder", "il", "export"].forEach((t) => ($("#tab-" + t).onclick = () => selectTab(t)));
+$("#addIo").onclick = () => ioRow();
+$("#addStep").onclick = () => stepRow();
+$("#gen").onclick = () => { runGenerate(); selectTab("ladder"); toast("已產生階梯圖"); };
+$("#redraw").onclick = () => { analyze(); selectTab("ladder"); };
+$("#loadSample").onclick = () => { loadProject(SAMPLE); runGenerate(); toast("已載入範例"); };
+$("#series").onchange = () => { runGenerate(); showFmt(); };
+document.querySelectorAll("[data-exp]").forEach((b) => (b.onclick = () => (b.dataset.act === "save" ? saveFile(b.dataset.exp) : copyText(b.dataset.exp))));
+$("#loadJson").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { loadProject(JSON.parse(await f.text())); runGenerate(); toast("已載入專案"); } catch { toast("檔案格式不正確，請選擇本工具匯出的 JSON"); }
+  e.target.value = "";
+};
+function saveLocal() { try { localStorage.setItem("mlg-project", JSON.stringify(readProject())); } catch {} }
+document.addEventListener("change", (e) => { if (e.target.closest("main") && e.target.id !== "loadJson" && e.target.id !== "il") saveLocal(); });
+
+let initial = SAMPLE;
+try { const s = localStorage.getItem("mlg-project"); if (s) initial = JSON.parse(s); } catch {}
+loadFmt(); loadProject(initial); runGenerate(); showFmt();
+try { const t = localStorage.getItem("mlg-tab"); if (t) selectTab(t); } catch {}
+</script>
+
+</body>
+</html>
