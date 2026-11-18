@@ -87,6 +87,7 @@ svg .cm { font-family: var(--sans); }
       <select id="series">
         <option value="FX3U">FX3U / FX3G（GX Works2）</option>
         <option value="FX5U">FX5U / FX5UC（GX Works3）</option>
+        <option value="FX5S">FX5S / FX5UJ（GX Works3）</option>
         <option value="Q">Q 系列（GX Works2）</option>
         <option value="R">iQ-R（GX Works3）</option>
       </select>
@@ -225,6 +226,7 @@ const $ = (s) => document.querySelector(s);
 const SERIES = {
   FX3U: { base: 8, pulse: "M8002", clk: "M8013", sw: "GX Works2" },
   FX5U: { base: 8, pulse: "SM402", clk: "SM412", sw: "GX Works3" },
+  FX5S: { base: 8, pulse: "SM402", clk: "SM412", sw: "GX Works3" },
   Q:    { base: 16, pulse: "SM402", clk: "SM412", sw: "GX Works2" },
   R:    { base: 16, pulse: "SM402", clk: "SM412", sw: "GX Works3" }
 };
@@ -596,7 +598,7 @@ const PRESETS = {
   gxw2: { delim: "\t", enc: "utf16le", pad: "1" },
   utf8: { delim: ",", enc: "utf8bom", pad: "0" }
 };
-const PLC_INFO = { FX3U: "FX3U/FX3UC", FX5U: "FX5U", Q: "QCPU (Q mode)", R: "R04CPU" };
+const PLC_INFO = { FX3U: "FX3U/FX3UC", FX5U: "FX5U", FX5S: "FX5S", Q: "QCPU (Q mode)", R: "R04CPU" };
 const fmt = { preset: "gxd", delim: ",", enc: "big5", pad: "1", name: "MAIN", plc: "", delay: "120", tpl: null, ctpl: null };
 function loadFmt() { try { Object.assign(fmt, JSON.parse(localStorage.getItem("mlg-fmt") || "{}")); } catch {} }
 function saveFmt() { try { localStorage.setItem("mlg-fmt", JSON.stringify(fmt)); } catch {} }
