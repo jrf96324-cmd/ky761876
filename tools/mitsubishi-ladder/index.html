@@ -627,7 +627,7 @@ function mbMap(enc) {
   const leads = enc === "big5" ? [[0x81, 0xfe]] : [[0x81, 0x9f], [0xe0, 0xfc]];
   for (const [a, b] of leads) for (let l = a; l <= b; l++) for (let t = 0x40; t <= 0xfe; t++) {
     if (t === 0x7f) continue; pair[0] = l; pair[1] = t;
-    const ch = dec.decode(pair); if (ch.length === 1 && ch !== "�" && !map.has(ch)) map.set(ch, (l << 8) | t);
+    const ch = dec.decode(pair); if (ch.length === 1 && ch !== "\uFFFD" && !map.has(ch)) map.set(ch, (l << 8) | t);
   }
   return (mbMaps[enc] = map);
 }
@@ -645,7 +645,7 @@ function decodeBytes(buf) {
   if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return { text: new TextDecoder("utf-8").decode(b.subarray(3)), enc: "utf8bom" };
   try { return { text: new TextDecoder("utf-8", { fatal: true }).decode(b), enc: "utf8" }; } catch {}
   const big5 = new TextDecoder("big5").decode(b), sj = new TextDecoder("shift_jis").decode(b);
-  const bad = (s) => (s.match(/�/g) || []).length;
+  const bad = (s) => (s.match(/\uFFFD/g) || []).length;
   return bad(sj) < bad(big5) ? { text: sj, enc: "shift_jis" } : { text: big5, enc: "big5" };
 }
 function splitCsv(line, delim) {
