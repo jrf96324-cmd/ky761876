@@ -144,11 +144,14 @@ tr.grand td{font-weight:700;color:var(--accent);font-size:14px}
     <button class="btn" id="bCopy" title="複製全部清單為表格，可直接貼到 Excel">複製 BOM（貼 Excel）</button>
     <button class="btn" id="bCsv">下載 CSV</button>
     <button class="btn" id="bPng">匯出圖片</button>
+    <button class="btn" id="bPdf" title="A3 圖框：立面、側面、平面、3D、BOM、估價">匯出 2D 圖面 PDF</button>
+    <button class="btn" id="bStp" title="3D 實體模型 STEP AP214，單位 mm，Z 軸向上">匯出 3D STEP</button>
     <button class="btn primary" id="bOffline" hidden title="下載單一 HTML 檔，離線雙擊即可使用">下載單機版</button>
   </div>
 </header>
 
 <section class="params" aria-label="主要尺寸">
+  <div class="f"><label for="projName">案名</label><input id="projName" data-k="projName" type="text" class="w150" style="font-family:var(--font-ui)"></div>
   <div class="f"><label for="preset">結構模式</label>
     <select id="preset" class="w150">
       <option value="factory">廠房（單跨門型剛架）</option>
@@ -425,7 +428,7 @@ function makeState(key){
   const p = {...structuredClone(DEF), ...structuredClone(src)};
   p.prof = {...DEF.prof, ...src.prof}; p.mz = {...DEF.mz};
   if(key==='factoryMz'){ p.mz.on=true; p.floorLL=500; }
-  const s = {preset:key, ...p, LL:60, wq:110, Fy:'2500', paint:'paint', colors:{steel:'#c9ced6',roof:'#3f7fb5',wall:'#d8dde3'}};
+  const s = {preset:key, ...p, LL:60, wq:110, Fy:'2500', paint:'paint', projName:'鋼構工程方案', colors:{steel:'#c9ced6',roof:'#3f7fb5',wall:'#d8dde3'}};
   if(key==='shed'||key.startsWith('house')){s.colors.roof='#b8bec6';s.colors.wall='#e9e5dc'}
   if(s.floors>1) s.H = s.storyH.slice(0,s.floors).reduce((a,b)=>a+b,0);
   s.bays = Array(p.nBays).fill(Math.round(p.L/p.nBays));
@@ -918,6 +921,8 @@ function wire(){
   $('#bCopy').onclick=async()=>{ const txt=tableText('\t'); try{ await navigator.clipboard.writeText(txt); toast('已複製，可直接貼到 Excel'); }catch(e){ fallbackCopy(txt); } };
   $('#bCsv').onclick=()=>saveFile('鋼構BOM.csv','\uFEFF'+tableText(','),'text/csv');
   $('#bPng').onclick=()=>{ if(!renderer) return; renderer.render(scene,camera); renderer.domElement.toBlob(b=>{ if(b) saveFile('鋼構3D.png',b,'image/png'); }); };
+  $('#bPdf').onclick=()=>runBusy('#bPdf','產生 PDF 中…',exportPDF);
+  $('#bStp').onclick=()=>runBusy('#bStp','產生 STEP 中…',exportSTEP);
   $('#bOffline').onclick=async()=>{ try{ const r=await fetch('steel-designer-offline.html'); if(!r.ok) throw 0; saveFile('鋼構廠房3D設計器-單機版.html',await r.text(),'text/html'); }catch(e){ toast('單機版檔案讀取失敗，請稍後再試'); } };
   if(window.claude && window.claude.use) window.claude.use('downloads').then(d=>{ DLS=d; if(d) $('#bOffline').hidden=false; }).catch(()=>{});
 }
@@ -926,7 +931,7 @@ function saveFile(name,data,type){
   if(DLS){ DLS.save({filename:name,data}).then(()=>toast('已下載 '+name)).catch(e=>{ if(e&&e.code!=='declined') toast('無法下載：'+(e.message||e.code)); }); return; }
   download(data,name,type);
 }
-function download(data,name,type){ const blob=data instanceof Blob?data:new Blob([data],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
+function download(data,name,type){ const blob=data instanceof Blob?data:new Blob([data],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.style.display='none'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },4000); }
 function fallbackCopy(txt){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;left:16px;right:16px;bottom:16px;height:40vh;z-index:30;background:#0c1520;color:#dce6ef'; document.body.appendChild(ta); ta.select(); toast('請按 Ctrl+C 複製，點其他地方關閉'); ta.onblur=()=>ta.remove(); }
 function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2200); }
 
@@ -1233,29 +1238,30 @@ function loop(){
 }
 
 /* ================= 工程三視圖 (SVG) ================= */
-function drawViews(g){
-  const s=st, C={fl:'#5fb3a1',ln:'#c9d6e3',mem:'#8fb3d6',sec:'#e0b84f',br:'#e98a35',dim:'#6fb0e6',op:'#e98a35',tx:'#c9d6e3',mut:'#6f879e',gr:'#3a5570'};
+function drawViews(g,mode){
+  const PR=mode==='print', K=PR?2.4:1;
+  const s=st, C=PR?{fl:'#127a63',ln:'#222',mem:'#1d3d63',sec:'#a06a00',br:'#c2491a',dim:'#1458b0',op:'#c2491a',tx:'#111',mut:'#555',gr:'#888'}:{fl:'#5fb3a1',ln:'#c9d6e3',mem:'#8fb3d6',sec:'#e0b84f',br:'#e98a35',dim:'#6fb0e6',op:'#e98a35',tx:'#c9d6e3',mut:'#6f879e',gr:'#3a5570'};
   const fsz=Math.max(g.W,g.L,g.ridge)*0.018;
   const T=(x,y,t,o={})=>`<text x="${x}" y="${y}" fill="${o.c||C.tx}" font-size="${o.fs||fsz}" font-family="IBM Plex Mono, monospace" text-anchor="${o.a||'middle'}" ${o.r?`transform="rotate(${o.r} ${x} ${y})"`:''} dominant-baseline="middle">${t}</text>`;
-  const Ln=(x1,y1,x2,y2,c,w=1.2,d='')=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" ${d?`stroke-dasharray="${d}"`:''}/>`;
-  const R=(x,y,w,h,c,f='none',d='')=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${c}" fill="${f}" stroke-width="1.2" vector-effect="non-scaling-stroke" ${d?`stroke-dasharray="${d}"`:''}/>`;
+  const Ln=(x1,y1,x2,y2,c,w=1.2,d='')=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w*K}" vector-effect="non-scaling-stroke" ${d?`stroke-dasharray="${d}"`:''}/>`;
+  const R=(x,y,w,h,c,f='none',d='')=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${c}" fill="${f}" stroke-width="${1.2*K}" vector-effect="non-scaling-stroke" ${d?`stroke-dasharray="${d}"`:''}/>`;
   const dimH=(x1,x2,y,t)=>Ln(x1,y,x2,y,C.dim,1)+Ln(x1,y-fsz*.5,x1,y+fsz*.5,C.dim,1)+Ln(x2,y-fsz*.5,x2,y+fsz*.5,C.dim,1)+T((x1+x2)/2,y-fsz*.7,t,{c:C.dim});
   const dimV=(x,y1,y2,t)=>Ln(x,y1,x,y2,C.dim,1)+Ln(x-fsz*.5,y1,x+fsz*.5,y1,C.dim,1)+Ln(x-fsz*.5,y2,x+fsz*.5,y2,C.dim,1)+T(x-fsz*.8,(y1+y2)/2,t,{c:C.dim,r:-90});
-  const bub=(x,y,t)=>`<circle cx="${x}" cy="${y}" r="${fsz*.8}" fill="none" stroke="${C.mut}" stroke-width="1" vector-effect="non-scaling-stroke"/>`+T(x,y,t,{c:C.tx,fs:fsz*.85});
+  const bub=(x,y,t)=>`<circle cx="${x}" cy="${y}" r="${fsz*.8}" fill="none" stroke="${C.mut}" stroke-width="${K}" vector-effect="non-scaling-stroke"/>`+T(x,y,t,{c:C.tx,fs:fsz*.85});
   const svg=(vb,body)=>`<svg viewBox="${vb.join(' ')}" xmlns="http://www.w3.org/2000/svg"><g transform="scale(1,-1)">${body}</g></svg>`;
   // 前視（山牆立面）— y 向上；以 scale(1,-1) 翻轉，文字需反轉
   const flipT=(x,y,t,o)=>`<g transform="translate(${x} ${y}) scale(1,-1)">${T(0,0,t,o)}</g>`;
   const dimHf=(x1,x2,y,t)=>Ln(x1,y,x2,y,C.dim,1)+Ln(x1,y-fsz*.5,x1,y+fsz*.5,C.dim,1)+Ln(x2,y-fsz*.5,x2,y+fsz*.5,C.dim,1)+flipT((x1+x2)/2,y+fsz*.7,t,{c:C.dim});
   const dimVf=(x,y1,y2,t)=>Ln(x,y1,x,y2,C.dim,1)+Ln(x-fsz*.5,y1,x+fsz*.5,y1,C.dim,1)+Ln(x-fsz*.5,y2,x+fsz*.5,y2,C.dim,1)+flipT(x-fsz*.8,(y1+y2)/2,t,{c:C.dim,r:-90});
-  const bubf=(x,y,t)=>`<circle cx="${x}" cy="${y}" r="${fsz*.8}" fill="none" stroke="${C.mut}" stroke-width="1" vector-effect="non-scaling-stroke"/>`+flipT(x,y,t,{fs:fsz*.85});
+  const bubf=(x,y,t)=>`<circle cx="${x}" cy="${y}" r="${fsz*.8}" fill="none" stroke="${C.mut}" stroke-width="${K}" vector-effect="non-scaling-stroke"/>`+flipT(x,y,t,{fs:fsz*.85});
   const rf=(x)=>g.roofY(x);
   // ---- 前視
   let b='';
   const pad=fsz*5;
   b+=Ln(-g.oh-pad*.5,0,g.W+g.oh+pad*.5,0,C.gr,1.5);
   const rx=[-g.oh, ...(s.roof==='gable'?[g.W/2]:[]), g.W+g.oh];
-  b+=`<polyline points="${rx.map(x=>`${x},${rf(x)}`).join(' ')}" fill="none" stroke="${C.mem}" stroke-width="2.4" vector-effect="non-scaling-stroke"/>`;
-  b+=`<polyline points="${rx.map(x=>`${x},${rf(x)-g.raf.h}`).join(' ')}" fill="none" stroke="${C.mem}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  b+=`<polyline points="${rx.map(x=>`${x},${rf(x)}`).join(' ')}" fill="none" stroke="${C.mem}" stroke-width="${2.4*K}" vector-effect="non-scaling-stroke"/>`;
+  b+=`<polyline points="${rx.map(x=>`${x},${rf(x)-g.raf.h}`).join(' ')}" fill="none" stroke="${C.mem}" stroke-width="${K}" vector-effect="non-scaling-stroke"/>`;
   g.colX.forEach(x=>b+=R(x-g.col.h/2,0,g.col.h,rf(x)-g.raf.h,C.mem));
   (g.windXs.front.length?g.windXs.front:[]).forEach(x=>b+=R(x-g.wind.b/2,0,g.wind.b,rf(x)-g.raf.h,C.mem,'none','4 3'));
   g.purX.forEach(x=>b+=R(x-g.pur.b/2,rf(x),g.pur.b,g.pur.h,C.sec,C.sec));
@@ -1282,7 +1288,7 @@ function drawViews(g){
   g.M.filter(m=>m.name==='牆面斜撐'&&m.p1[0]===0).forEach(m=>c2+=Ln(m.p1[2],m.p1[1],m.p2[2],m.p2[1],C.br,1));
   g.plats.forEach(pl=>{ c2+=R(pl.zA,pl.y-g.dT,pl.zB-pl.zA,g.dT,C.fl,C.fl); c2+=flipT(pl.zA+fsz*4,pl.y+fsz*.9,`${pl.label} FL+${fmt(pl.y)}`,{c:C.fl,fs:fsz*.8,a:'start'}); });
   g.stairs.forEach(t=>{ let d=''; for(let i=0;i<t.n;i++){ const z=t.zBot+t.dir*(i-1)*260; d+=`${z},${t.base+i*t.riser} ${z+t.dir*260},${t.base+i*t.riser} `; }
-    c2+=`<polyline points="${d}" fill="none" stroke="${C.fl}" stroke-width="1" vector-effect="non-scaling-stroke"/>`; });
+    c2+=`<polyline points="${d}" fill="none" stroke="${C.fl}" stroke-width="${K}" vector-effect="non-scaling-stroke"/>`; });
   g.ops.filter(o=>o.wall==='left').forEach(o=>{ c2+=R(+o.pos,+o.sill,+o.w,+o.h,C.op,'none','6 4'); c2+=flipT(+o.pos+(+o.w)/2,+o.sill+(+o.h)/2,`${OPS[o.type]} ${o.w}×${o.h}`,{c:C.op,fs:fsz*.8}); });
   g.fz.slice(0,-1).forEach((z,i)=>c2+=dimHf(z,g.fz[i+1],-pad*.25,fmt(s.bays[i])));
   c2+=dimHf(0,g.L,-pad*.55,fmt(g.L));
@@ -1316,10 +1322,212 @@ function drawViews(g){
   g.fz.forEach((z,i)=>c3+=bub(z,g.W+g.oh+pad*.6,String(i+1)));
   g.colX.forEach((x,i)=>c3+=bub(g.L+g.gOh+pad*.6,x,String.fromCharCode(65+i)));
   const vbP=[-g.gOh-pad,-g.oh-pad*.9,g.L+2*g.gOh+2*pad,g.W+2*g.oh+pad*1.9];
+  if(PR) return [
+    {t:'山牆立面圖（1 軸）',vb:vbF,svg:svg(vbF,b)},
+    {t:'左側牆立面圖（A 軸）',vb:vbS,svg:svg(vbS,c2)},
+    {t:'屋頂結構平面圖'+(g.plats.length?'（含樓板／樓梯）':''),vb:vbP,svg:`<svg viewBox="${vbP.join(' ')}" xmlns="http://www.w3.org/2000/svg">${c3}</svg>`}];
   $('#views').innerHTML=`
     <div class="sheet"><h3><span>前視圖・山牆立面（1 軸）</span><span>單位 mm</span></h3>${svg(vbF,b)}</div>
     <div class="sheet"><h3><span>側視圖・左側牆立面（A 軸）</span><span>單位 mm</span></h3>${svg(vbS,c2)}</div>
     <div class="sheet wide"><h3><span>屋頂結構平面圖（桁條・斜撐・柱位${g.plats.length?'・樓板／樓梯':''}）</span><span>單位 mm</span></h3><svg viewBox="${vbP.join(' ')}" xmlns="http://www.w3.org/2000/svg">${c3}</svg></div>`;
+}
+
+/* ================= 匯出：PDF 圖面 / STEP 3D ================= */
+async function runBusy(sel,msg,fn){ const b=$(sel), t=b.textContent; b.disabled=true; b.textContent=msg;
+  try{ await fn(); }catch(e){ console.error(e); toast('匯出失敗：'+(e.message||e)); } finally{ b.disabled=false; b.textContent=t; } }
+const stamp=()=>{ const d=new Date(), z=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}`; };
+const safeName=t=>String(t||'鋼構').replace(/[\\/:*?"<>|]/g,'_').slice(0,40);
+
+// ---- A3 圖紙（200 dpi）
+const PX=3307/420, PW=3307, PH=2339, CJK='"Microsoft JhengHei","PingFang TC","Noto Sans CJK TC","Noto Sans TC",sans-serif';
+function sheetCanvas(title,no,scale,total,idx){
+  const c=document.createElement('canvas'); c.width=PW; c.height=PH; const x=c.getContext('2d');
+  x.fillStyle='#fff'; x.fillRect(0,0,PW,PH); x.strokeStyle='#111';
+  const mm=v=>v*PX;
+  x.lineWidth=mm(.7); x.strokeRect(mm(10),mm(10),mm(400),mm(277));
+  x.lineWidth=mm(.35); x.strokeRect(mm(12),mm(12),mm(396),mm(273));
+  // 標題欄
+  const ty=255, cells=[['案名',st.projName||'—',100],['圖名',title,92],['比例',scale,30],['圖號',no,26],['日期',new Date().toLocaleDateString('zh-TW'),34],['張次',`${idx}/${total}`,22],
+    ['規模',`${fmt(G.W)}×${fmt(G.L)}×H${fmt(G.H)}${G.floors>1?`・${G.floors}F`:''}${G.plats.some(p=>p.kind==='mezz')?'・夾層':''}`,92]];
+  x.lineWidth=mm(.35); x.strokeRect(mm(12),mm(ty),mm(396),mm(30)); let cx=12;
+  cells.forEach(([k,v,w])=>{ x.beginPath(); x.moveTo(mm(cx),mm(ty)); x.lineTo(mm(cx),mm(ty+30)); x.stroke();
+    x.fillStyle='#555'; x.font=`${mm(3)}px ${CJK}`; x.fillText(k,mm(cx+2),mm(ty+5.5));
+    x.fillStyle='#111'; x.font=`bold ${mm(k==='圖名'||k==='案名'?5:4.2)}px ${CJK}`;
+    let tv=String(v); while(x.measureText(tv).width>mm(w-4)&&tv.length>2) tv=tv.slice(0,-2)+'…'; x.fillText(tv,mm(cx+2),mm(ty+17)); cx+=w; });
+  x.fillStyle='#777'; x.font=`${mm(2.6)}px ${CJK}`;
+  x.fillText('鋼構廠房 3D 設計器輸出・單位 mm・方案評估用圖，施工前須經結構技師計算簽證',mm(14),mm(ty+27));
+  return {c,x,mm};
+}
+function svgToImage(svg,w,h){ return new Promise((res,rej)=>{ const im=new Image();
+  im.onload=()=>res(im); im.onerror=()=>rej(new Error('SVG 轉換失敗'));
+  im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg.replace('<svg ',`<svg width="${w}" height="${h}" `)); }); }
+const STD=[10,20,25,30,50,75,100,150,200,250,300,400,500,600,750,1000,1500,2000];
+async function drawSheetFromSVG(v,no,total,idx){
+  const aw=390, ah=232, need=Math.max(v.vb[2]/aw, v.vb[3]/ah), S=STD.find(x=>x>=need)||Math.ceil(need/100)*100;
+  const {c,x,mm}=sheetCanvas(v.t,no,`1:${S}（A3）`,total,idx);
+  const wmm=v.vb[2]/S, hmm=v.vb[3]/S, im=await svgToImage(v.svg,Math.round(mm(wmm)),Math.round(mm(hmm)));
+  x.drawImage(im,mm(15+(aw-wmm)/2),mm(16+(ah-hmm)/2),mm(wmm),mm(hmm));
+  // 比例尺
+  const bar=[1000,2000,5000,10000].find(b=>b/S>=25)||1000, L=bar/S; x.strokeStyle='#111'; x.lineWidth=mm(.35);
+  for(let i=0;i<5;i++){ x.fillStyle=i%2?'#fff':'#111'; x.fillRect(mm(18+i*L/5),mm(246),mm(L/5),mm(2)); x.strokeRect(mm(18+i*L/5),mm(246),mm(L/5),mm(2)); }
+  x.fillStyle='#111'; x.font=`${mm(2.8)}px ${CJK}`; x.fillText('0',mm(17),mm(244.5)); x.fillText(`${bar/1000} m`,mm(18+L-3),mm(244.5));
+  return c;
+}
+function tablePages(title,no0,head,widths,rows,total0){
+  const per=31, pages=[];
+  for(let p=0;p*per<Math.max(rows.length,1);p++) pages.push(rows.slice(p*per,(p+1)*per));
+  return pages.map((rs,pi)=>(idx,total)=>{
+    const {c,x,mm}=sheetCanvas(title+(pages.length>1?`（${pi+1}/${pages.length}）`:''),no0,'—',total,idx);
+    let y=24, X=[16]; widths.forEach(w=>X.push(X[X.length-1]+w));
+    x.fillStyle='#e8edf2'; x.fillRect(mm(16),mm(y-5.5),mm(X[X.length-1]-16),mm(7.5));
+    const row=(cells,bold,yy)=>cells.forEach((v,i)=>{ const num=typeof v==='number'; x.font=`${bold?'bold ':''}${mm(3.4)}px ${CJK}`; x.fillStyle='#111';
+      const tv=num?fmt(v,Number.isInteger(v)?0:1):String(v??''); x.textAlign=num?'right':'left'; x.fillText(tv,mm(num?X[i+1]-2:X[i]+2),mm(yy)); x.textAlign='left'; });
+    row(head,true,y); x.strokeStyle='#999'; x.lineWidth=mm(.2);
+    rs.forEach((r,i)=>{ y+=7.2; if(r._sub){ x.fillStyle='#f3f5f7'; x.fillRect(mm(16),mm(y-5),mm(X[X.length-1]-16),mm(7)); }
+      row(r.cells,r._b,y); x.beginPath(); x.moveTo(mm(16),mm(y+2)); x.lineTo(mm(X[X.length-1]),mm(y+2)); x.stroke(); });
+    return c; });
+}
+async function exportPDF(){
+  const views=drawViews(G,'print'), makers=[];
+  views.forEach((v,i)=>makers.push(async(idx,total)=>drawSheetFromSVG(v,`S-0${i+1}`,total,idx)));
+  if(renderer && renderer.domElement.width>0 && !$('#stage').hidden){
+    makers.push(async(idx,total)=>{ renderer.render(scene,camera); const src=renderer.domElement;
+      const {c,x,mm}=sheetCanvas('3D 結構透視圖','S-04','NTS',total,idx);
+      const r=Math.min(mm(390)/src.width,mm(232)/src.height), w=src.width*r, h=src.height*r;
+      x.drawImage(src,(PW-w)/2,mm(16)+(mm(232)-h)/2,w,h); return c; }); }
+  const steelRows=Q.steel.map((r,i)=>({cells:[i+1,r.name,r.prof,r.len,r.qty,+r.totLen.toFixed(2),+r.kg.toFixed(1),r.note]}))
+    .concat([{_sub:1,_b:1,cells:['','鋼板零件 SS400']}], Q.plates.map(p=>({cells:['',p.name,'PL '+p.spec,'',p.qty,'',+p.kg.toFixed(1),p.note]})),
+      [{_sub:1,_b:1,cells:['','合計','','',``,+Q.totLen.toFixed(1),+Q.totKg.toFixed(1),`用鋼量 ${fmt(Q.totKg/Q.floorArea,1)} kg/m²`]}]);
+  const tp1=tablePages('鋼材裁切清單','B-01',['#','品名','規格','裁切長度 mm','數量','小計長 m','小計 kg','加工備註'],[12,46,52,32,20,28,30,168],steelRows);
+  const estRows=EST.it.map(i=>({cells:[i.grp,i.n,+i.qty.toFixed(i.u==='kg'||i.u==='m²'||i.u==='m'?1:0),i.u,i.p,Math.round(i.amt)]}))
+    .concat([{_sub:1,_b:1,cells:['','小計','','','',Math.round(EST.sub)]},{cells:['',`管理利潤 ${st.price.mgmt}%`,'','','',Math.round(EST.mg)]},{cells:['','營業稅 5%','','','',Math.round(EST.tax)]},
+      {_sub:1,_b:1,cells:['',`含稅總價（總樓地板 ${fmt(Q.floorArea/3.30579,1)} 坪）`,'','','',Math.round(EST.total)]}]);
+  const tp2=tablePages('估價單','B-02',['類別','項目','數量','單位','單價 NT$','複價 NT$'],[30,150,40,24,60,84],estRows);
+  makers.push(...tp1, ...tp2);
+  const total=makers.length, imgs=[];
+  for(let i=0;i<total;i++){ const c=await makers[i](i+1,total);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.9)); imgs.push({bytes:new Uint8Array(await blob.arrayBuffer()),w:c.width,h:c.height}); }
+  saveFile(`${safeName(st.projName)}_圖面_${stamp()}.pdf`,new Blob([buildPdf(imgs)],{type:'application/pdf'}),'application/pdf');
+}
+function buildPdf(imgs){
+  const enc=new TextEncoder(), parts=[], offs=[]; let len=0;
+  const push=x=>{ const b=typeof x==='string'?enc.encode(x):x; parts.push(b); len+=b.length; };
+  const W=(420*72/25.4).toFixed(2), H=(297*72/25.4).toFixed(2), n=imgs.length;
+  const obj=(id,fn)=>{ offs[id]=len; push(`${id} 0 obj\n`); fn(); push('\nendobj\n'); };
+  push('%PDF-1.4\n%âã\n');
+  obj(1,()=>push('<</Type/Catalog/Pages 2 0 R>>'));
+  obj(2,()=>push(`<</Type/Pages/Count ${n}/Kids[${imgs.map((_,i)=>`${3+3*i} 0 R`).join(' ')}]>>`));
+  imgs.forEach((im,i)=>{ const pg=3+3*i, ct=pg+1, ix=pg+2, cs=`q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+    obj(pg,()=>push(`<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${W} ${H}]/Resources<</XObject<</Im0 ${ix} 0 R>>>>/Contents ${ct} 0 R>>`));
+    obj(ct,()=>push(`<</Length ${cs.length}>>stream\n${cs}\nendstream`));
+    obj(ix,()=>{ push(`<</Type/XObject/Subtype/Image/Width ${im.w}/Height ${im.h}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${im.bytes.length}>>stream\n`); push(im.bytes); push('\nendstream'); }); });
+  const N=3+3*n, xref=len;
+  push(`xref\n0 ${N}\n0000000000 65535 f \n`+Array.from({length:N-1},(_,i)=>String(offs[i+1]).padStart(10,'0')+' 00000 n \n').join(''));
+  push(`trailer\n<</Size ${N}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(parts,{type:'application/pdf'});
+}
+
+// ---- STEP AP214（平面 B-rep 實體，mm，Z 軸向上）
+const EN={'主柱':'COLUMN','中柱':'COLUMN_INNER','屋頂大樑':'RAFTER','山牆柱':'GABLE_COLUMN','簷口繫樑':'EAVE_STRUT','中柱繫樑':'TIE_BEAM','桁條':'PURLIN','牆檁':'GIRT',
+  '開口框料（立框）':'OPENING_JAMB','開口框料（橫框）':'OPENING_HEADER','屋面斜撐':'ROOF_BRACE','牆面斜撐':'WALL_BRACE','夾層柱':'MEZZ_COLUMN','樓層大樑':'FLOOR_GIRDER',
+  '夾層大樑':'MEZZ_GIRDER','樓板小樑':'FLOOR_JOIST','夾層小樑':'MEZZ_JOIST','樓梯斜樑':'STAIR_STRINGER'};
+const asciiProf=p=>p.replace('□','SHS').replace(/φ(\d+).*/,'RB$1').replace(/[^\x20-\x7E]/g,'');
+function profLoops(p){
+  if(p.t==='H'){ const h=p.h/2,b=p.b/2,w=p.tw/2,f=p.tf; return [[[-b,-h],[b,-h],[b,-h+f],[w,-h+f],[w,h-f],[b,h-f],[b,h],[-b,h],[-b,h-f],[-w,h-f],[-w,-h+f],[-b,-h+f]]]; }
+  if(p.t==='C'){ const h=p.h/2,b=p.b,t=p.tt,c=p.c,x0=-b/2; return [[[x0,-h],[x0+b,-h],[x0+b,-h+c],[x0+b-t,-h+c],[x0+b-t,-h+t],[x0+t,-h+t],[x0+t,h-t],[x0+b-t,h-t],[x0+b-t,h-c],[x0+b,h-c],[x0+b,h],[x0,h]]]; }
+  if(p.t==='BOX'){ const h=p.h/2,b=p.b/2,t=p.tt; return [[[-b,-h],[b,-h],[b,h],[-b,h]],[[-b+t,-h+t],[-b+t,h-t],[b-t,h-t],[b-t,-h+t]]]; }
+  const r=p.d/2; return [Array.from({length:12},(_,i)=>[r*Math.cos(i*Math.PI/6),r*Math.sin(i*Math.PI/6)])];
+}
+function exportSTEP(){
+  const g=G, L=[]; let id=30;
+  const E=t=>{ id++; L.push(`#${id}=${t};`); return id; };
+  const f=n=>{ if(Math.abs(n)<1e-9) n=0; let s=String(Math.round(n*1e4)/1e4); if(!/[.e]/i.test(s)) s+='.'; return s; };
+  const T=v=>[v[0],-v[2],v[1]];                       // 模型 Y 向上 → CAD Z 向上
+  const P=v=>{ const c=T(v); return E(`CARTESIAN_POINT('',(${f(c[0])},${f(c[1])},${f(c[2])}))`); };
+  const D=v=>{ const c=T(v), l=Math.hypot(...c); return E(`DIRECTION('',(${f(c[0]/l)},${f(c[1]/l)},${f(c[2]/l)}))`); };
+  const add3=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], mul=(a,k)=>[a[0]*k,a[1]*k,a[2]*k], sub3=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  const area=l=>l.reduce((a,p,i)=>{ const q=l[(i+1)%l.length]; return a+p[0]*q[1]-q[0]*p[1]; },0);
+  const solids=[], count={};
+  const edge=(v1,v2,c1,c2)=>{ const d=sub3(c2,c1), l=Math.hypot(...d); return E(`EDGE_CURVE('',#${v1},#${v2},#${E(`LINE('',#${P(c1)},#${E(`VECTOR('',#${D(d)},${f(l)})`)})`)},.T.)`); };
+  const OE=(e,s)=>E(`ORIENTED_EDGE('',*,*,#${e},${s?'.T.':'.F.'})`);
+  const face=(loops,o,n,r)=>{ const bs=loops.map((oes,i)=>E(`${i?'FACE_BOUND':'FACE_OUTER_BOUND'}('',#${E(`EDGE_LOOP('',(${oes.map(x=>'#'+x).join(',')}))`)},.T.)`));
+    return E(`ADVANCED_FACE('',(${bs.map(x=>'#'+x).join(',')}),#${E(`PLANE('',#${E(`AXIS2_PLACEMENT_3D('',#${P(o)},#${D(n)},#${D(r)})`)})`)},.T.)`); };
+  // loops：局部 XY 多邊形（第一個外框），沿局部 Z 擠出 len；B=[原點,X,Y,Z]（世界座標）
+  function prism(loops,len,B,name){
+    if(len<1) return;
+    loops=loops.map((l,i)=>{ const a=area(l); return (i===0?a<0:a>0)?l.slice().reverse():l; });
+    const [o,X,Y,Z]=B, W=(p,z)=>add3(add3(add3(o,mul(X,p[0])),mul(Y,p[1])),mul(Z,z));
+    const faces=[], top=[], bot=[];
+    loops.forEach(l=>{ const n=l.length, bc=l.map(p=>W(p,0)), tc=l.map(p=>W(p,len));
+      const bv=bc.map(c=>E(`VERTEX_POINT('',#${P(c)})`)), tv=tc.map(c=>E(`VERTEX_POINT('',#${P(c)})`));
+      const Eb=[],Et=[],Ev=[];
+      for(let i=0;i<n;i++){ const j=(i+1)%n; Eb.push(edge(bv[i],bv[j],bc[i],bc[j])); Et.push(edge(tv[i],tv[j],tc[i],tc[j])); Ev.push(edge(bv[i],tv[i],bc[i],tc[i])); }
+      top.push(Et.map(e=>OE(e,true))); bot.push(Eb.map(e=>OE(e,false)).reverse());
+      for(let i=0;i<n;i++){ const j=(i+1)%n, d=sub3(bc[j],bc[i]);
+        faces.push(face([[OE(Eb[i],true),OE(Ev[j],true),OE(Et[i],false),OE(Ev[i],false)]],bc[i],cross(d,Z),d)); } });
+    faces.push(face(top,W(loops[0][0],len),Z,X), face(bot,W(loops[0][0],0),mul(Z,-1),X));
+    const nm=name.replace(/[^\x20-\x7E]/g,'').replace(/'/g,''); count[nm]=(count[nm]||0)+1;
+    solids.push(E(`MANIFOLD_SOLID_BREP('${nm}_${count[nm]}',#${E(`CLOSED_SHELL('',(${faces.map(x=>'#'+x).join(',')}))`)})`));
+  }
+  const basis=(a,b,upv)=>{ const d=sub3(b,a), l=Math.hypot(...d), z=mul(d,1/l); let u=sub3(upv,mul(z,upv[0]*z[0]+upv[1]*z[1]+upv[2]*z[2]));
+    if(Math.hypot(...u)<1e-6) u=Math.abs(z[1])<.9?[0,1,0]:[1,0,0]; u=mul(u,1/Math.hypot(...u)); const x=cross(u,z); return {B:[a,x,u,z],l}; };
+  // 構件
+  g.M.forEach(m=>{ const {B,l}=basis(m.p1,m.p2,m.up); prism(profLoops(PROF[m.prof]),l,B,`${EN[m.name]||'MEMBER'}_${asciiProf(m.prof)}`); });
+  // 底板
+  g.M.filter(m=>['主柱','中柱','山牆柱','夾層柱'].includes(m.name)).forEach(m=>{ const p=PROF[m.prof], sz=Math.max(p.h,p.b)+150, t=m.name==='主柱'||m.name==='中柱'?20:16;
+    prism([[[-sz/2,-sz/2],[sz/2,-sz/2],[sz/2,sz/2],[-sz/2,sz/2]]],t,[[m.p1[0],0,m.p1[2]],[1,0,0],[0,0,-1],[0,1,0]],'BASE_PLATE'); });
+  // 樓板（含開口）
+  g.plats.forEach(pl=>{ prism([[[pl.x0,-pl.zA],[pl.x1,-pl.zA],[pl.x1,-pl.zB],[pl.x0,-pl.zB]], ...pl.ops.map(o=>[[o.x0,-o.z0],[o.x0,-o.z1],[o.x1,-o.z1],[o.x1,-o.z0]])],
+    g.dT,[[0,pl.y-g.dT,0],[1,0,0],[0,0,-1],[0,1,0]],`DECK_${pl.label}`); });
+  // 踏板・欄杆
+  g.stairs.forEach(t=>{ for(let i=1;i<t.n;i++){ const zc=t.zBot+t.dir*((i-1)*260+130), y=t.base+i*t.riser;
+    prism([[[t.xs,-(zc-140)],[t.xs+t.sw,-(zc-140)],[t.xs+t.sw,-(zc+140)],[t.xs,-(zc+140)]]],6,[[0,y-6,0],[1,0,0],[0,0,-1],[0,1,0]],'STAIR_TREAD'); } });
+  const bar=(a,b,w,name)=>{ const {B,l}=basis(a,b,[0,1,0]); prism([[[-w/2,-w/2],[w/2,-w/2],[w/2,w/2],[-w/2,w/2]]],l,B,name); };
+  g.rails.forEach(({y,seg:[x0,z0,x1,z1]})=>{ const Ls=Math.hypot(x1-x0,z1-z0), n=Math.max(1,Math.ceil(Ls/1500));
+    for(let i=0;i<=n;i++){ const x=x0+(x1-x0)*i/n, z=z0+(z1-z0)*i/n; bar([x,y,z],[x,y+1100,z],40,'RAIL_POST'); }
+    bar([x0,y+1100,z0],[x1,y+1100,z1],40,'RAIL_TOP'); });
+  const head=`ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('Steel structure model'),'2;1');
+FILE_NAME('steel-structure.stp','${new Date().toISOString().slice(0,19)}',(''),(''),'Steel Building Designer','Steel Building Designer','');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));
+ENDSEC;
+DATA;
+#1=APPLICATION_CONTEXT('core data for automotive mechanical design processes');
+#2=APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#1);
+#3=PRODUCT_CONTEXT('',#1,'mechanical');
+#4=PRODUCT('STEEL_STRUCTURE','STEEL_STRUCTURE','',(#3));
+#5=PRODUCT_DEFINITION_FORMATION('','',#4);
+#6=PRODUCT_DEFINITION_CONTEXT('part definition',#1,'design');
+#7=PRODUCT_DEFINITION('design','',#5,#6);
+#8=PRODUCT_DEFINITION_SHAPE('','',#7);
+#10=PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,(#4));
+#11=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));
+#12=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));
+#13=(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT());
+#14=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-03),#11,'distance_accuracy_value','confusion accuracy');
+#15=(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#14))GLOBAL_UNIT_ASSIGNED_CONTEXT((#11,#12,#13))REPRESENTATION_CONTEXT('Context3D','3D Context with 1E-3 uncertainty'));
+#16=CARTESIAN_POINT('',(0.,0.,0.));
+#17=DIRECTION('',(0.,0.,1.));
+#18=DIRECTION('',(1.,0.,0.));
+#19=AXIS2_PLACEMENT_3D('',#16,#17,#18);
+`;
+  const rep=E(`ADVANCED_BREP_SHAPE_REPRESENTATION('STEEL_STRUCTURE',(#19,${solids.map(x=>'#'+x).join(',')}),#15)`);
+  const txt=head+L.join('\n')+`\n#9=SHAPE_DEFINITION_REPRESENTATION(#8,#${rep});\nENDSEC;\nEND-ISO-10303-21;\n`;
+  const base=`${safeName(st.projName)}_3D_${stamp()}`;
+  if(DLS) saveFile(base+'.zip',makeZip('steel-structure.stp',new TextEncoder().encode(txt)),'application/zip');
+  else saveFile(base+'.stp',new Blob([txt],{type:'application/step'}),'application/step');
+  toast(`STEP：${solids.length} 個實體`);
+}
+function makeZip(name,data){
+  const crcT=new Uint32Array(256).map((_,n)=>{ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; return c>>>0; });
+  let crc=0xFFFFFFFF; for(let i=0;i<data.length;i++) crc=crcT[(crc^data[i])&255]^(crc>>>8); crc=(crc^0xFFFFFFFF)>>>0;
+  const nm=new TextEncoder().encode(name), sz=data.length;
+  const lh=new DataView(new ArrayBuffer(30)); [[0,0x04034b50,4],[4,20,2],[6,0,2],[8,0,2],[10,0,2],[12,0x21,2],[14,crc,4],[18,sz,4],[22,sz,4],[26,nm.length,2],[28,0,2]].forEach(([o,v,b])=>b===4?lh.setUint32(o,v,true):lh.setUint16(o,v,true));
+  const ch=new DataView(new ArrayBuffer(46)); [[0,0x02014b50,4],[4,20,2],[6,20,2],[8,0,2],[10,0,2],[12,0,2],[14,0x21,2],[16,crc,4],[20,sz,4],[24,sz,4],[28,nm.length,2],[30,0,2],[32,0,2],[34,0,2],[36,0,2],[38,0,4],[42,0,4]].forEach(([o,v,b])=>b===4?ch.setUint32(o,v,true):ch.setUint16(o,v,true));
+  const off=30+nm.length+sz, ed=new DataView(new ArrayBuffer(22)); [[0,0x06054b50,4],[4,0,2],[6,0,2],[8,1,2],[10,1,2],[12,46+nm.length,4],[16,off,4],[20,0,2]].forEach(([o,v,b])=>b===4?ed.setUint32(o,v,true):ed.setUint16(o,v,true));
+  return new Blob([lh,nm,data,ch,nm,ed],{type:'application/zip'});
 }
 
 /* ================= 啟動 ================= */
