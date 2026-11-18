@@ -142,8 +142,9 @@ tr.grand td{font-weight:700;color:var(--accent);font-size:14px}
   </div>
   <div class="top-actions">
     <button class="btn" id="bCopy" title="複製全部清單為表格，可直接貼到 Excel">複製 BOM（貼 Excel）</button>
-    <button class="btn" id="bCsv" title="本機開啟時可下載 CSV">下載 CSV</button>
-    <button class="btn primary" id="bPng" title="本機開啟時可下載 PNG">匯出圖片</button>
+    <button class="btn" id="bCsv">下載 CSV</button>
+    <button class="btn" id="bPng">匯出圖片</button>
+    <button class="btn primary" id="bOffline" hidden title="下載單一 HTML 檔，離線雙擊即可使用">下載單機版</button>
   </div>
 </header>
 
@@ -153,6 +154,9 @@ tr.grand td{font-weight:700;color:var(--accent);font-size:14px}
       <option value="factory">廠房（單跨門型剛架）</option>
       <option value="ware2">倉庫（雙跨・中柱）</option>
       <option value="shed">小鐵屋（單斜）</option>
+      <option value="factoryMz">廠房＋內夾層（半樓層）</option>
+      <option value="house2">二層鐵屋</option>
+      <option value="house3">三層鐵屋（店住）</option>
       <option value="carport">車棚（開放雙斜）</option>
     </select></div>
   <div class="f"><label for="roof">屋頂形式</label>
@@ -190,7 +194,7 @@ tr.grand td{font-weight:700;color:var(--accent);font-size:14px}
       <div class="card" id="card"></div>
       <div class="pick" id="pick" hidden></div>
       <div class="hint">左鍵旋轉｜右鍵平移｜滾輪縮放｜點構件看規格</div>
-      <div class="legend"><span><i style="background:#c9ced6"></i>主構架</span><span><i style="background:#e0b84f"></i>桁條/牆檁</span><span><i style="background:#e98a35"></i>斜撐</span></div>
+      <div class="legend"><span><i style="background:#c9ced6"></i>主構架</span><span><i style="background:#e0b84f"></i>桁條/牆檁</span><span><i style="background:#5fb3a1"></i>樓層構架</span><span><i style="background:#e98a35"></i>斜撐</span></div>
     </div>
     <div id="views"></div>
   </section>
@@ -208,6 +212,38 @@ tr.grand td{font-weight:700;color:var(--accent);font-size:14px}
           <div class="f"><label for="p_eave">簷口繫樑</label><select id="p_eave" data-k="prof.eave"></select></div>
           <div class="f"><label for="p_brace">斜撐圓鋼</label><select id="p_brace" data-k="prof.brace"></select></div>
         </div>
+      </div>
+    </div>
+    <div>
+      <h2 class="sec-t">樓層與夾層</h2>
+      <div class="g1">
+        <div class="g2">
+          <div class="f"><label for="floors">樓層數</label><select id="floors" data-k="floors" data-num="1"><option value="1">1 層</option><option value="2">2 層</option><option value="3">3 層</option></select></div>
+          <div class="f"><label for="floorLL">樓板活載 kgf/m²</label><input id="floorLL" data-k="floorLL" type="number" step="50" min="0"></div>
+        </div>
+        <div class="f" id="shBox"><span class="lb">各層樓高 (mm，由 1F 起；合計＝簷高)</span><div class="bays" id="storyH"></div></div>
+        <div class="f" id="mzBox">
+          <label class="chk" style="padding:0"><input type="checkbox" data-k="mz.on"> 廠房內夾層（半樓層）</label>
+          <div class="g2" style="margin-top:6px">
+            <div class="f"><label for="mz_h">夾層樓板高 FL</label><input id="mz_h" data-k="mz.h" type="number" step="100" min="2000"></div>
+            <div class="f"><label for="mz_side">夾層位置</label><select id="mz_side" data-k="mz.side"><option value="left">靠左側牆（A 軸）</option><option value="right">靠右側牆</option><option value="full">全跨度</option></select></div>
+            <div class="f"><label for="mz_d">夾層深度 (跨向)</label><input id="mz_d" data-k="mz.d" type="number" step="100" min="1500"></div>
+            <div class="f"><label for="mz_cs">夾層柱最大間距</label><input id="mz_cs" data-k="mz.colSp" type="number" step="100" min="1500"></div>
+            <div class="f"><label for="mz_b0">起始開間</label><input id="mz_b0" data-k="mz.b0" type="number" step="1" min="1"></div>
+            <div class="f"><label for="mz_b1">結束開間</label><input id="mz_b1" data-k="mz.b1" type="number" step="1" min="1"></div>
+          </div>
+        </div>
+        <div class="g2">
+          <div class="f"><label for="deck">樓板型式</label><select id="deck" data-k="deck"></select></div>
+          <div class="f"><label for="joistSp">小樑間距</label><input id="joistSp" data-k="joistSp" type="number" step="100" min="500"></div>
+          <div class="f"><label for="p_fbeam">樓層大樑</label><select id="p_fbeam" data-k="prof.fbeam"></select></div>
+          <div class="f"><label for="p_joist">樓板小樑</label><select id="p_joist" data-k="prof.joist"></select></div>
+          <div class="f"><label for="p_mcol">夾層柱</label><select id="p_mcol" data-k="prof.mcol"></select></div>
+          <div class="f"><label for="p_stair">樓梯斜樑</label><select id="p_stair" data-k="prof.stair"></select></div>
+          <label class="chk" style="padding:0;align-self:end"><input type="checkbox" data-k="stairOn"> 設置鋼梯</label>
+          <div class="f"><label for="stairW">樓梯寬</label><input id="stairW" data-k="stairW" type="number" step="50" min="600"></div>
+        </div>
+        <p class="note" id="flNote"></p>
       </div>
     </div>
     <div>
@@ -323,6 +359,12 @@ const PANELS = {
   clear:    {n:'PC 採光浪板',          price:520,  kg:2},
 };
 const OPS = {rollup:'鐵捲門', door:'鋼製門', window:'鋁窗'};
+const DECKS = {
+  rc:      {n:'鋼承板＋RC 12cm',      t:150, dl:300, c:'#9aa3ad'},
+  checker: {n:'花紋鋼板 4.5t',         t:10,  dl:45,  c:'#8d96a0'},
+  grating: {n:'熱浸鍍鋅格柵板',        t:32,  dl:40,  c:'#b3bcc5'},
+  wood:    {n:'輕鋼骨架＋夾板木地板',  t:40,  dl:50,  c:'#b08a5a'},
+};
 const COLORS = {
   steel:['#c9ced6','#9a3b2c','#3d6fa3','#e9e5dc','#4b5563'],
   roof: ['#3f7fb5','#b8bec6','#2f6b45','#9c3a32','#e9e5dc','#d8dde3'],
@@ -332,7 +374,8 @@ const PRICE_LABELS = {
   matH:'H型鋼 /kg', matC:'C型鋼・方管 /kg', matR:'圓鋼・鋼板 /kg', fab:'加工製作 /kg', erect:'吊裝組立 /kg',
   paint:'防鏽＋面漆 /kg', galv:'熱浸鍍鋅 /kg', trim:'收邊・天溝 /m', pipe:'落水管 /支', rollup:'鐵捲門 /m²', motor:'電動馬達 /組',
   door:'鋼製門 /樘', window:'鋁窗 /m²', hsb:'高強度螺栓 /組', anchor:'地腳螺栓 /支', bolt:'C型鋼螺栓 /組',
-  fMain:'主柱基礎 /座', fWind:'山牆柱基礎 /座', slab:'RC 地坪 /m²', mgmt:'管理利潤 %',
+  fMain:'主柱基礎 /座', fWind:'山牆柱基礎 /座', fMz:'夾層柱基礎 /座', slab:'RC 地坪 /m²', rail:'欄杆扶手 /m',
+  d_rc:'鋼承板＋RC /m²', d_checker:'花紋鋼板樓板 /m²', d_grating:'格柵板 /m²', d_wood:'木地板樓板 /m²', mgmt:'管理利潤 %',
 };
 const PANEL_PRICE_KEYS = Object.keys(PANELS).filter(k=>k!=='none');
 
@@ -343,6 +386,7 @@ const PRESETS = {
     openings:[{wall:'front',type:'rollup',pos:5500,w:4000,h:4500,sill:0},{wall:'left',type:'door',pos:1500,w:900,h:2100,sill:0},
       {wall:'left',type:'window',pos:8000,w:3000,h:1200,sill:1500},{wall:'left',type:'window',pos:20000,w:3000,h:1200,sill:1500},{wall:'back',type:'rollup',pos:6000,w:3000,h:4000,sill:0}],
     found:{fMain:22000,fWind:12000},slab:true},
+  factoryMz:'factory',
   ware2:{roof:'gable',W:30000,L:48000,H:8000,slope:10,spans:2,nBays:8,eaveOh:600,gableOh:300,
     prof:{col:'H400x200x8x13',raf:'H400x200x8x13',wind:'H300x150x6.5x9',pur:'C150x65x20x3.2',girt:'C200x75x20x3.2',eave:'C150x65x20x3.2',brace:'φ22 圓鋼'},
     purSp:1200,girtSp:1500,windSp:5000,brace:'ends3',roofPanel:'pu',wallPanel:'steel',walls:{front:true,back:true,left:true,right:true},
@@ -353,18 +397,37 @@ const PRESETS = {
     purSp:900,girtSp:900,windSp:2000,brace:'ends',roofPanel:'pu',wallPanel:'eps',walls:{front:true,back:true,left:true,right:true},
     openings:[{wall:'front',type:'door',pos:500,w:900,h:2100,sill:0},{wall:'front',type:'window',pos:1900,w:1200,h:900,sill:1000},{wall:'left',type:'window',pos:2300,w:1500,h:900,sill:1000}],
     found:{fMain:6000,fWind:4000},slab:true},
+  house2:{roof:'gable',W:7200,L:12000,H:6300,slope:15,spans:2,nBays:3,eaveOh:500,gableOh:300,floors:2,storyH:[3300,3000,3000],floorLL:200,
+    prof:{col:'H200x200x8x12',raf:'H200x100x5.5x8',wind:'□100x100x4.5',pur:'C125x50x20x2.3',girt:'C100x50x20x2.3',eave:'C125x50x20x2.3',brace:'φ16 圓鋼',fbeam:'H250x125x6x9',joist:'H200x100x5.5x8',mcol:'H200x200x8x12',stair:'C200x75x20x3.2'},
+    purSp:1000,girtSp:1000,windSp:3000,brace:'ends',roofPanel:'pu',wallPanel:'eps',walls:{front:true,back:true,left:true,right:true},joistSp:1200,stairW:900,
+    openings:[{wall:'front',type:'door',pos:800,w:900,h:2100,sill:0},{wall:'front',type:'window',pos:4200,w:1800,h:1200,sill:900},{wall:'front',type:'window',pos:1200,w:1500,h:1200,sill:4200},{wall:'front',type:'window',pos:4400,w:1500,h:1200,sill:4200},
+      {wall:'left',type:'window',pos:5000,w:1800,h:1200,sill:900},{wall:'left',type:'window',pos:5000,w:1800,h:1200,sill:4200}],
+    found:{fMain:14000,fWind:6000},slab:true},
+  house3:{roof:'gable',W:6000,L:12000,H:9200,slope:15,spans:2,nBays:3,eaveOh:400,gableOh:300,floors:3,storyH:[3200,3000,3000],floorLL:250,
+    prof:{col:'H200x200x8x12',raf:'H200x100x5.5x8',wind:'□100x100x4.5',pur:'C125x50x20x2.3',girt:'C100x50x20x2.3',eave:'C125x50x20x2.3',brace:'φ16 圓鋼',fbeam:'H250x125x6x9',joist:'H200x100x5.5x8',mcol:'H200x200x8x12',stair:'C200x75x20x3.2'},
+    purSp:1000,girtSp:1000,windSp:3000,brace:'ends',roofPanel:'pu',wallPanel:'eps',walls:{front:true,back:true,left:true,right:true},joistSp:1200,stairW:900,
+    openings:[{wall:'front',type:'rollup',pos:600,w:3000,h:2700,sill:0},{wall:'front',type:'door',pos:4300,w:900,h:2100,sill:0},
+      {wall:'front',type:'window',pos:1000,w:1800,h:1200,sill:4100},{wall:'front',type:'window',pos:1000,w:1800,h:1200,sill:7100},{wall:'left',type:'window',pos:5000,w:1500,h:1200,sill:4100},{wall:'left',type:'window',pos:5000,w:1500,h:1200,sill:7100}],
+    found:{fMain:16000,fWind:6000},slab:true},
   carport:{roof:'gable',W:6000,L:6000,H:2700,slope:15,spans:1,nBays:2,eaveOh:400,gableOh:300,
     prof:{col:'□125x125x4.5',raf:'H150x75x5x7',wind:'□75x75x3.2',pur:'C100x50x20x2.3',girt:'C75x45x15x2.3',eave:'C100x50x20x2.3',brace:'φ12 圓鋼'},
     purSp:1000,girtSp:1000,windSp:3000,brace:'none',roofPanel:'pu',wallPanel:'none',walls:{front:false,back:false,left:false,right:false},
     openings:[],found:{fMain:8000,fWind:4000},slab:false},
 };
 const BASE_PRICE = {matH:30,matC:38,matR:32,fab:16,erect:10,paint:7,galv:14,trim:220,pipe:2800,rollup:3200,motor:28000,door:16000,window:3800,
-  hsb:65,anchor:280,bolt:12,fMain:22000,fWind:12000,slab:1900,mgmt:10, steel:380,pu:680,eps:950,rockwool:1350,clear:520};
+  hsb:65,anchor:280,bolt:12,fMain:22000,fWind:12000,fMz:9000,slab:1900,rail:2200,d_rc:2600,d_checker:1800,d_grating:2600,d_wood:1500,mgmt:10, steel:380,pu:680,eps:950,rockwool:1350,clear:520};
 
+const DEF = {floors:1,storyH:[3200,3000,3000],deck:'rc',floorLL:300,joistSp:1500,stairOn:true,stairW:1000,
+  mz:{on:false,h:3500,side:'left',d:6000,b0:1,b1:2,colSp:3000},
+  prof:{fbeam:'H300x150x6.5x9',joist:'H300x150x6.5x9',mcol:'H200x200x8x12',stair:'C200x75x20x3.2'}};
 function makeState(key){
-  const p = structuredClone(PRESETS[key]);
+  const src = typeof PRESETS[key]==='string' ? PRESETS[PRESETS[key]] : PRESETS[key];
+  const p = {...structuredClone(DEF), ...structuredClone(src)};
+  p.prof = {...DEF.prof, ...src.prof}; p.mz = {...DEF.mz};
+  if(key==='factoryMz'){ p.mz.on=true; p.floorLL=500; }
   const s = {preset:key, ...p, LL:60, wq:110, Fy:'2500', paint:'paint', colors:{steel:'#c9ced6',roof:'#3f7fb5',wall:'#d8dde3'}};
-  if(key==='shed'){s.colors.roof='#b8bec6';s.colors.wall='#e9e5dc'}
+  if(key==='shed'||key.startsWith('house')){s.colors.roof='#b8bec6';s.colors.wall='#e9e5dc'}
+  if(s.floors>1) s.H = s.storyH.slice(0,s.floors).reduce((a,b)=>a+b,0);
   s.bays = Array(p.nBays).fill(Math.round(p.L/p.nBays));
   s.bays[s.bays.length-1] = p.L - s.bays.slice(0,-1).reduce((a,b)=>a+b,0);
   s.price = {...BASE_PRICE, fMain:p.found.fMain, fWind:p.found.fWind};
@@ -372,7 +435,9 @@ function makeState(key){
   return s;
 }
 let st;
-try{ const sv = JSON.parse(localStorage.getItem('steelDesigner.v1')||'null'); if(sv && sv.bays && sv.prof) st = sv; }catch(e){}
+try{ const sv = JSON.parse(localStorage.getItem('steelDesigner.v2')||'null');
+  if(sv && sv.bays && sv.prof && PRESETS[sv.preset]){ const b=makeState(sv.preset);
+    st={...b,...sv,prof:{...b.prof,...sv.prof},price:{...b.price,...sv.price},mz:{...b.mz,...sv.mz},storyH:sv.storyH||b.storyH}; } }catch(e){}
 if(!st) st = makeState('factory');
 
 /* ================= 幾何產生 ================= */
@@ -385,7 +450,7 @@ function gen(){
   const fz=[0]; s.bays.forEach(b=>fz.push(fz[fz.length-1]+(+b)));
   const nb=s.bays.length, gOh=+s.gableOh, oh=+s.eaveOh;
   const M=[], add=o=>M.push(o);
-  const conn = {knee:0, ridge:0, splice:0, colTop:0, purEnds:0, clips:0, turnbuckle:0};
+  const conn = {knee:0, ridge:0, splice:0, colTop:0, purEnds:0, clips:0, turnbuckle:0, fb:0, jt:0};
 
   // 主柱
   fz.forEach((z,fi)=>colX.forEach((x,ci)=>{
@@ -513,9 +578,79 @@ function gen(){
     if(sill>0) add({grp:'sec',name:'開口框料（橫框）',prof:s.prof.girt,p1:wallPos(o.wall,a,sill),p2:wallPos(o.wall,b,sill),up:[0,1,0],len:+o.w,note:`${OPS[o.type]} 下框`});
   });
 
+  // ===== 樓層／內夾層 =====
+  const DK=DECKS[s.deck]||DECKS.rc, dT=DK.t, fb=PROF[s.prof.fbeam], jb=PROF[s.prof.joist];
+  const floors=Math.max(1,Math.min(3,+s.floors||1));
+  const plats=[];
+  if(floors>1){ let y=0; for(let k=1;k<floors;k++){ const rise=+s.storyH[k-1]; y+=rise;
+    plats.push({kind:'floor',label:`${k+1}F`,y,rise,x0:0,x1:W,b0:0,b1:nb-1,lane:k-1}); } }
+  else if(s.mz.on){
+    const b0=Math.max(0,Math.min(nb-1,(+s.mz.b0||1)-1)), b1=Math.max(b0,Math.min(nb-1,(+s.mz.b1||1)-1));
+    const d=Math.min(W,Math.max(1500,+s.mz.d));
+    const [x0,x1]= s.mz.side==='right'?[W-d,W]: s.mz.side==='full'?[0,W]:[0,d];
+    const yy=Math.min(+s.mz.h, H-raf.h-1500);
+    plats.push({kind:'mezz',label:'夾層',y:yy,rise:yy,x0,x1,b0,b1,lane:0});
+  }
+  const near=(a,arr)=>arr.some(c=>Math.abs(c-a)<1);
+  const stairs=[], rails=[];
+  let mezzCols=0, railLen=0;
+  plats.forEach(pl=>{
+    const zA=fz[pl.b0], zB=fz[pl.b1+1], isF=pl.kind==='floor';
+    pl.zA=zA; pl.zB=zB; pl.ops=[];
+    // 支承點
+    let sup;
+    if(isF) sup=[...colX];
+    else { const base=[...new Set([pl.x0,...colX.filter(c=>c>pl.x0+1&&c<pl.x1-1),pl.x1])].sort((a,b)=>a-b); sup=[];
+      for(let i=0;i<base.length-1;i++){ const n=Math.ceil((base[i+1]-base[i])/(+s.mz.colSp)); for(let q=0;q<n;q++) sup.push(base[i]+(base[i+1]-base[i])*q/n); }
+      sup.push(pl.x1); }
+    pl.sup=sup;
+    // 樓梯
+    if(s.stairOn){
+      const sw=+s.stairW, n=Math.max(3,Math.ceil(pl.rise/185)), riser=pl.rise/n, run=(n-1)*260, base=pl.y-pl.rise;
+      let xs, zBot, zTop, inside=true, arrive=null;
+      if(isF){ xs=pl.x1-300-sw-pl.lane*(sw+150); const zt=zB-1200;
+        if(pl.lane%2===0){ zTop=zt; zBot=zt-run; } else { zBot=zt; zTop=zt-run; } }
+      else { xs= s.mz.side==='right'? pl.x0+300 : pl.x1-300-sw;
+        if(zA-run>=300){ zBot=zA-run; zTop=zA; inside=false; arrive='A'; }
+        else if(zB+run<=L-300){ zBot=zB+run; zTop=zB; inside=false; arrive='B'; }
+        else { zBot=zA+300; zTop=zBot+run; } }
+      const st_={xs,sw,zBot,zTop,base,top:pl.y,n,riser,run,inside,dir:Math.sign(zTop-zBot)||1,pl:pl.label};
+      stairs.push(st_);
+      if(inside) pl.ops.push({x0:xs-50,x1:xs+sw+50,z0:Math.min(zBot,zTop),z1:Math.max(zBot,zTop),st:st_});
+      [xs,xs+sw].forEach(x=>{ const yb=base, yt=pl.y-dT; const len=Math.hypot(run+260,yt-yb);
+        add({grp:'floor',name:'樓梯斜樑',prof:s.prof.stair,p1:[x,yb,zBot-st_.dir*260],p2:[x,yt,zTop],up:[0,1,0],len,note:`${pl.label} 鋼梯 ${n} 級・級高 ${riser.toFixed(0)}`}); });
+      railLen+=2*Math.hypot(run,pl.rise)/1000;
+      pl.arrive=arrive; pl.stair=st_;
+    }
+    // 大樑
+    const yG=pl.y-dT-fb.h/2;
+    for(let j=pl.b0;j<=pl.b1+1;j++){ const z=fz[j];
+      for(let i=0;i<sup.length-1;i++){ add({grp:'floor',name:isF?'樓層大樑':'夾層大樑',prof:s.prof.fbeam,p1:[sup[i],yG,z],p2:[sup[i+1],yG,z],up:[0,1,0],len:sup[i+1]-sup[i],note:`${pl.label} FL+${pl.y}・兩端剪力板`,axis:`${j+1}`}); conn.fb+=2; }
+      if(!isF) sup.filter(x=>!near(x,colX)).forEach(x=>{ const t=pl.y-dT-fb.h; mezzCols++;
+        add({grp:'floor',name:'夾層柱',prof:s.prof.mcol,p1:[x,0,z],p2:[x,t,z],up:[1,0,0],len:t,note:'底板焊接・頂板',axis:`${j+1}`}); });
+    }
+    // 小樑（扣樓梯開口）
+    const nJ=Math.max(1,Math.ceil((pl.x1-pl.x0)/(+s.joistSp))), yJ=pl.y-dT-jb.h/2;
+    for(let i=0;i<=nJ;i++){ const x=pl.x0+(pl.x1-pl.x0)*i/nJ;
+      for(let j=pl.b0;j<=pl.b1;j++){ let segs=[[fz[j],fz[j+1]]];
+        pl.ops.filter(o=>x>o.x0&&x<o.x1).forEach(o=>{ segs=segs.flatMap(([a,b])=> o.z1<=a||o.z0>=b?[[a,b]]:[[a,o.z0],[o.z1,b]].filter(([u,v])=>v-u>200)); });
+        segs.forEach(([a,b])=>{ add({grp:'floor',name:isF?'樓板小樑':'夾層小樑',prof:s.prof.joist,p1:[x,yJ,a],p2:[x,yJ,b],up:[0,1,0],len:b-a,note:`${pl.label}・兩端接合板`}); conn.jt+=2; }); } }
+    // 欄杆
+    const segs=[];
+    if(!isF){
+      if(pl.x0>1) segs.push([pl.x0,zA,pl.x0,zB]); if(pl.x1<W-1) segs.push([pl.x1,zA,pl.x1,zB]);
+      const zEdge=(z,key)=>{ if(pl.arrive===key&&pl.stair){ const a=pl.stair.xs,b=a+pl.stair.sw; [[pl.x0,a],[b,pl.x1]].forEach(([u,v])=>{ if(v-u>100) segs.push([u,z,v,z]); }); } else segs.push([pl.x0,z,pl.x1,z]); };
+      if(zA>1) zEdge(zA,'A'); if(zB<L-1) zEdge(zB,'B');
+    }
+    pl.ops.forEach(o=>{ segs.push([o.x0,o.z0,o.x0,o.z1],[o.x1,o.z0,o.x1,o.z1]); const zb=o.st.zBot; segs.push([o.x0,zb,o.x1,zb]); });
+    segs.forEach(sg=>{ railLen+=Math.hypot(sg[2]-sg[0],sg[3]-sg[1])/1000; rails.push({y:pl.y,seg:sg}); });
+    pl.area=((pl.x1-pl.x0)*(zB-zA) - pl.ops.reduce((a,o)=>a+(o.x1-o.x0)*(o.z1-o.z0),0))/1e6;
+  });
+
   const mainCols = M.filter(m=>m.name==='主柱'||m.name==='中柱').length;
   const windCols = M.filter(m=>m.name==='山牆柱').length;
   return {W,L,H,k,roofY,colX,fz,nb,gOh,oh,M,conn,planes,purX,windXs,braceBays,ops,offSide,offG,mainCols,windCols,spans,
+    plats,stairs,rails,railLen,mezzCols,dT,DK,floors,fb,jb,
     ridge: s.roof==='gable'?roofY(W/2):s.roof==='mono'?roofY(W):H, raf,col,wind,pur,girt,eave};
 }
 
@@ -527,7 +662,7 @@ function quantities(g){
   const map=new Map();
   g.M.forEach(m=>{ const key=m.name+'|'+m.prof+'|'+r5(m.len);
     if(!map.has(key)) map.set(key,{name:m.name,prof:m.prof,len:r5(m.len),qty:0,note:m.note,grp:m.grp}); map.get(key).qty++; });
-  const order=['主柱','中柱','屋頂大樑','山牆柱','簷口繫樑','中柱繫樑','桁條','牆檁','開口框料（立框）','開口框料（橫框）','屋面斜撐','牆面斜撐'];
+  const order=['主柱','中柱','屋頂大樑','山牆柱','簷口繫樑','中柱繫樑','桁條','牆檁','開口框料（立框）','開口框料（橫框）','屋面斜撐','牆面斜撐','夾層柱','樓層大樑','夾層大樑','樓板小樑','夾層小樑','樓梯斜樑'];
   const steel=[...map.values()].sort((a,b)=>order.indexOf(a.name)-order.indexOf(b.name)||b.len-a.len).map(r=>{
     const kgm=PROF[r.prof].kg; return {...r,kgm,totLen:r.len*r.qty/1000,kg:kgm*r.len/1000*r.qty,cat:catOf(r.prof)};
   });
@@ -543,6 +678,11 @@ function quantities(g){
   const clipKg=plateKg(g.pur.h+60,120,6);
   plates.push({name:'檁托（L 型連接片）',spec:`${g.pur.h+60}×120×6`,qty:g.conn.clips,kgE:clipKg,note:'焊於大樑上翼'});
   plates.push({name:'加勁板',spec:`${Math.round(g.raf.h-2*(g.raf.tf||8))}×${Math.round(((g.raf.b||100)-(g.raf.tw||6))/2)}×10`,qty:(g.conn.knee+g.conn.ridge)*4,kgE:plateKg(g.raf.h-20,(g.raf.b-6)/2,10),note:'柱頂・屋脊'});
+  if(g.mezzCols){ const mb=[g.col.h>0?PROF[st.prof.mcol].h+120:300,PROF[st.prof.mcol].b+120,16]; plates.push({name:'夾層柱底板',spec:`${mb[0]}×${mb[1]}×${mb[2]}`,qty:g.mezzCols,kgE:plateKg(...mb),note:'4 孔・錨栓'}); }
+  if(g.conn.fb){ const sp=[Math.round(g.fb.h*0.7),100,10]; plates.push({name:'樓層樑剪力板',spec:`${sp[0]}×${sp[1]}×${sp[2]}`,qty:g.conn.fb,kgE:plateKg(...sp),note:'焊於柱／大樑，3～4 孔'}); }
+  if(g.conn.jt){ const sp=[Math.round(g.jb.h*0.7),90,9]; plates.push({name:'小樑接合板',spec:`${sp[0]}×${sp[1]}×${sp[2]}`,qty:g.conn.jt,kgE:plateKg(...sp),note:'焊於大樑腹板，2 孔'}); }
+  const treads=g.stairs.reduce((a,t)=>a+t.n-1,0);
+  if(treads){ const tw=+st.stairW; plates.push({name:'樓梯踏板（花紋鋼板）',spec:`${tw}×280×4.5`,qty:treads,kgE:plateKg(tw,280,4.5)*1.08,note:'兩端折邊・L 角鋼托'}); }
   plates.forEach(p=>p.kg=p.kgE*p.qty);
 
   const steelKg = steel.reduce((a,r)=>a+r.kg,0), plateTot=plates.reduce((a,r)=>a+r.kg,0);
@@ -586,9 +726,14 @@ function quantities(g){
   if(g.conn.turnbuckle) hw.push({n:'花籃螺絲',spec:`${st.prof.brace.replace(' 圓鋼','')} 用`,q:g.conn.turnbuckle,u:'組',p:null});
   const screws=Math.ceil(roofArea*6+wallArea*4);
   if(screws) hw.push({n:'自攻螺絲（附防水墊圈）',spec:'#12×25～65（依板厚）',q:screws,u:'支',p:null});
+  if(g.conn.fb) hw.push({n:'高強度螺栓 樓層樑',spec:'M16×45 F10T',q:g.conn.fb*4,u:'組',p:'hsb'});
+  if(g.conn.jt) hw.push({n:'小樑接合螺栓',spec:'M16×40 8.8 級',q:g.conn.jt*2,u:'組',p:'bolt'});
+  if(g.mezzCols) hw.push({n:'地腳螺栓 夾層柱',spec:'M16×400 附雙螺帽墊片',q:g.mezzCols*4,u:'支',p:'anchor'});
   const opRows = g.ops.map(o=>({n:OPS[o.type],spec:`${o.w}×${o.h}${o.sill>0?' 窗台 '+o.sill:''}・${({front:'前山牆',back:'後山牆',left:'左側牆',right:'右側牆'})[o.wall]}`,q:o.type==='door'?1:o.w*o.h/1e6,u:o.type==='door'?'樘':'m²',type:o.type}));
 
-  return {steel,plates,steelKg,plateTot,totKg,kgByCat,totLen,bars,roofArea,roofPlanes,walls,wallArea,trims,hw,opRows,screws,gableArea};
+  const deckArea=g.plats.reduce((a,p)=>a+p.area,0);
+  if(g.plats.length && g.DK===DECKS.rc){ hw.push({n:'剪力釘',spec:'φ16×100',q:Math.ceil(g.M.filter(m=>m.name.endsWith('大樑')&&m.grp==='floor').reduce((a,m)=>a+m.len,0)/300),u:'支',p:null}); }
+  return {floorArea:g.W*g.L/1e6+deckArea,deckArea,treads,steel,plates,steelKg,plateTot,totKg,kgByCat,totLen,bars,roofArea,roofPlanes,walls,wallArea,trims,hw,opRows,screws,gableArea};
 }
 
 function estimate(g,q){
@@ -612,7 +757,10 @@ function estimate(g,q){
   const ru=q.opRows.filter(o=>o.type==='rollup'); if(ru.length){ add('門窗','鐵捲門',ru.reduce((a,o)=>a+o.q,0),'m²',P.rollup); add('門窗','鐵捲門電動馬達',ru.length,'組',P.motor); }
   const dr=q.opRows.filter(o=>o.type==='door'); if(dr.length) add('門窗','鋼製門（含鎖、門框）',dr.length,'樘',P.door);
   const wn=q.opRows.filter(o=>o.type==='window'); if(wn.length) add('門窗','鋁窗',wn.reduce((a,o)=>a+o.q,0),'m²',P.window);
+  if(q.deckArea) add('樓板','樓板 '+g.DK.n,q.deckArea,'m²',P['d_'+s.deck]);
+  if(g.railLen) add('樓板','欄杆扶手（含樓梯扶手）',g.railLen,'m',P.rail);
   add('基礎','主柱獨立基礎（開挖・鋼筋・混凝土）',g.mainCols,'座',P.fMain);
+  if(g.mezzCols) add('基礎','夾層柱基礎',g.mezzCols,'座',P.fMz);
   if(g.windCols) add('基礎','山牆柱基礎',g.windCols,'座',P.fWind);
   if(s.slab) add('基礎','RC 地坪 15cm（含鋼絲網）',g.W*g.L/1e6,'m²',P.slab);
   const sub=it.reduce((a,b)=>a+b.amt,0), mg=sub*P.mgmt/100, tax=(sub+mg)*0.05;
@@ -632,21 +780,36 @@ function checks(g,q){
   const gGap=Math.max(0, ...[...g.colX, ...g.windXs.front].sort((a,b)=>a-b).map((x,i,a)=>i?x-a[i-1]:0));
   const gSpan=Math.max(s.walls.left||s.walls.right?maxBay:0, s.walls.front||s.walls.back?gGap:0);
   if(gSpan) beam('牆檁',s.prof.girt,gSpan,wq*s.girtSp/1000,150,`風壓 ${wq} kgf/m²`);
-  if(g.windCols){ const hc=Math.max(...g.M.filter(m=>m.name==='山牆柱').map(m=>m.len)); const gap=(g.W/g.spans)/(Math.ceil((g.W/g.spans)/s.windSp));
+  if(g.windCols){ const hc=g.floors>1?Math.max(...s.storyH.slice(0,g.floors)):Math.max(...g.M.filter(m=>m.name==='山牆柱').map(m=>m.len)); const gap=(g.W/g.spans)/(Math.ceil((g.W/g.spans)/s.windSp));
     beam('山牆柱',s.prof.wind,hc,wq*gap/1000,150,`受風寬 ${Math.round(gap)} mm`); }
+  // 樓板
+  const DLf=g.DK.dl+30, LLf=+s.floorLL;
+  if(g.plats.length){
+    const pl=g.plats[0], bayMax=Math.max(...s.bays.slice(pl.b0,pl.b1+1).map(Number));
+    const jsp=(pl.x1-pl.x0)/Math.max(1,Math.ceil((pl.x1-pl.x0)/s.joistSp));
+    beam(pl.kind==='floor'?'樓板小樑':'夾層小樑',s.prof.joist,bayMax,(DLf+LLf)*jsp/1000+g.jb.kg,300,`DL ${DLf}＋LL ${LLf} kgf/m²`);
+    const gMax=Math.max(...pl.sup.map((x,i,a)=>i?x-a[i-1]:0));
+    beam(pl.kind==='floor'?'樓層大樑':'夾層大樑',s.prof.fbeam,gMax,(DLf+LLf)*bayMax/1000+g.fb.kg,300,`受載寬 ${fmt(bayMax)} mm`);
+    if(g.mezzCols){ const p=PROF[s.prof.mcol], P_=(DLf+LLf)*gMax/1000*bayMax/1000, hc=pl.y-g.dT-g.fb.h;
+      const r=p.t==='H'?0.24*p.b/10:Math.sqrt(p.Ix/p.A), KLr=hc/10/r, Cc=Math.sqrt(2*Math.PI**2*E/Fy);
+      const Fa= KLr<Cc ? (1-KLr**2/(2*Cc**2))*Fy/(5/3+3/8*KLr/Cc-KLr**3/(8*Cc**3)) : 12*Math.PI**2*E/(23*KLr**2);
+      out.push({name:'夾層柱',prof:s.prof.mcol,span:hc,load:`P = ${(P_/1000).toFixed(1)} tf`,fml:'fa / Fa（弱軸 K=1）',ratio:P_/p.A/Fa,fb:P_/p.A,def:null,note:`KL/r = ${KLr.toFixed(0)}`}); }
+  }
   // 大樑 — 門型剛架近似
   const raf=g.raf, Ls=g.W/g.spans, wR=(DL+LL)*maxBay/1000+raf.kg;
   const Mr=wR*(Ls/1000)**2/10*100, fbr=Mr/raf.Zx;
   const dr=5*(wR/100)*(Ls/10)**4/(384*E*raf.Ix)*0.5*10;
   out.push({name:'屋頂大樑',prof:s.prof.raf,span:Ls,load:`w = ${wR.toFixed(0)} kgf/m`,fml:'門型剛架 M ≈ wL²/10',ratio:fbr/Fb,fb:fbr,def:dr,defLim:Ls/240,lim:240,note:'端部半剛接近似'});
   // 柱 — 軸力 + 彎矩
-  const col=g.col, Hc=g.H-raf.h, P_=wR*Ls/1000/2*(g.spans>1?2:1);
-  const Mg=wR*(Ls/1000)**2/12*100, Mw=wq*maxBay/1000*(Hc/1000)**2/4*100;
+  const col=g.col, Hc=g.H-raf.h, fac=g.spans>1?2:1, nF=g.floors-1, wF=(DLf+LLf)*maxBay/1000;
+  const P_=wR*Ls/1000/2*fac + nF*wF*Ls/1000/2*fac;
+  const Mg=Math.max(wR*(Ls/1000)**2/12, nF?wF*(Ls/1000)**2/12:0)*100;
+  const Mw= nF ? wq*maxBay/1000*g.H/1000/(g.spans+1)*(+s.storyH[0])/1000/2*100 : wq*maxBay/1000*(Hc/1000)**2/4*100;
   const Mc=Math.max(Mg,0.75*(Mg+Mw));
-  const rx=Math.sqrt(col.Ix/col.A), KLr=1.5*Hc/10/rx, Cc=Math.sqrt(2*Math.PI**2*E/Fy);
+  const rx=Math.sqrt(col.Ix/col.A), KLr=(nF?1.2*Math.max(...s.storyH.slice(0,g.floors)):1.5*Hc)/10/rx, Cc=Math.sqrt(2*Math.PI**2*E/Fy);
   const Fa= KLr<Cc ? (1-KLr**2/(2*Cc**2))*Fy/(5/3+3/8*KLr/Cc-KLr**3/(8*Cc**3)) : 12*Math.PI**2*E/(23*KLr**2);
   const fa=P_/col.A, fbc=Mc/col.Zx;
-  out.push({name:'主柱',prof:s.prof.col,span:Hc,load:`P = ${(P_/1000).toFixed(1)} tf・M = ${(Mc/1e5).toFixed(2)} tf·m`,fml:'fa/Fa + fb/Fb',ratio:fa/Fa+fbc/Fb,fb:fbc,def:null,note:`KL/r = ${KLr.toFixed(0)}・風載組合 ×0.75`});
+  out.push({name:'主柱',prof:s.prof.col,span:Hc,load:`P = ${(P_/1000).toFixed(1)} tf・M = ${(Mc/1e5).toFixed(2)} tf·m`,fml:'fa/Fa + fb/Fb',ratio:fa/Fa+fbc/Fb,fb:fbc,def:null,note:`KL/r = ${KLr.toFixed(0)}・風載組合 ×0.75${nF?'・多層以門架法分配風力':''}`});
   // 斜撐
   if(g.braceBays.size){
     const rod=PROF[s.prof.brace], F=wq*q.gableArea/2/2; // 山牆一半風力，兩側分擔
@@ -669,6 +832,9 @@ function fillSelects(){
   $('#p_wind').innerHTML=opt(byType(['H','BOX'])); $('#p_pur').innerHTML=opt(byType(['C']));
   $('#p_girt').innerHTML=opt(byType(['C'])); $('#p_eave').innerHTML=opt(byType(['C','BOX']));
   $('#p_brace').innerHTML=opt(byType(['RB']));
+  $('#p_fbeam').innerHTML=opt(byType(['H'])); $('#p_joist').innerHTML=opt(byType(['H','C']));
+  $('#p_mcol').innerHTML=opt(byType(['H','BOX'])); $('#p_stair').innerHTML=opt(byType(['C','H']));
+  $('#deck').innerHTML=Object.entries(DECKS).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('');
   const po=Object.entries(PANELS).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('');
   $('#roofPanel').innerHTML=po; $('#wallPanel').innerHTML=po;
   const pk=[...Object.keys(PRICE_LABELS).slice(0,5), ...PANEL_PRICE_KEYS, ...Object.keys(PRICE_LABELS).slice(5)];
@@ -679,7 +845,14 @@ function syncInputs(){
   $$('[data-k]').forEach(el=>{const v=getK(st,el.dataset.k); if(el.type==='checkbox') el.checked=!!v; else el.value=v;});
   $('#preset').value=st.preset; $('#nBays').value=st.bays.length;
   $$('[data-sw]').forEach(el=>el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===st.colors[el.dataset.sw])));
-  renderBays(); renderOps();
+  renderBays(); renderOps(); renderStory();
+}
+function renderStory(){
+  const n=+st.floors; $('#shBox').hidden=n<2; $('#mzBox').hidden=n>1;
+  $('#storyH').innerHTML=st.storyH.slice(0,n).map((h,i)=>`<input type="number" step="100" min="2400" value="${h}" data-sh="${i}" aria-label="${i+1}F 樓高">`).join('');
+  $('#H').disabled=n>1;
+  $('#flNote').textContent= n>1 ? '多層時簷高＝各層樓高合計，主柱貫通至屋頂；樓梯為交錯雙跑，自動於樓板開口。'
+    : st.mz.on ? '夾層支承於主柱與夾層柱；樓梯優先設於夾層外側，無空間時改於夾層內開口。' : '勾選「廠房內夾層」或將樓層數改為 2～3 層。';
 }
 function renderBays(){
   $('#bays').innerHTML=st.bays.map((b,i)=>`<input type="number" step="100" min="500" value="${b}" data-bay="${i}" aria-label="第 ${i+1} 開間">`).join('');
@@ -702,10 +875,13 @@ function wire(){
   document.addEventListener('input',e=>{
     const el=e.target;
     if(el.type==='number' && el.min!=='' && !(parseFloat(el.value)>=+el.min)) return;
-    if(el.dataset.k){ let v = el.type==='checkbox'?el.checked : el.type==='number'? (parseFloat(el.value)||0) : el.value;
+    if(el.dataset.sh!==undefined){ st.storyH[+el.dataset.sh]=parseFloat(el.value); st.H=st.storyH.slice(0,st.floors).reduce((a,b)=>a+b,0); $('#H').value=st.H; changed(true); return; }
+    if(el.dataset.k){ let v = el.type==='checkbox'?el.checked : (el.type==='number'||el.dataset.num)? (parseFloat(el.value)||0) : el.value;
       if(el.dataset.k==='L'){ const n=st.bays.length; st.L=v; st.bays=Array(n).fill(Math.round(v/n)); st.bays[n-1]=v-st.bays.slice(0,-1).reduce((a,b)=>a+b,0); renderBays(); }
       else setK(st,el.dataset.k,v);
       if(el.dataset.k.startsWith('walls')) renderOps();
+      if(el.dataset.k==='floors'){ if(v>1){ st.H=st.storyH.slice(0,v).reduce((a,b)=>a+b,0); $('#H').value=st.H; } renderStory(); }
+      if(el.dataset.k==='mz.on') renderStory();
       changed(true); return; }
     if(el.dataset.bay!==undefined){
       const i=+el.dataset.bay, v=Math.max(500,parseFloat(el.value)||0); st.bays[i]=v;
@@ -740,8 +916,15 @@ function wire(){
     if(b.dataset.t){ $$('[data-t]').forEach(x=>x.setAttribute('aria-selected',x===b)); tab=b.dataset.t; renderTable(); }
   });
   $('#bCopy').onclick=async()=>{ const txt=tableText('\t'); try{ await navigator.clipboard.writeText(txt); toast('已複製，可直接貼到 Excel'); }catch(e){ fallbackCopy(txt); } };
-  $('#bCsv').onclick=()=>{ download('﻿'+tableText(','),'鋼構BOM.csv','text/csv'); toast('若未下載，請改用「複製 BOM」'); };
-  $('#bPng').onclick=()=>{ if(!renderer) return; renderer.render(scene,camera); renderer.domElement.toBlob(b=>{ if(b) download(b,'鋼構3D.png','image/png'); }); toast('若未下載，請改在本機開啟此頁'); };
+  $('#bCsv').onclick=()=>saveFile('鋼構BOM.csv','\uFEFF'+tableText(','),'text/csv');
+  $('#bPng').onclick=()=>{ if(!renderer) return; renderer.render(scene,camera); renderer.domElement.toBlob(b=>{ if(b) saveFile('鋼構3D.png',b,'image/png'); }); };
+  $('#bOffline').onclick=async()=>{ try{ const r=await fetch('steel-designer-offline.html'); if(!r.ok) throw 0; saveFile('鋼構廠房3D設計器-單機版.html',await r.text(),'text/html'); }catch(e){ toast('單機版檔案讀取失敗，請稍後再試'); } };
+  if(window.claude && window.claude.use) window.claude.use('downloads').then(d=>{ DLS=d; if(d) $('#bOffline').hidden=false; }).catch(()=>{});
+}
+let DLS=null;
+function saveFile(name,data,type){
+  if(DLS){ DLS.save({filename:name,data}).then(()=>toast('已下載 '+name)).catch(e=>{ if(e&&e.code!=='declined') toast('無法下載：'+(e.message||e.code)); }); return; }
+  download(data,name,type);
 }
 function download(data,name,type){ const blob=data instanceof Blob?data:new Blob([data],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
 function fallbackCopy(txt){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;left:16px;right:16px;bottom:16px;height:40vh;z-index:30;background:#0c1520;color:#dce6ef'; document.body.appendChild(ta); ta.select(); toast('請按 Ctrl+C 複製，點其他地方關閉'); ta.onblur=()=>ta.remove(); }
@@ -761,6 +944,7 @@ function tableText(sep){
   if(Q.roofArea) row(['屋面板',PANELS[st.roofPanel].n,Q.roofArea.toFixed(2),'m²']);
   Q.walls.forEach(w=>row([w.n,PANELS[st.wallPanel].n,w.net.toFixed(2),'m²']));
   Q.trims.forEach(t=>row([t.n,'',t.q.toFixed(t.u==='m'?1:0),t.u]));
+  G.plats.forEach(p=>row([`${p.label} 樓板 FL+${p.y}`,G.DK.n,p.area.toFixed(2),'m²'])); if(G.railLen) row(['欄杆扶手','H1100',G.railLen.toFixed(1),'m']);
   row([]); row(['【五金・門窗】']); row(['項目','規格','數量','單位']);
   Q.hw.forEach(h=>row([h.n,h.spec,h.q,h.u])); Q.opRows.forEach(o=>row([o.n,o.spec,o.q.toFixed(o.u==='樘'?0:2),o.u]));
   row([]); row(['【估價單】']); row(['類別','項目','數量','單位','單價','複價']);
@@ -775,13 +959,17 @@ function renderTable(){
     let i=0; Q.steel.forEach(r=>h+=`<tr><td class="mono">${++i}</td><td>${r.name}</td><td class="mono">${r.prof}</td><td class="r mono">${fmt(r.len,1)}</td><td class="r mono">${r.qty}</td><td class="r mono">${fmt(r.totLen,2)}</td><td class="r mono">${r.kgm}</td><td class="r mono">${fmt(r.kg,1)}</td><td>${r.cat}</td><td>${r.note}</td></tr>`);
     h+=`<tr class="sub"><td></td><td colspan="9">鋼板零件（SS400）</td></tr>`;
     Q.plates.forEach(p=>h+=`<tr><td class="mono">${++i}</td><td>${p.name}</td><td class="mono">PL ${p.spec}</td><td class="r mono">—</td><td class="r mono">${p.qty}</td><td class="r mono">—</td><td class="r mono">${fmt(p.kgE,2)}/片</td><td class="r mono">${fmt(p.kg,1)}</td><td>鋼板</td><td>${p.note}</td></tr>`);
-    h+=`<tr class="total"><td></td><td colspan="4">合計（${Q.bars} 支 12m 定尺料估）</td><td class="r mono">${fmt(Q.totLen,1)}</td><td></td><td class="r mono">${fmt(Q.totKg,1)}</td><td colspan="2">用鋼量 ${fmt(Q.totKg/(G.W*G.L/1e6),1)} kg/m²</td></tr></tbody></table>`;
+    h+=`<tr class="total"><td></td><td colspan="4">合計（${Q.bars} 支 12m 定尺料估）</td><td class="r mono">${fmt(Q.totLen,1)}</td><td></td><td class="r mono">${fmt(Q.totKg,1)}</td><td colspan="2">用鋼量 ${fmt(Q.totKg/Q.floorArea,1)} kg/m²</td></tr></tbody></table>`;
   } else if(tab==='skin'){
     h=`<table><thead><tr><th>項目</th><th>材質規格</th><th class="r">毛面積 m²</th><th class="r">開口扣除 m²</th><th class="r">淨數量</th><th>單位</th><th>備註</th></tr></thead><tbody>`;
     if(Q.roofArea) h+=`<tr><td>屋面板</td><td>${PANELS[st.roofPanel].n}</td><td class="r mono">${fmt(Q.roofArea,2)}</td><td class="r mono">—</td><td class="r mono">${fmt(Q.roofArea,2)}</td><td>m²</td><td>含簷口/山牆出挑，${Q.roofPlanes.length} 面</td></tr>`;
     else h+=`<tr><td>屋面板</td><td colspan="6">不封板</td></tr>`;
     if(st.wallPanel!=='none') Q.walls.forEach(w=>h+=`<tr><td>${w.n}</td><td>${PANELS[st.wallPanel].n}</td><td class="r mono">${fmt(w.gross,2)}</td><td class="r mono">${fmt(w.op,2)}</td><td class="r mono">${fmt(w.net,2)}</td><td>m²</td><td>${w.w==='front'||w.w==='back'?'含山尖三角':''}</td></tr>`);
     if(!Q.walls.length||st.wallPanel==='none') h+=`<tr><td>牆面板</td><td colspan="6">開放式／不封板</td></tr>`;
+    if(G.plats.length){ h+=`<tr class="sub"><td colspan="7">樓板・欄杆</td></tr>`;
+      G.plats.forEach(p=>h+=`<tr><td>${p.label} 樓板（FL+${fmt(p.y)}）</td><td>${G.DK.n}</td><td class="r mono">${fmt((p.x1-p.x0)*(p.zB-p.zA)/1e6,2)}</td><td class="r mono">${fmt((p.x1-p.x0)*(p.zB-p.zA)/1e6-p.area,2)}</td><td class="r mono">${fmt(p.area,2)}</td><td>m²</td><td>扣樓梯開口</td></tr>`);
+      if(G.railLen) h+=`<tr><td>欄杆扶手</td><td>□40 方管立柱＋扶手 H1100</td><td class="r mono">—</td><td class="r mono">—</td><td class="r mono">${fmt(G.railLen,1)}</td><td>m</td><td>夾層邊緣、樓梯開口、樓梯兩側</td></tr>`;
+      G.stairs.forEach(t=>h+=`<tr><td>鋼梯（${t.pl}）</td><td>寬 ${t.sw}・${t.n} 級・級高 ${t.riser.toFixed(0)}・級深 260</td><td class="r mono">—</td><td class="r mono">—</td><td class="r mono">1</td><td>座</td><td>水平投影 ${fmt(t.run)} mm</td></tr>`); }
     h+=`<tr class="sub"><td colspan="7">收邊・排水</td></tr>`;
     Q.trims.forEach(t=>h+=`<tr><td>${t.n}</td><td>${t.pipe?'PVC φ100':'0.5t 烤漆鋼板'}</td><td class="r mono">—</td><td class="r mono">—</td><td class="r mono">${fmt(t.q,t.u==='m'?1:0)}</td><td>${t.u}</td><td></td></tr>`);
     h+=`</tbody></table>`;
@@ -802,11 +990,11 @@ function renderTable(){
   } else {
     h=`<table><thead><tr><th>類別</th><th>項目</th><th class="r">數量</th><th>單位</th><th class="r">單價 NT$</th><th class="r">複價 NT$</th></tr></thead><tbody>`;
     let last=''; EST.it.forEach(i=>{ h+=`<tr><td>${i.grp!==last?i.grp:''}</td><td>${i.n}</td><td class="r mono">${fmt(i.qty,i.u==='kg'||i.u==='m²'||i.u==='m'?1:0)}</td><td>${i.u}</td><td class="r mono">${fmt(i.p)}</td><td class="r mono">${fmt(i.amt)}</td></tr>`; last=i.grp; });
-    const ping=G.W*G.L/1e6/3.30579;
+    const ping=Q.floorArea/3.30579;
     h+=`<tr class="total"><td></td><td colspan="4">小計</td><td class="r mono">${fmt(EST.sub)}</td></tr>
       <tr><td></td><td colspan="4">管理利潤 ${st.price.mgmt}%</td><td class="r mono">${fmt(EST.mg)}</td></tr>
       <tr><td></td><td colspan="4">營業稅 5%</td><td class="r mono">${fmt(EST.tax)}</td></tr>
-      <tr class="grand"><td></td><td colspan="4">含稅總價（建築面積 ${fmt(ping,1)} 坪，約 NT$ ${fmt(EST.total/ping)}/坪）</td><td class="r mono">${fmt(EST.total)}</td></tr></tbody></table>`;
+      <tr class="grand"><td></td><td colspan="4">含稅總價（總樓地板面積 ${fmt(ping,1)} 坪，約 NT$ ${fmt(EST.total/ping)}/坪）</td><td class="r mono">${fmt(EST.total)}</td></tr></tbody></table>`;
   }
   t.innerHTML=h;
   const foot={
@@ -824,8 +1012,9 @@ function renderSummary(){
   $('#card').innerHTML=`<b class="num">${fmt(G.W)} × ${fmt(G.L)} × ${fmt(G.H)}</b> mm <span class="k">（屋脊 ${fmt(G.ridge)}）</span><br>
     <span class="k">主柱</span> ${st.prof.col}<br><span class="k">大樑</span> ${st.prof.raf}<br>
     <span class="k">桁條</span> ${st.prof.pur} @${st.purSp}<br>
+    ${G.plats.length?`<span class="k">樓層</span> ${G.plats.map(p=>p.label+' FL+'+fmt(p.y)).join('・')}・樓板 ${fmt(Q.deckArea,1)} m²<br>`:''}
     <span class="k">構件</span> 主柱 ${G.mainCols}・山牆柱 ${G.windCols}・桁條 ${G.M.filter(m=>m.name==='桁條').length}<br>
-    <span class="k">鋼材</span> <b class="num">${fmt(Q.totKg)}</b> kg <span class="k">（${fmt(Q.totKg/(G.W*G.L/1e6),1)} kg/m²）</span><br>
+    <span class="k">鋼材</span> <b class="num">${fmt(Q.totKg)}</b> kg <span class="k">（${fmt(Q.totKg/Q.floorArea,1)} kg/m²）</span><br>
     <span class="k">估價</span> <span class="big num">NT$ ${fmt(EST.total)}</span><br>
     <span class="k">結構初檢</span> ${ng.length?`<span class="chip ng">${ng.length} 項 NG</span>`:'<span class="chip ok">全部 OK</span>'}`;
 }
@@ -836,7 +1025,7 @@ function update(full){
   renderTable(); renderSummary();
   if(scene) build3D();
   if($('#views').classList.contains('on')) drawViews(G);
-  try{ localStorage.setItem('steelDesigner.v1',JSON.stringify(st)); }catch(e){}
+  try{ localStorage.setItem('steelDesigner.v2',JSON.stringify(st)); }catch(e){}
 }
 
 /* ================= 3D ================= */
@@ -861,7 +1050,7 @@ function memberGeo(prof,len){
 }
 const mats={};
 function matFor(grp){
-  const c={main:st.colors.steel,sec:'#e0b84f',brace:'#e98a35'}[grp];
+  const c={main:st.colors.steel,sec:'#e0b84f',brace:'#e98a35',floor:'#5fb3a1'}[grp];
   const key=grp+c; if(!mats[key]) mats[key]=new THREE.MeshStandardMaterial({color:c,metalness:.45,roughness:.45});
   return mats[key];
 }
@@ -925,6 +1114,8 @@ function build3D(){
     const bp=new THREE.Mesh(new THREE.BoxGeometry(sz,20,sz),matFor('main')); bp.position.set(m.p1[0],10,m.p1[2]); root.add(bp);
     const pd=new THREE.Mesh(new THREE.BoxGeometry(sz+300,250,sz+300),conc); pd.position.set(m.p1[0],-125+2,m.p1[2]); pd.receiveShadow=true; root.add(pd);
   });
+  // 樓板・踏板・欄杆
+  buildFloors(g,root);
   // 地坪
   if(s.slab){ const sl=new THREE.Mesh(new THREE.BoxGeometry(g.W+200,40,g.L+200),new THREE.MeshStandardMaterial({color:'#5b6573',roughness:1})); sl.position.set(g.W/2,-21,g.L/2); sl.receiveShadow=true; root.add(sl); }
   // 外殼
@@ -982,6 +1173,26 @@ function buildSkin(g,root){
     mk(w,[[0,0],[g.L,0],[g.L,yt],[0,yt]],0,g.L,(o,dz)=>{ const grp=new THREE.Group(); grp.position.set(x+sg*(g.offSide+gt/2+5),0,0); grp.rotation.y=-Math.PI/2; o.position.z=sg<0?dz:-dz; grp.add(o); root.add(grp); });
   });
 }
+function buildFloors(g,root){
+  if(!g.plats.length) return;
+  const dm=new THREE.MeshStandardMaterial({color:g.DK.c,roughness:.8,metalness:st.deck==='rc'||st.deck==='wood'?0:.5,transparent:st.deck==='grating',opacity:st.deck==='grating'?.7:1});
+  const rm=new THREE.MeshStandardMaterial({color:'#dfe5ea',metalness:.5,roughness:.4});
+  const tm=new THREE.MeshStandardMaterial({color:'#9aa4ae',metalness:.6,roughness:.4});
+  g.plats.forEach(pl=>{
+    const sh=new THREE.Shape([[pl.x0,-pl.zA],[pl.x1,-pl.zA],[pl.x1,-pl.zB],[pl.x0,-pl.zB]].map(([a,b])=>new THREE.Vector2(a,b)));
+    pl.ops.forEach(o=>sh.holes.push(new THREE.Path([[o.x0,-o.z0],[o.x0,-o.z1],[o.x1,-o.z1],[o.x1,-o.z0]].map(([a,b])=>new THREE.Vector2(a,b)))));
+    const m=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:g.dT,bevelEnabled:false}),dm); m.rotation.x=-Math.PI/2; m.position.y=pl.y-g.dT; m.castShadow=m.receiveShadow=true; root.add(m);
+  });
+  g.stairs.forEach(t=>{ for(let i=1;i<t.n;i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(t.sw,8,280),tm);
+    b.position.set(t.xs+t.sw/2,t.base+i*t.riser-4,t.zBot+t.dir*((i-1)*260+130)); b.castShadow=true; root.add(b); } });
+  const bar=(a,b,w)=>{ const d=b.clone().sub(a), L=d.length(); if(L<1) return; const m=new THREE.Mesh(new THREE.BoxGeometry(w,w,L),rm);
+    m.position.copy(a).add(b).multiplyScalar(.5); m.quaternion.setFromUnitVectors(V(0,0,1),d.normalize()); root.add(m); };
+  g.rails.forEach(({y,seg:[x0,z0,x1,z1]})=>{ const L=Math.hypot(x1-x0,z1-z0), n=Math.max(1,Math.ceil(L/1500));
+    for(let i=0;i<=n;i++){ const x=x0+(x1-x0)*i/n, z=z0+(z1-z0)*i/n; bar(V(x,y,z),V(x,y+1100,z),40); }
+    bar(V(x0,y+1100,z0),V(x1,y+1100,z1),45); bar(V(x0,y+550,z0),V(x1,y+550,z1),25); });
+  g.stairs.forEach(t=>[t.xs,t.xs+t.sw].forEach(x=>{ bar(V(x,t.base+900,t.zBot),V(x,t.top+900,t.zTop),40);
+    bar(V(x,t.base,t.zBot),V(x,t.base+900,t.zBot),40); bar(V(x,t.top,t.zTop),V(x,t.top+900,t.zTop),40); }));
+}
 function addLabel(text,pos,cls=''){ const el=document.createElement('div'); el.className='lbl '+cls; el.textContent=text; $('#labels').appendChild(el); labels.push({el,p:pos}); }
 function dimLine(a,b,ticks=true){
   const pts=[a,b]; const geo=new THREE.BufferGeometry().setFromPoints(pts);
@@ -997,6 +1208,7 @@ function buildDims(g){
   g.fz.forEach((z,i)=>addLabel(String(i+1),V(xR+off*1.5,0,z),'g'));
   dimLine(V(xL,0,z0),V(xL,g.H,z0)); addLabel(`H ${fmt(g.H)}`,V(xL,g.H/2,z0),'h');
   if(g.ridge>g.H+1){ const xr=st.roof==='gable'?g.W/2:g.W; dimLine(V(xr,0,z0-off*0.3),V(xr,g.ridge,z0-off*0.3)); addLabel(`屋脊 ${fmt(g.ridge)}`,V(xr,g.ridge*0.75,z0-off*0.3),'h'); }
+  g.plats.forEach(pl=>addLabel(`${pl.label} FL+${fmt(pl.y)}`,V(pl.x0,pl.y,pl.zA),'h'));
   g.ops.forEach(o=>{ const u=+o.pos+(+o.w)/2, y=+o.sill+(+o.h)+250;
     const p= o.wall==='front'?V(u,y,-g.offG): o.wall==='back'?V(u,y,g.L+g.offG): o.wall==='left'?V(-g.offSide,y,u):V(g.W+g.offSide,y,u);
     addLabel(`${OPS[o.type]} ${o.w}×${o.h}`,p,'o'); });
@@ -1022,7 +1234,7 @@ function loop(){
 
 /* ================= 工程三視圖 (SVG) ================= */
 function drawViews(g){
-  const s=st, C={ln:'#c9d6e3',mem:'#8fb3d6',sec:'#e0b84f',br:'#e98a35',dim:'#6fb0e6',op:'#e98a35',tx:'#c9d6e3',mut:'#6f879e',gr:'#3a5570'};
+  const s=st, C={fl:'#5fb3a1',ln:'#c9d6e3',mem:'#8fb3d6',sec:'#e0b84f',br:'#e98a35',dim:'#6fb0e6',op:'#e98a35',tx:'#c9d6e3',mut:'#6f879e',gr:'#3a5570'};
   const fsz=Math.max(g.W,g.L,g.ridge)*0.018;
   const T=(x,y,t,o={})=>`<text x="${x}" y="${y}" fill="${o.c||C.tx}" font-size="${o.fs||fsz}" font-family="IBM Plex Mono, monospace" text-anchor="${o.a||'middle'}" ${o.r?`transform="rotate(${o.r} ${x} ${y})"`:''} dominant-baseline="middle">${t}</text>`;
   const Ln=(x1,y1,x2,y2,c,w=1.2,d='')=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" ${d?`stroke-dasharray="${d}"`:''}/>`;
@@ -1047,6 +1259,9 @@ function drawViews(g){
   g.colX.forEach(x=>b+=R(x-g.col.h/2,0,g.col.h,rf(x)-g.raf.h,C.mem));
   (g.windXs.front.length?g.windXs.front:[]).forEach(x=>b+=R(x-g.wind.b/2,0,g.wind.b,rf(x)-g.raf.h,C.mem,'none','4 3'));
   g.purX.forEach(x=>b+=R(x-g.pur.b/2,rf(x),g.pur.b,g.pur.h,C.sec,C.sec));
+  g.plats.forEach(pl=>{ b+=R(pl.x0,pl.y-g.dT,pl.x1-pl.x0,g.dT,C.fl,C.fl); b+=Ln(pl.x0,pl.y-g.dT-g.fb.h,pl.x1,pl.y-g.dT-g.fb.h,C.fl,1);
+    pl.sup.filter(x=>!g.colX.some(c=>Math.abs(c-x)<1)).forEach(x=>b+=R(x-PROF[st.prof.mcol].h/2,0,PROF[st.prof.mcol].h,pl.y-g.dT-g.fb.h,C.fl));
+    b+=flipT(pl.x0+fsz*4,pl.y+fsz*.9,`${pl.label} FL+${fmt(pl.y)}`,{c:C.fl,fs:fsz*.85,a:'start'}); });
   g.ops.filter(o=>o.wall==='front').forEach(o=>{ b+=R(+o.pos,+o.sill,+o.w,+o.h,C.op,'none','6 4'); b+=flipT(+o.pos+(+o.w)/2,+o.sill+(+o.h)/2,`${OPS[o.type]}`,{c:C.op}); b+=flipT(+o.pos+(+o.w)/2,+o.sill+(+o.h)/2-fsz*1.3,`${o.w}×${o.h}`,{c:C.op,fs:fsz*.85}); });
   b+=dimHf(0,g.W,-pad*.55,`${fmt(g.W)}`);
   if(g.spans>1) g.colX.slice(0,-1).forEach((x,i)=>b+=dimHf(x,g.colX[i+1],-pad*.25,fmt(g.colX[i+1]-x)));
@@ -1065,6 +1280,9 @@ function drawViews(g){
   if(g.ridge>yE) c2+=Ln(-g.gOh,g.ridge+g.pur.h,g.L+g.gOh,g.ridge+g.pur.h,C.mem,1,'10 6');
   if(hasL) g.M.filter(m=>m.name==='牆檁'&&m.p1[0]<0).forEach(m=>c2+=Ln(m.p1[2],m.p1[1],m.p2[2],m.p2[1],C.sec,1,'6 4'));
   g.M.filter(m=>m.name==='牆面斜撐'&&m.p1[0]===0).forEach(m=>c2+=Ln(m.p1[2],m.p1[1],m.p2[2],m.p2[1],C.br,1));
+  g.plats.forEach(pl=>{ c2+=R(pl.zA,pl.y-g.dT,pl.zB-pl.zA,g.dT,C.fl,C.fl); c2+=flipT(pl.zA+fsz*4,pl.y+fsz*.9,`${pl.label} FL+${fmt(pl.y)}`,{c:C.fl,fs:fsz*.8,a:'start'}); });
+  g.stairs.forEach(t=>{ let d=''; for(let i=0;i<t.n;i++){ const z=t.zBot+t.dir*(i-1)*260; d+=`${z},${t.base+i*t.riser} ${z+t.dir*260},${t.base+i*t.riser} `; }
+    c2+=`<polyline points="${d}" fill="none" stroke="${C.fl}" stroke-width="1" vector-effect="non-scaling-stroke"/>`; });
   g.ops.filter(o=>o.wall==='left').forEach(o=>{ c2+=R(+o.pos,+o.sill,+o.w,+o.h,C.op,'none','6 4'); c2+=flipT(+o.pos+(+o.w)/2,+o.sill+(+o.h)/2,`${OPS[o.type]} ${o.w}×${o.h}`,{c:C.op,fs:fsz*.8}); });
   g.fz.slice(0,-1).forEach((z,i)=>c2+=dimHf(z,g.fz[i+1],-pad*.25,fmt(s.bays[i])));
   c2+=dimHf(0,g.L,-pad*.55,fmt(g.L));
@@ -1081,6 +1299,12 @@ function drawViews(g){
   g.purX.forEach(x=>c3+=Ln(-g.gOh,x,g.L+g.gOh,x,C.sec,.8));
   g.braceBays.forEach(j=>{ const z0=g.fz[j],z1=g.fz[j+1]; const ip=[...new Set([...g.colX,...(s.roof==='gable'?[g.W/2]:[])])].sort((a,b)=>a-b);
     for(let i=0;i<ip.length-1;i++){ const a=ip[i],bb=ip[i+1],m=Math.max(1,Math.round((bb-a)/(z1-z0))); for(let q=0;q<m;q++){ const xa=a+(bb-a)*q/m, xb=a+(bb-a)*(q+1)/m; c3+=Ln(z0,xa,z1,xb,C.br,1)+Ln(z1,xa,z0,xb,C.br,1);} } });
+  g.plats.forEach(pl=>{ c3+=R(pl.zA,pl.x0,pl.zB-pl.zA,pl.x1-pl.x0,C.fl,'#5fb3a11a','8 4');
+    c3+=T(pl.zA+fsz*3,pl.x0+fsz*1.4,`${pl.label} FL+${fmt(pl.y)}`,{c:C.fl,a:'start',fs:fsz*.85}); });
+  g.stairs.forEach(t=>{ const z0=Math.min(t.zBot,t.zTop), z1=Math.max(t.zBot,t.zTop); c3+=R(z0,t.xs,z1-z0,t.sw,C.fl,'none');
+    for(let i=1;i<t.n;i++){ const z=t.zBot+t.dir*(i-1)*260; c3+=Ln(z,t.xs,z,t.xs+t.sw,C.fl,.6); }
+    c3+=Ln(t.zBot,t.xs+t.sw/2,t.zTop,t.xs+t.sw/2,C.fl,1.4); });
+  g.M.filter(m=>m.name==='夾層柱').forEach(m=>{ const p=PROF[m.prof],[x,,z]=m.p1; c3+=R(z-p.b/2,x-p.h/2,p.b,p.h,C.fl,C.fl); });
   g.M.filter(m=>m.name==='主柱'||m.name==='中柱').forEach(m=>{ const [x,,z]=m.p1; c3+=R(z-g.col.b/2,x-g.col.h/2,g.col.b,g.col.h,C.ln,C.mem); });
   g.M.filter(m=>m.name==='山牆柱').forEach(m=>{ const [x,,z]=m.p1; c3+=R(z-g.wind.h/2,x-g.wind.b/2,g.wind.h,g.wind.b,C.ln,C.mem); });
   g.ops.forEach(o=>{ const a=+o.pos,bb=+o.pos+(+o.w); const w=fsz*.5;
@@ -1095,7 +1319,7 @@ function drawViews(g){
   $('#views').innerHTML=`
     <div class="sheet"><h3><span>前視圖・山牆立面（1 軸）</span><span>單位 mm</span></h3>${svg(vbF,b)}</div>
     <div class="sheet"><h3><span>側視圖・左側牆立面（A 軸）</span><span>單位 mm</span></h3>${svg(vbS,c2)}</div>
-    <div class="sheet wide"><h3><span>屋頂結構平面圖（桁條・斜撐・柱位）</span><span>單位 mm</span></h3><svg viewBox="${vbP.join(' ')}" xmlns="http://www.w3.org/2000/svg">${c3}</svg></div>`;
+    <div class="sheet wide"><h3><span>屋頂結構平面圖（桁條・斜撐・柱位${g.plats.length?'・樓板／樓梯':''}）</span><span>單位 mm</span></h3><svg viewBox="${vbP.join(' ')}" xmlns="http://www.w3.org/2000/svg">${c3}</svg></div>`;
 }
 
 /* ================= 啟動 ================= */
