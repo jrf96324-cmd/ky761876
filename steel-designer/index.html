@@ -87,6 +87,11 @@ aside.side{background:var(--panel);border:1px solid var(--line);border-radius:va
 .sw{display:flex;gap:6px;flex-wrap:wrap}
 .sw button{width:26px;height:26px;border-radius:5px;border:2px solid var(--line-2);padding:0}
 .sw button[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.autobox{display:grid;gap:6px;padding:8px;border:1px dashed var(--line-2);border-radius:6px;margin-bottom:10px;background:var(--panel-2)}
+#autoNote:empty{display:none}
+#autoNote .up{color:var(--accent);font-weight:700}
+#autoNote .dn{color:var(--ok);font-weight:700}
+select.bumped{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .walls{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}
 .walls .chk{padding:0}
 .op{border:1px solid var(--line-2);border-radius:6px;padding:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;position:relative;background:var(--panel-2)}
@@ -204,7 +209,12 @@ tr.grand td{font-weight:700;color:var(--accent);font-size:14px}
 
   <aside class="side" aria-label="構件與外殼設定">
     <div>
-      <h2 class="sec-t">型鋼規格</h2>
+      <h2 class="sec-t">型鋼規格 <button class="btn sm" id="bAuto" type="button" title="依目前尺寸、樓層與荷重重新選材">立即選材</button></h2>
+      <div class="autobox">
+        <label class="chk" style="padding:0"><input type="checkbox" data-k="autoSize"> 依樓層／荷重自動選材</label>
+        <div class="f" style="flex-direction:row;align-items:center;gap:6px"><label for="ratioMax" style="white-space:nowrap">應力比上限</label><input id="ratioMax" data-k="ratioMax" type="number" step="0.05" min="0.5" max="1" style="width:70px"></div>
+        <div id="autoNote" class="note"></div>
+      </div>
       <div class="g1">
         <div class="f"><label for="p_col">主柱</label><select id="p_col" data-k="prof.col"></select></div>
         <div class="f"><label for="p_raf">屋頂大樑</label><select id="p_raf" data-k="prof.raf"></select></div>
@@ -420,7 +430,7 @@ const PRESETS = {
 const BASE_PRICE = {matH:30,matC:38,matR:32,fab:16,erect:10,paint:7,galv:14,trim:220,pipe:2800,rollup:3200,motor:28000,door:16000,window:3800,
   hsb:65,anchor:280,bolt:12,fMain:22000,fWind:12000,fMz:9000,slab:1900,rail:2200,d_rc:2600,d_checker:1800,d_grating:2600,d_wood:1500,mgmt:10, steel:380,pu:680,eps:950,rockwool:1350,clear:520};
 
-const DEF = {floors:1,storyH:[3200,3000,3000],deck:'rc',floorLL:300,joistSp:1500,stairOn:true,stairW:1000,
+const DEF = {autoSize:true,ratioMax:0.9,floors:1,storyH:[3200,3000,3000],deck:'rc',floorLL:300,joistSp:1500,stairOn:true,stairW:1000,
   mz:{on:false,h:3500,side:'left',d:6000,b0:1,b1:2,colSp:3000},
   prof:{fbeam:'H300x150x6.5x9',joist:'H300x150x6.5x9',mcol:'H200x200x8x12',stair:'C200x75x20x3.2'}};
 function makeState(key){
@@ -431,6 +441,7 @@ function makeState(key){
   const s = {preset:key, ...p, LL:60, wq:110, Fy:'2500', paint:'paint', projName:'鋼構工程方案', colors:{steel:'#c9ced6',roof:'#3f7fb5',wall:'#d8dde3'}};
   if(key==='shed'||key.startsWith('house')){s.colors.roof='#b8bec6';s.colors.wall='#e9e5dc'}
   if(s.floors>1) s.H = s.storyH.slice(0,s.floors).reduce((a,b)=>a+b,0);
+  s.baseProf = {...s.prof};
   s.bays = Array(p.nBays).fill(Math.round(p.L/p.nBays));
   s.bays[s.bays.length-1] = p.L - s.bays.slice(0,-1).reduce((a,b)=>a+b,0);
   s.price = {...BASE_PRICE, fMain:p.found.fMain, fWind:p.found.fWind};
@@ -809,18 +820,54 @@ function checks(g,q){
   const Mg=Math.max(wR*(Ls/1000)**2/12, nF?wF*(Ls/1000)**2/12:0)*100;
   const Mw= nF ? wq*maxBay/1000*g.H/1000/(g.spans+1)*(+s.storyH[0])/1000/2*100 : wq*maxBay/1000*(Hc/1000)**2/4*100;
   const Mc=Math.max(Mg,0.75*(Mg+Mw));
-  const rx=Math.sqrt(col.Ix/col.A), KLr=(nF?1.2*Math.max(...s.storyH.slice(0,g.floors)):1.5*Hc)/10/rx, Cc=Math.sqrt(2*Math.PI**2*E/Fy);
+  const maxSt=Math.max(...s.storyH.slice(0,g.floors)), rx=Math.sqrt(col.Ix/col.A), ry=col.t==='H'?0.24*col.b/10:rx;
+  const KLx=(nF?1.2*maxSt:1.5*Hc)/10/rx, KLy=(nF?maxSt:Hc/2)/10/ry, KLr=Math.max(KLx,KLy), Cc=Math.sqrt(2*Math.PI**2*E/Fy);
   const Fa= KLr<Cc ? (1-KLr**2/(2*Cc**2))*Fy/(5/3+3/8*KLr/Cc-KLr**3/(8*Cc**3)) : 12*Math.PI**2*E/(23*KLr**2);
   const fa=P_/col.A, fbc=Mc/col.Zx;
-  out.push({name:'主柱',prof:s.prof.col,span:Hc,load:`P = ${(P_/1000).toFixed(1)} tf・M = ${(Mc/1e5).toFixed(2)} tf·m`,fml:'fa/Fa + fb/Fb',ratio:fa/Fa+fbc/Fb,fb:fbc,def:null,note:`KL/r = ${KLr.toFixed(0)}・風載組合 ×0.75${nF?'・多層以門架法分配風力':''}`});
+  out.push({name:'主柱',prof:s.prof.col,span:Hc,load:`P = ${(P_/1000).toFixed(1)} tf・M = ${(Mc/1e5).toFixed(2)} tf·m`,fml:'fa/Fa + fb/Fb',ratio:fa/Fa+fbc/Fb,fb:fbc,def:null,note:`KL/r = ${KLr.toFixed(0)}（${KLy>KLx?'弱軸控制':'強軸控制'}）・風載組合 ×0.75${nF?'・多層以門架法分配風力':''}`});
   // 斜撐
   if(g.braceBays.size){
-    const rod=PROF[s.prof.brace], F=wq*q.gableArea/2/2; // 山牆一半風力，兩側分擔
+    const rod=PROF[s.prof.brace], F=wq*((g.W*g.H+g.W*(g.ridge-g.H)/2)/1e6)/2/2; // 山牆一半風力，兩側分擔
     const per=F/Math.max(1,g.braceBays.size), Lb=Math.max(...g.M.filter(m=>m.name==='屋面斜撐').map(m=>m.len),1);
     const T=per*Lb/maxBay, Ae=Math.PI*(rod.d/10)**2/4*0.75, ft=T/Ae;
     out.push({name:'屋面斜撐',prof:s.prof.brace,span:Lb,load:`T = ${(T/1000).toFixed(2)} tf`,fml:'ft = T / Ae（牙底 0.75A）',ratio:ft/(0.6*Fy),fb:ft,def:null,note:'山牆風力傳遞'});
   }
   return out;
+}
+
+/* ================= 自動選材 ================= */
+const AUTO_GROUPS=[
+  ['pur','桁條',['桁條'],['C']], ['girt','牆檁',['牆檁'],['C']], ['wind','山牆柱',['山牆柱'],['H','BOX']],
+  ['joist','樓板小樑',['樓板小樑','夾層小樑'],['H','C']], ['fbeam','樓層大樑',['樓層大樑','夾層大樑'],['H']], ['mcol','夾層柱',['夾層柱'],['H','BOX']],
+  ['raf','屋頂大樑',['屋頂大樑'],['H']], ['col','主柱',['主柱'],['H','BOX']], ['brace','斜撐圓鋼',['屋面斜撐'],['RB']]];
+let lastAuto=[];
+function autoSize(){
+  const lim=Math.min(1,Math.max(0.5,+st.ratioMax||0.9)), before={...st.prof}, changes=[];
+  const evalP=(key,names,cand)=>{ st.prof[key]=cand; const g=gen(); return checks(g).find(r=>names.includes(r.name)); };
+  const pass=c=>c && c.ratio<=lim && (c.def==null || c.def<=c.defLim);
+  // 兩輪：大樑自重影響柱，柱與大樑梁深影響山牆柱
+  for(let round=0;round<2;round++) AUTO_GROUPS.forEach(([key,label,names,types])=>{
+    const cur=st.prof[key]; if(!evalP(key,names,cur)){ st.prof[key]=cur; return; }
+    const fam=PROF[cur].t, list=Object.keys(PROF).filter(k=>types.includes(PROF[k].t))
+      .sort((a,b)=>(PROF[a].t===fam?0:1)-(PROF[b].t===fam?0:1) || PROF[a].kg-PROF[b].kg);
+    let pick=null, best=null, bestR=1e9;
+    for(const c of list){ const r=evalP(key,names,c); if(pass(r)){ pick=c; break; }
+      const sc=(r&&r.ratio!=null?r.ratio:9)+((r&&r.def!=null&&r.def>r.defLim)?r.def/r.defLim:0); if(sc<bestR){ bestR=sc; best=c; } }
+    st.prof[key]=pick||best||cur;
+  });
+  AUTO_GROUPS.forEach(([key,label])=>{ if(st.prof[key]!==before[key]) changes.push({key,label,from:before[key],to:st.prof[key],up:PROF[st.prof[key]].kg>PROF[before[key]].kg}); });
+  lastAuto=changes;
+  $$('[data-k^="prof."]').forEach(el=>{ el.value=getK(st,el.dataset.k); });
+  renderAutoNote();
+  if(changes.length){ const ups=changes.filter(c=>c.up).length, dn=changes.length-ups;
+    toast('自動選材：'+[ups?`提升 ${ups} 項`:'',dn?`減重 ${dn} 項`:''].filter(Boolean).join('、')); }
+}
+function renderAutoNote(){
+  const base=st.baseProf||{}, lim=+st.ratioMax||0.9;
+  const diff=AUTO_GROUPS.filter(([k])=>base[k]&&base[k]!==st.prof[k]).map(([k,label])=>({k,label,from:base[k],to:st.prof[k],up:PROF[st.prof[k]].kg>PROF[base[k]].kg}));
+  $$('[data-k^="prof."]').forEach(el=>el.classList.toggle('bumped',diff.some(c=>'prof.'+c.k===el.dataset.k)));
+  $('#autoNote').innerHTML = (diff.length ? `<div style="color:var(--fg)">相對方案預設的變更：</div>`+diff.map(c=>`<div><span class="${c.up?'up':'dn'}">${c.up?'▲ 提升':'▼ 減重'}</span> ${c.label}：${c.from} → <b>${c.to}</b></div>`).join('')
+    : `<div>維持方案預設規格</div>`) + (st.autoSize?`<div>自動選材：取應力比 ≤ ${lim} 且撓度合格之最輕斷面</div>`:'<div>手動選材中</div>');
 }
 
 /* ================= UI ================= */
@@ -873,7 +920,7 @@ function renderOps(){
   </div>`).join('') : '<p class="note">尚無開口。車棚或開放式結構可不設。</p>';
 }
 
-let timer=null; const changed=(full)=>{ clearTimeout(timer); timer=setTimeout(()=>update(full),40); };
+let timer=null, needAuto=false; const changed=(full,auto=true)=>{ if(auto) needAuto=true; clearTimeout(timer); timer=setTimeout(()=>{ update(full,needAuto); needAuto=false; },60); };
 function wire(){
   document.addEventListener('input',e=>{
     const el=e.target;
@@ -885,7 +932,9 @@ function wire(){
       if(el.dataset.k.startsWith('walls')) renderOps();
       if(el.dataset.k==='floors'){ if(v>1){ st.H=st.storyH.slice(0,v).reduce((a,b)=>a+b,0); $('#H').value=st.H; } renderStory(); }
       if(el.dataset.k==='mz.on') renderStory();
-      changed(true); return; }
+      const k=el.dataset.k;
+      if(k.startsWith('prof.') && st.autoSize){ st.autoSize=false; $('[data-k="autoSize"]').checked=false; toast('已改為手動選材；勾選「自動選材」可恢復'); }
+      changed(true, !(k.startsWith('price.')||k==='projName'||k==='paint'||k.startsWith('prof.')||(k==='autoSize'&&!v))); return; }
     if(el.dataset.bay!==undefined){
       const i=+el.dataset.bay, v=Math.max(500,parseFloat(el.value)||0); st.bays[i]=v;
       if($('#lockL').checked && st.bays.length>1){
@@ -903,12 +952,13 @@ function wire(){
     if(el.id==='nBays'){ const n=Math.max(1,Math.min(30,parseInt(el.value)||1)); st.bays=Array(n).fill(Math.round(st.L/n)); st.bays[n-1]=st.L-st.bays.slice(0,-1).reduce((a,b)=>a+b,0); renderBays(); changed(true); }
   });
   document.addEventListener('change',e=>{
-    if(e.target.id==='preset'){ const c=st.price; st=makeState(e.target.value); syncInputs(); update(true); fitCam('iso'); }
+    if(e.target.id==='preset'){ st=makeState(e.target.value); syncInputs(); update(true,true); fitCam('iso'); }
     if(e.target.id==='showSkin'||e.target.id==='showDim') update(true);
   });
   document.addEventListener('click',e=>{
     const b=e.target.closest('button'); if(!b) return;
-    if(b.dataset.c){ const key=b.closest('[data-sw]').dataset.sw; st.colors[key]=b.dataset.c; syncInputs(); update(true); }
+    if(b.dataset.c){ const key=b.closest('[data-sw]').dataset.sw; st.colors[key]=b.dataset.c; syncInputs(); update(true,false); }
+    if(b.id==='bAuto'){ const was=st.autoSize; st.autoSize=true; update(true,true); st.autoSize=was; }
     if(b.dataset.add){ const t=b.dataset.add, wall=st.walls.front?'front':Object.keys(st.walls).find(w=>st.walls[w])||'front';
       const def={rollup:{w:Math.min(4000,st.W/3),h:Math.min(4000,st.H-500),sill:0},door:{w:900,h:2100,sill:0},window:{w:1500,h:1000,sill:1200}}[t];
       st.openings.push({wall,type:t,pos:Math.round((wall==='front'||wall==='back'?st.W:st.L)/2-def.w/2),...def}); renderOps(); update(true); }
@@ -1024,10 +1074,11 @@ function renderSummary(){
     <span class="k">結構初檢</span> ${ng.length?`<span class="chip ng">${ng.length} 項 NG</span>`:'<span class="chip ok">全部 OK</span>'}`;
 }
 
-function update(full){
+function update(full,auto=false){
+  if(auto && st.autoSize) autoSize();
   if(st.bays.reduce((a,b)=>a+b,0)!==st.L){ st.L=st.bays.reduce((a,b)=>a+b,0); $('#L').value=st.L; }
   G=gen(); Q=quantities(G); EST=estimate(G,Q); CHK=checks(G,Q);
-  renderTable(); renderSummary();
+  renderTable(); renderSummary(); renderAutoNote();
   if(scene) build3D();
   if($('#views').classList.contains('on')) drawViews(G);
   try{ localStorage.setItem('steelDesigner.v2',JSON.stringify(st)); }catch(e){}
@@ -1531,6 +1582,6 @@ function makeZip(name,data){
 }
 
 /* ================= 啟動 ================= */
-fillSelects(); syncInputs(); wire(); update(true);
+fillSelects(); syncInputs(); wire(); update(true, st.autoSize);
 try{ init3D(); }catch(e){ $('#loading').textContent='此瀏覽器無法啟用 WebGL，仍可使用工程三視圖與 BOM。'; console.error(e); }
 </script>
