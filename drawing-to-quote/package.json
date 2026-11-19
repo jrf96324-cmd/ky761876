@@ -1,0 +1,11 @@
+{
+  "name": "drawing-to-quote",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI 製作圖製程審查與多元估價系統（台灣本地加工價格）",
+  "type": "commonjs",
+  "scripts": {
+    "quote": "node cli.js samples/parts.csv -o out/報價分析.xlsx",
+    "test": "node test/run-test.js"
+  }
+}
