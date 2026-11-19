@@ -371,7 +371,7 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
   $("#fileCsv").onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
     const buf = await f.arrayBuffer(); let text = new TextDecoder("utf-8").decode(buf);
-    if (text.includes("�")) { try { text = new TextDecoder("big5").decode(buf); } catch {} } // Excel 存檔常為 Big5
+    if (text.includes("\uFFFD")) { try { text = new TextDecoder("big5").decode(buf); } catch {} } // Excel 存檔常為 Big5
     const rows = E.parseCSV(text);
     if (!rows.length) { toast("CSV 沒有資料列，請確認第一列為欄位名稱", true); return; }
     parts = rows.map((r) => Object.fromEntries(E.CSV_HEADERS.map((h) => [h, r[h] ?? ""]))); isSample = false;
