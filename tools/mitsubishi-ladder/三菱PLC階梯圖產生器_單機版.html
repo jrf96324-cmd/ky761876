@@ -58,6 +58,8 @@ table.grid input { width: 100%; }
 table.grid td.n { font-family: var(--mono); color: var(--muted); padding-top: 8px; white-space: nowrap; }
 .w-dev { width: 78px; } .w-num { width: 58px; }
 table.steps input.s-n { min-width: 150px; } table.steps input.s-st { min-width: 76px; } table.steps input.s-o, table.steps input.s-t, table.steps input.s-bc { min-width: 110px; }
+.wiring { display: grid; gap: 10px; }
+.sheet { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
 .flow-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); max-height: 80vh; }
 .cfg { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .cfg label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
@@ -262,6 +264,8 @@ svg .cm { font-family: var(--sans); }
       <div class="tabs" role="tablist">
         <button type="button" role="tab" id="tab-flow" aria-selected="true">流程圖</button>
         <button type="button" role="tab" id="tab-ladder" aria-selected="false">階梯圖</button>
+        <button type="button" role="tab" id="tab-timing" aria-selected="false">時序圖</button>
+        <button type="button" role="tab" id="tab-wiring" aria-selected="false">接線圖</button>
         <button type="button" role="tab" id="tab-il" aria-selected="false">指令表 IL（可手動編輯）</button>
         <button type="button" role="tab" id="tab-export" aria-selected="false">匯出 / 匯入 GX Works</button>
       </div>
@@ -295,6 +299,20 @@ svg .cm { font-family: var(--sans); }
             <div class="ctl"><button id="addMech" type="button">＋ 新增機構</button><label class="inline" for="simInit">重置時預設 ON 的輸入<input id="simInit" class="mono" placeholder="X4,X5,X13"></label></div>
           </details>
       </div>
+      <div id="pane-timing" hidden style="display:grid;gap:8px">
+        <div class="ctl"><button id="tmGen" class="primary" type="button">產生時序圖（自動通過一個循環）</button><span class="hint" id="tmNote">以模擬「自動通過」跑完一個循環，記錄各流程步序、輸出 Y、輸入 X 的 ON/OFF 時間。</span></div>
+        <div class="flow-wrap" id="timing"><p class="hint" style="padding:12px">按上方按鈕產生。程式或步序修改後請重新產生。</p></div>
+      </div>
+      <div id="pane-wiring" hidden style="display:grid;gap:8px">
+        <div class="cfg">
+          <label for="wIn">輸入型式<select id="wIn"><option value="sink">Sink（NPN 感測器）</option><option value="source">Source（PNP 感測器）</option></select></label>
+          <label for="wOut">輸出型式<select id="wOut"><option value="tsink">電晶體 Sink</option><option value="tsource">電晶體 Source</option><option value="relay">繼電器</option></select></label>
+          <label for="wPlc">PLC 型號（空白＝自動建議）<input id="wPlc" class="mono"></label>
+        </div>
+        <p class="hint" id="wInfo"></p>
+        <p class="hint">元件依 I/O 註解自動判定：按鈕→SB、缸端／磁簧→SQ（2 線）、其他感測→B（3 線）、氣壓→SP、Robot／視覺／壓入監視→外部控制器；SOL／缸→YV 電磁閥、震動盤／轉盤→KA 繼電器、燈→HL、蜂鳴器→HA。危險輸出由安全 24V（P24S）供電。圖面為設計初稿，須經電控工程師審核。</p>
+        <div class="wiring" id="wiring"></div>
+      </div>
       <div id="pane-flow"><p class="hint">由步序表自動繪製（SFC 式）：方框為步序，橫槓為轉移條件，虛線為跳步／回待機，橘色為分支（NG／重試）。模擬運轉時，目前所在步序會亮起。</p><div class="flow-wrap" id="flow"></div></div>
       <div id="pane-ladder" style="display:grid;gap:10px" hidden>
         <div class="ladder-wrap" id="ladder"></div>
@@ -327,6 +345,21 @@ svg .cm { font-family: var(--sans); }
             <h3>異常與導引訊息表 CSV</h3>
             <p>異常代碼（D100）、訊息、原因、處置，以及操作導引代碼（D101），可設定到人機 GOT 的警報與訊息畫面。</p>
             <div class="ctl"><button data-exp="alarm" data-act="save" type="button">下載</button><button data-exp="alarm" data-act="copy" type="button">複製</button></div>
+          </article>
+          <article>
+            <h3>接線圖 SVG（全部圖面）</h3>
+            <p>E-01 電源、E-02 安全迴路、E-03～ 輸入／輸出接線，含端子號與線號。</p>
+            <div class="ctl"><button data-exp="wiring" data-act="save" type="button">下載</button></div>
+          </article>
+          <article>
+            <h3>端子台／線號表 CSV</h3>
+            <p>端子、線號、PLC 點位、元件代號、說明、建議線色線徑，可用於配線與套管印字。</p>
+            <div class="ctl"><button data-exp="terminal" data-act="save" type="button">下載</button><button data-exp="terminal" data-act="copy" type="button">複製</button></div>
+          </article>
+          <article>
+            <h3>時序圖 SVG</h3>
+            <p>自動通過一個循環的步序與 I/O 時序，可放入作業說明或評估報告。</p>
+            <div class="ctl"><button data-exp="timing" data-act="save" type="button">下載</button></div>
           </article>
           <article>
             <h3>流程圖 SVG</h3>
@@ -547,6 +580,8 @@ function loadProject(p) {
   $("#ioBody").innerHTML = ""; p.io.forEach(([d, c]) => ioRow(d, c));
   for (const [k, id] of Object.entries(CFG_IDS)) $("#" + id).value = p.cfg[k] ?? (k === "stopNC" ? "0" : "");
   $("#almBody").innerHTML = ""; (p.alarms || []).forEach((a) => alarmRow(a));
+  Object.assign(WCFG, { inType: "sink", outType: p.series === "FX3U" ? "relay" : "tsink", plc: "" }, p.wiring || {});
+  if ($("#wIn")) { $("#wIn").value = WCFG.inType; $("#wOut").value = WCFG.outType; $("#wPlc").value = WCFG.plc; }
   flowsState.flows = JSON.parse(JSON.stringify(p.flows)); showFlow(0);
   if ($("#simInit")) $("#simInit").value = p.simInit || "";
 }
@@ -557,7 +592,8 @@ function readProject() {
   const il = st.ilSource === "manual" ? $("#il").value : "";
   const sim = $("#mechBody") ? [...$("#mechBody").children].map((tr) => [".m-y", ".m-a", ".m-h", ".m-t"].map((c) => tr.querySelector(c).value.trim())).filter((r) => r[0]) : [];
   const alarms = [...$("#almBody").children].map((tr) => [".a-c", ".a-l", ".a-m", ".a-f"].map((c) => tr.querySelector(c).value.trim())).filter((r) => r[0] || r[2]);
-  return { series: $("#series").value, io, cfg, alarms, flows: JSON.parse(JSON.stringify(flowsState.flows)), il, extraCm: Object.fromEntries(st.extraCm), sim, simInit: $("#simInit") ? $("#simInit").value.trim() : "" };
+  const wiring = { ...WCFG };
+  return { series: $("#series").value, io, cfg, alarms, wiring, flows: JSON.parse(JSON.stringify(flowsState.flows)), il, extraCm: Object.fromEntries(st.extraCm), sim, simInit: $("#simInit") ? $("#simInit").value.trim() : "" };
 }
 
 /* ---------- 流程 → 指令表 產生器 ---------- */
@@ -1077,7 +1113,7 @@ function analyze() {
 }
 function runGenerate() {
   const p = readProject(); const g = generate(p);
-  st.genWarn = g.warn; st.cm = g.cm; st.stepDevs = g.stepDevs; st.alarms = g.alarms || []; st.guide = g.guide || []; renderSafety(g.safety || []); st.ilSource = "gen"; buildStepInfo(p); if (typeof renderManual === "function" && $("#manualCtl")) renderManual(); $("#il").value = g.il; analyze(); if (typeof renderPads === "function" && $("#simIn")) renderPads(); saveLocal();
+  st.genWarn = g.warn; st.cm = g.cm; st.stepDevs = g.stepDevs; st.alarms = g.alarms || []; st.guide = g.guide || []; renderSafety(g.safety || []); st.ilSource = "gen"; buildStepInfo(p); timingRec = null; if ($("#tmNote")) $("#tmNote").textContent = "程式已更新，請按按鈕重新產生時序圖。"; if (typeof renderManual === "function" && $("#manualCtl")) renderManual(); $("#il").value = g.il; analyze(); if (typeof renderPads === "function" && $("#simIn")) renderPads(); saveLocal();
 }
 function renderSafety(list) {
   const el = $("#safetyList"); if (!el) return;
@@ -1295,6 +1331,9 @@ function exportFile(kind) {
       ["導引代碼(D101)", "顯示訊息", "操作導引"].map(q).join(d), ...(st.guide || []).map((g) => [g[0], g[1], g[2]].map(q).join(d))];
     return { name: `${base}_AlarmGuide.csv`, text: rows.join("\r\n") + "\r\n", enc: fmt.enc };
   }
+  if (kind === "wiring") return { name: `${base}_Wiring.svg`, text: exportWiringSvg(), enc: "utf8" };
+  if (kind === "terminal") { const d = fmt.delim; const q = (x) => `"${String(x ?? "").replace(/"/g, '""')}"`; const rows = [["端子", "線號", "連接 PLC", "元件代號", "說明", "線色／線徑"], ...terminalRows(buildWiring(readProject()))]; return { name: `${base}_Terminal.csv`, text: rows.map((r) => r.map(q).join(d)).join("\r\n") + "\r\n", enc: fmt.enc }; }
+  if (kind === "timing") { if (!timingRec) timingRec = recordTiming(); return { name: `${base}_Timing.svg`, text: timingRec ? renderTiming(timingRec, true) : "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", enc: "utf8" }; }
   if (kind === "flowsvg") return { name: `${base}_Flow.svg`, text: renderFlowchart(readProject(), cmAll(), true), enc: "utf8" };
   if (kind === "json") return { name: `${base}_Project.json`, text: JSON.stringify(p, null, 2), enc: "utf8" };
 }
@@ -1681,7 +1720,8 @@ function paintAnim() {
 
 /* ---------- 模擬模式：自動通過（從頭至尾）／手動（逐階段、點步序） ---------- */
 Object.assign(sim, { forced: new Map(), since: new Map(), visited: new Set(), flowState: new Map(), stageRun: new Map() });
-const simMode = () => $("#simMode").value;
+const simMode = () => sim.forceMode || $("#simMode").value;
+const loopOn = () => !sim.forceMode && $("#simLoop").checked;
 function condOk(groups) { return !groups.length || groups.some((g) => g.every((t) => (t.nc ? !sbit(t.dev) : sbit(t.dev)))); }
 function logLine(html) { const li = document.createElement("li"); li.innerHTML = `<time>${simTime(sim.clock)}</time> ${html}`; const log = $("#narrLog"); log.prepend(li); while (log.children.length > 80) log.lastChild.remove(); }
 function clearForced() { sim.forced.forEach((o, d) => sim.bits.set(d, o.orig)); sim.forced.clear(); }
@@ -1698,7 +1738,7 @@ function forceTerms(groups, who) {
 function flowHeld(f) {
   const m = simMode();
   if (m === "manual") return $("#holdOthers").checked && !sim.stageRun.has(f.fi);
-  if (m === "auto") return !$("#simLoop").checked && !!sim.flowState.get(f.fi)?.done;
+  if (m === "auto") return !loopOn() && !!sim.flowState.get(f.fi)?.done;
   return false;
 }
 function autoPass() {
@@ -1736,7 +1776,7 @@ function stepBookkeeping(entered) {
     }
     if (r) r.fresh = false;
   });
-  if (simMode() === "auto" && !$("#simLoop").checked && st.flowsBuilt?.length && st.flowsBuilt.every((f) => sim.flowState.get(f.fi)?.done)) {
+  if (simMode() === "auto" && !loopOn() && st.flowsBuilt?.length && st.flowsBuilt.every((f) => sim.flowState.get(f.fi)?.done)) {
     if (!sim.allDone) { sim.allDone = true; pause = true; logLine("<b>全部流程已從頭到尾完成一個循環</b>"); toast("自動通過：全部流程完成一個循環"); }
   }
   return pause;
@@ -1788,6 +1828,234 @@ $("#flow").addEventListener("click", (e) => {
 });
 $("#simMode").onchange = () => { sim.stageRun.clear(); clearForced(); sim.allDone = false; renderManual(); updateModeUi(); paintState(); };
 function updateModeUi() { const m = simMode(); $("#autoOpts").hidden = m === "input"; $("#loopOpt").hidden = m !== "auto"; $("#manualCtl").hidden = m !== "manual"; $("#holdWrap").hidden = m !== "manual"; }
+
+/* ---------- 接線圖：依 I/O 點位與註解產生 ---------- */
+const WCFG = { inType: "sink", outType: "tsink", plc: "" };
+function ioKind(dir, d, c, cfg) {
+  c = String(c || ""); const n = normDev;
+  if (dir === "X") {
+    if (d === n(cfg.emg)) return { pre: "", tag: "K10", sym: "safety", type: "安全繼電器 K10 監視接點 33-34", note: "急停按鈕 S1 雙迴路接 K10（見 E-02）" };
+    if (d === n(cfg.door)) return { pre: "SQ", sym: "door", type: "安全門開關 輔助接點（關門 ON）" };
+    if (d === n(cfg.curtain)) return { pre: "", tag: "K11", sym: "safety", type: "安全光柵 OSSD 經 K11 監視" };
+    if (/按鈕|鈕|選擇/.test(c) || [cfg.start, cfg.stop, cfg.reset, cfg.twoHand].map(n).includes(d)) { const nc = d === n(cfg.stop) && cfg.stopNC === "1"; return { pre: "SB", sym: nc ? "pbnc" : "pb", type: nc ? "按鈕 1b（B 接點）" : "按鈕 1a（A 接點）" }; }
+    if (/氣壓|壓力開關/.test(c)) return { pre: "SP", sym: "pres", type: "壓力開關 1a" };
+    if (/robot|機器人/i.test(c)) return { pre: "", sym: "ext", ext: "Robot DO", type: "Robot 控制器 數位輸出" };
+    if (/視覺|相機|鏡頭/.test(c)) return { pre: "", sym: "ext", ext: "視覺 OUT", type: "視覺控制器 輸出" };
+    if (/壓力\/行程|荷重|壓入監視/.test(c)) return { pre: "", sym: "ext", ext: "壓入監視", type: "壓入監視器 判定輸出" };
+    if (/缸|磁簧/.test(c)) return { pre: "SQ", sym: "reed", type: "磁簧開關（2 線式）" };
+    return { pre: "B", sym: "sensor", type: "近接／光電感測器（3 線式）" };
+  }
+  if (/燈/.test(c)) return { pre: "HL", sym: "lamp", type: "指示燈 24VDC" };
+  if (/蜂鳴|警報器/.test(c)) return { pre: "HA", sym: "buzzer", type: "蜂鳴器 24VDC" };
+  if (/robot|機器人/i.test(c)) return { pre: "", sym: "ext", ext: "Robot DI", type: "Robot 控制器 數位輸入" };
+  if (/視覺|相機|觸發/.test(c)) return { pre: "", sym: "ext", ext: "視覺 TRIG", type: "視覺控制器 觸發輸入" };
+  if (/SOL|缸|電磁閥|夾/.test(c)) return { pre: "YV", sym: "coil", type: "電磁閥線圈 24VDC（附突波吸收）" };
+  if (/震動|振動/.test(c)) return { pre: "KA", sym: "relay", type: "中間繼電器", load: "震動盤控制器 RUN" };
+  if (/轉盤|分度/.test(c)) return { pre: "KA", sym: "relay", type: "中間繼電器", load: "分度器驅動 START" };
+  if (/馬達|motor|輸送/i.test(c)) return { pre: "KA", sym: "relay", type: "中間繼電器", load: "馬達接觸器 KM 線圈" };
+  return { pre: "KA", sym: "relay", type: "中間繼電器" };
+}
+const AMP = { coil: 0.06, relay: 0.025, lamp: 0.02, buzzer: 0.03, ext: 0.01, sensor: 0.025, reed: 0.005, pb: 0.005, pbnc: 0.005, pres: 0.005, door: 0.005, safety: 0.005 };
+function buildWiring(p) {
+  const cfg = p.cfg, base = SERIES[p.series].base;
+  const io = p.io.map(([d, c]) => [normDev(d), c]).filter(([d]) => /^[XY][0-9A-F]+$/.test(d));
+  const idx = (d) => parseInt(d.slice(1), base);
+  const xs = io.filter(([d]) => d[0] === "X").sort((a, b) => idx(a[0]) - idx(b[0]));
+  const ys = io.filter(([d]) => d[0] === "Y").sort((a, b) => idx(a[0]) - idx(b[0]));
+  const cnt = {}; const mkTag = (k) => k.tag || (k.pre ? k.pre + (cnt[k.pre] = (cnt[k.pre] || 0) + 1) : "");
+  const danger = new Set(parseOuts(cfg.danger).map((o) => o.dev));
+  const grp = p.series === "Q" || p.series === "R" ? 16 : 4;
+  const comName = (d) => { const g = Math.floor(idx(d) / grp); return p.series === "FX3U" ? `COM${g + 1}` : `COM${g}`; };
+  const ins = xs.map(([d, c], i) => { const k = ioKind("X", d, c, cfg); return { dev: d, cmt: c, ...k, tag: mkTag(k), term: `TB1-${i + 1}` }; });
+  const outs = ys.map(([d, c], i) => { const k = ioKind("Y", d, c, cfg); return { dev: d, cmt: c, ...k, tag: mkTag(k), term: `TB2-${i + 1}`, com: comName(d), safe: danger.has(d) }; });
+  // 機種建議
+  const needIn = Math.max(Math.ceil(xs.length * 1.2), xs.length ? idx(xs[xs.length - 1][0]) + 1 : 0);
+  const needOut = Math.max(Math.ceil(ys.length * 1.2), ys.length ? idx(ys[ys.length - 1][0]) + 1 : 0);
+  const tr = WCFG.outType === "relay" ? "R" : "T";
+  const pick = (list, name) => { const m = list.find(([, i, o]) => i >= needIn && o >= needOut); return m ? name(m[0]) : `${name(list[list.length - 1][0])} ＋ 擴充模組`; };
+  let plc;
+  if (p.series === "FX3U") plc = pick([[32, 16, 16], [48, 24, 24], [64, 32, 32], [80, 40, 40], [128, 64, 64]], (n) => `FX3U-${n}M${tr}/ES${tr === "T" && WCFG.outType === "tsource" ? "S" : ""}`);
+  else if (p.series === "FX5U") plc = pick([[32, 16, 16], [64, 32, 32], [80, 40, 40]], (n) => `FX5U-${n}M${tr}/ES${tr === "T" && WCFG.outType === "tsource" ? "S" : ""}`);
+  else if (p.series === "FX5S") plc = pick([[30, 16, 14], [40, 24, 16], [60, 36, 24], [80, 40, 40]], (n) => `FX5S-${n}M${tr}/ES${tr === "T" && WCFG.outType === "tsource" ? "S" : ""}`);
+  else plc = `${p.series === "Q" ? "QX40" : "RX40C7"} ×${Math.ceil(needIn / 16)}、${p.series === "Q" ? (tr === "R" ? "QY10" : "QY40P") : (tr === "R" ? "RY10R2" : "RY40NT5P")} ×${Math.ceil(needOut / 16)}`;
+  if (WCFG.plc) plc = WCFG.plc;
+  const amps = [...ins, ...outs].reduce((a, r) => a + (AMP[r.sym] || 0.01), 0) + ins.length * 0.005;
+  const psA = [1.5, 2.5, 5, 10, 20].find((a) => a >= amps * 1.5) || 20;
+  const safeA = outs.filter((o) => o.safe).reduce((a, r) => a + (AMP[r.sym] || 0.01), 0);
+  return { ins, outs, plc, needIn, needOut, amps, psA, safeA, hasKA: outs.some((o) => o.sym === "relay") };
+}
+function wcss(ex) {
+  return ex
+    ? `.wl{stroke:#1d2a24;stroke-width:1.3;fill:none}.wb{stroke:#1d2a24;stroke-width:2.4}.ws{stroke:#b45309;stroke-width:2.4;stroke-dasharray:6 3}.bx{fill:#fff;stroke:#1d2a24;stroke-width:1.2}.pl{fill:#f3f6f4;stroke:#1d2a24;stroke-width:1.5}.tb{fill:#fff;stroke:#1d2a24}.t{font:11px Consolas,monospace;fill:#18211d}.tg{font:600 11px Consolas,monospace;fill:#0b7a57}.c{font:10.5px "Microsoft JhengHei",sans-serif;fill:#3d6b8f}.wn{font:10px Consolas,monospace;fill:#b45309}.h{font:600 14px "Microsoft JhengHei",sans-serif;fill:#18211d}.n{font:10.5px "Microsoft JhengHei",sans-serif;fill:#5b6a63}.fr{fill:none;stroke:#5b6a63;stroke-width:1}.ok{fill:#1d2a24}`
+    : `.wl{stroke:var(--wire);stroke-width:1.3;fill:none}.wb{stroke:var(--wire);stroke-width:2.4}.ws{stroke:var(--warn);stroke-width:2.4;stroke-dasharray:6 3}.bx{fill:var(--panel);stroke:var(--wire);stroke-width:1.2}.pl{fill:var(--soft);stroke:var(--wire);stroke-width:1.5}.tb{fill:var(--panel);stroke:var(--wire)}.t{font-size:11px;fill:var(--ink)}.tg{font-size:11px;font-weight:600;fill:var(--accent)}.c{font:10.5px var(--sans);fill:var(--cmt)}.wn{font-size:10px;fill:var(--warn)}.h{font:600 14px var(--sans);fill:var(--ink)}.n{font:10.5px var(--sans);fill:var(--muted)}.fr{fill:none;stroke:var(--line);stroke-width:1}.ok{fill:var(--wire)}`;
+}
+function sym(kind, x, y, label) {
+  // 元件符號，寬 70，中心線 y，回傳 SVG
+  const L = (x1, y1, x2, y2, c = "wl") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${c}"/>`;
+  const contact = (nc, mark) => L(x, y, x + 27, y) + L(x + 43, y, x + 70, y) + L(x + 27, y - 9, x + 27, y + 9) + L(x + 43, y - 9, x + 43, y + 9) + (nc ? L(x + 22, y + 9, x + 48, y - 9) : "") + (mark || "");
+  switch (kind) {
+    case "pb": case "pbnc": return contact(kind === "pbnc", L(x + 35, y - 9, x + 35, y - 17) + L(x + 29, y - 17, x + 41, y - 17));
+    case "reed": return contact(false, `<text x="${x + 35}" y="${y + 19}" text-anchor="middle" class="n">磁簧</text>`);
+    case "pres": return contact(false, `<text x="${x + 35}" y="${y - 12}" text-anchor="middle" class="t">P</text>`);
+    case "door": return contact(false, `<text x="${x + 35}" y="${y - 12}" text-anchor="middle" class="n">門</text>`);
+    case "no": return contact(false);
+    case "safety": return contact(false, `<text x="${x + 35}" y="${y + 19}" text-anchor="middle" class="n">33-34</text>`);
+    case "sensor": return L(x, y, x + 8, y) + `<rect x="${x + 8}" y="${y - 11}" width="54" height="22" rx="3" class="bx"/><text x="${x + 35}" y="${y + 4}" text-anchor="middle" class="t">${WCFG.inType === "sink" ? "NPN" : "PNP"}</text>` + L(x + 62, y, x + 70, y);
+    case "ext": return L(x, y, x + 4, y) + `<rect x="${x + 4}" y="${y - 11}" width="62" height="22" class="bx"/><text x="${x + 35}" y="${y + 4}" text-anchor="middle" class="c">${esc(label || "外部")}</text>` + L(x + 66, y, x + 70, y);
+    case "coil": return L(x, y, x + 20, y) + `<rect x="${x + 20}" y="${y - 9}" width="30" height="18" class="bx"/>` + L(x + 20, y + 9, x + 50, y - 9) + L(x + 50, y, x + 70, y) + `<path d="M${x + 30} ${y - 22} L${x + 40} ${y - 22} M${x + 35} ${y - 22} L${x + 31} ${y - 15} L${x + 39} ${y - 15} Z M${x + 31} ${y - 14} L${x + 39} ${y - 14}" class="wl"/>` + L(x + 24, y - 18, x + 24, y - 9) + L(x + 46, y - 18, x + 46, y - 9) + L(x + 24, y - 18, x + 31, y - 18) + L(x + 39, y - 18, x + 46, y - 18);
+    case "relay": return L(x, y, x + 20, y) + `<rect x="${x + 20}" y="${y - 9}" width="30" height="18" class="bx"/>` + L(x + 50, y, x + 70, y);
+    case "lamp": return L(x, y, x + 24, y) + `<circle cx="${x + 35}" cy="${y}" r="10" class="bx"/>` + L(x + 28, y - 7, x + 42, y + 7) + L(x + 28, y + 7, x + 42, y - 7) + L(x + 46, y, x + 70, y);
+    case "buzzer": return L(x, y, x + 22, y) + `<path d="M${x + 24} ${y + 9} A11 11 0 0 1 ${x + 46} ${y + 9} Z" class="bx"/>` + L(x + 24, y + 9, x + 24, y) + L(x + 46, y + 9, x + 46, y) + L(x + 46, y, x + 70, y);
+  }
+  return L(x, y, x + 70, y);
+}
+function frame(W, H, sheet, title, plc, ex) {
+  const d = new Date().toISOString().slice(0, 10);
+  return `<rect x="6" y="6" width="${W - 12}" height="${H - 12}" class="fr"/><rect x="${W - 336}" y="${H - 56}" width="330" height="50" class="fr"/>` +
+    `<text x="${W - 326}" y="${H - 37}" class="h">${esc(title)}</text><text x="${W - 326}" y="${H - 18}" class="n">圖號 ${sheet}｜${esc(plc)}｜${d}</text><text x="${W - 14}" y="${H - 18}" text-anchor="end" class="n">本工具產生・須經電控工程師審核</text>`;
+}
+function svgWrap(W, H, body, ex) { return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${wcss(ex)}</style>${ex ? `<rect width="${W}" height="${H}" fill="#fff"/>` : ""}${body}</svg>`; }
+function sheetPower(w, p, ex) {
+  const W = 1000, H = 400; const L = (a, b, c, d, k = "wl") => `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" class="${k}"/>`;
+  const box = (x, y, w2, h, t1, t2) => `<rect x="${x}" y="${y}" width="${w2}" height="${h}" class="bx"/><text x="${x + w2 / 2}" y="${y + h / 2 - 2}" text-anchor="middle" class="tg">${esc(t1)}</text>${t2 ? `<text x="${x + w2 / 2}" y="${y + h / 2 + 13}" text-anchor="middle" class="n">${esc(t2)}</text>` : ""}`;
+  let b = `<text x="24" y="34" class="h">E-01 主電源與控制電源</text>`;
+  b += `<text x="24" y="80" class="t">AC220V 1φ</text><text x="24" y="96" class="n">L / N / PE</text>`;
+  b += L(100, 76, 150, 76, "wb") + L(100, 100, 150, 100, "wb") + box(150, 62, 70, 52, "QF1", "2P 10A");
+  b += L(220, 76, 940, 76, "wb") + L(220, 100, 940, 100, "wb") + `<text x="930" y="70" text-anchor="end" class="wn">L</text><text x="930" y="114" text-anchor="end" class="wn">N</text>`;
+  // PLC power
+  b += L(300, 76, 300, 160) + L(320, 100, 320, 160) + box(270, 160, 90, 52, "PLC", w.plc) + `<text x="300" y="155" text-anchor="middle" class="n">L</text><text x="330" y="155" class="n">N</text>`;
+  // PSU
+  b += L(470, 76, 470, 160) + L(490, 100, 490, 160) + box(430, 160, 110, 52, "PS1", `24VDC ${w.psA}A（${w.psA * 24}W）`);
+  b += L(540, 176, 580, 176, "wb") + box(580, 164, 44, 24, "F1", "") + L(624, 176, 800, 176, "wb") + `<text x="800" y="170" text-anchor="end" class="wn">P24（+24V）</text>`;
+  b += L(540, 200, 800, 200, "wb") + `<text x="800" y="214" text-anchor="end" class="wn">0V</text>`;
+  b += L(700, 176, 700, 250) + box(660, 250, 80, 40, "K10 13-14", "安全繼電器") + L(740, 270, 800, 270, "ws") + `<text x="800" y="286" text-anchor="end" class="wn">P24S（安全 24V）</text>`;
+  if (w.hasKA) { b += L(880, 76, 880, 160) + L(900, 100, 900, 160) + box(840, 160, 100, 44, "QF2 → KM1", "AC 動力負載"); }
+  b += `<text x="24" y="250" class="n">估算 24V 負載：${w.amps.toFixed(2)} A（含輸入、感測器、電磁閥、繼電器、燈）</text><text x="24" y="268" class="n">建議電源 ${w.psA}A（1.5 倍餘裕）；P24S 負載約 ${w.safeA.toFixed(2)} A</text><text x="24" y="286" class="n">PE 接地：機架、PLC、電源、伺服／分度器須共點接地</text>${w.hasKA ? `<text x="24" y="304" class="n">震動盤控制器、分度器等 AC 負載經 QF2 → KM1 主接點供電，KM1 受安全繼電器 K10 控制</text>` : ""}`;
+  return svgWrap(W, H, b + frame(W, H, "E-01", "主電源與控制電源", w.plc, ex), ex);
+}
+function sheetSafety(w, p, ex) {
+  const W = 1000, H = 470; const L = (a, b2, c, d, k = "wl") => `<line x1="${a}" y1="${b2}" x2="${c}" y2="${d}" class="${k}"/>`;
+  const cfg = p.cfg; const lbl = (d) => { const r = [...w.ins, ...w.outs].find((x) => x.dev === normDev(d)); return r ? `${r.dev} ${r.cmt}` : d; };
+  let b = `<text x="24" y="34" class="h">E-02 安全迴路（急停／防護門 → 安全繼電器 K10）</text>`;
+  b += L(60, 60, 60, 340, "wb") + L(940, 60, 940, 340, "wb") + `<text x="60" y="54" text-anchor="middle" class="wn">P24</text><text x="940" y="54" text-anchor="middle" class="wn">0V</text>`;
+  const rung = (y, parts, end) => { let x = 60, s = ""; parts.forEach(([k, tag, note]) => { s += L(x, y, x + 30, y) + sym(k, x + 30, y, tag) + `<text x="${x + 65}" y="${y - 22}" text-anchor="middle" class="tg">${esc(tag)}</text>` + (note ? `<text x="${x + 65}" y="${y + 24}" text-anchor="middle" class="c">${esc(note)}</text>` : ""); x += 100; }); s += L(x, y, 700, y) + `<rect x="700" y="${y - 12}" width="110" height="24" class="bx"/><text x="755" y="${y + 4}" text-anchor="middle" class="t">${esc(end)}</text>` + L(810, y, 940, y); return s; };
+  b += rung(110, [["pbnc", "S1-1", "急停 CH1"], ...(cfg.door ? [["pbnc", "SQ門-1", "安全門 CH1"]] : [])], "K10 S11-S12");
+  b += rung(180, [["pbnc", "S1-2", "急停 CH2"], ...(cfg.door ? [["pbnc", "SQ門-2", "安全門 CH2"]] : [])], "K10 S21-S22");
+  b += rung(250, [["pb", "SB復歸", "安全復歸"]], "K10 S33-S34");
+  b += rung(320, [["no", "K10", "23-24"]], "KM1 線圈");
+  b += `<text x="24" y="380" class="n">K10 安全輸出：13-14 → P24S（危險輸出負載電源）；23-24 → KM1（動力負載）；33-34 → PLC ${esc(lbl(cfg.emg || "X?"))} 監視</text>`;
+  b += `<text x="24" y="398" class="n">急停、安全門須以安全繼電器硬體斷電，PLC 僅監視；安全元件規格（PL／SIL）依風險評估選定。</text>`;
+  return svgWrap(W, H, b + frame(W, H, "E-02", "安全迴路", w.plc, ex), ex);
+}
+function sheetIO(w, list, dir, page, pages, sheetNo, ex) {
+  const RH = 48, top = 96, W = 1000, H = top + list.length * RH + 110;
+  const L = (a, b2, c, d, k = "wl") => `<line x1="${a}" y1="${b2}" x2="${c}" y2="${d}" class="${k}"/>`;
+  const sink = WCFG.inType === "sink";
+  let b = `<text x="24" y="34" class="h">${sheetNo} PLC ${dir === "X" ? "輸入" : "輸出"}接線（${page}/${pages}）</text>`;
+  const PX = 680;
+  if (dir === "X") {
+    b += `<text x="24" y="54" class="n">輸入型式：${sink ? "Sink（NPN 感測器；S/S 接 +24V，接點接 0V）" : "Source（PNP 感測器；S/S 接 0V，接點接 +24V）"}　3 線式感測器：棕 +24V／藍 0V／黑 信號</text>`;
+    b += L(60, top - 20, 60, top + list.length * RH, "wb") + `<text x="60" y="${top - 26}" text-anchor="middle" class="wn">${sink ? "0V" : "P24"}</text>`;
+  } else {
+    const ot = WCFG.outType;
+    b += `<text x="24" y="54" class="n">輸出型式：${ot === "tsink" ? "電晶體 Sink（負載接 +24V 與 Y，COM 接 0V）" : ot === "tsource" ? "電晶體 Source（負載接 Y 與 0V，+V 接 +24V）" : "繼電器（COM 接電源，負載接 Y 與回線）"}　DC 線圈附二極體／突波吸收</text>`;
+    b += L(50, top - 20, 50, top + list.length * RH, "wb") + `<text x="50" y="${top - 26}" text-anchor="middle" class="wn">${ot === "tsink" ? "P24" : "0V"}</text>`;
+    if (ot === "tsink" && list.some((r) => r.safe)) b += L(80, top - 20, 80, top + list.length * RH, "ws") + `<text x="86" y="${top - 26}" class="wn">P24S</text>`;
+  }
+  b += `<rect x="${PX}" y="${top - 30}" width="250" height="${list.length * RH + 50}" class="pl"/><text x="${PX + 125}" y="${top - 12}" text-anchor="middle" class="tg">PLC ${esc(w.plc)}</text>`;
+  list.forEach((r, i) => {
+    const y = top + 10 + i * RH; const x0 = dir === "X" ? 60 : r.safe && WCFG.outType === "tsink" ? 80 : 50;
+    b += L(x0, y, 170, y) + sym(r.sym, 170, y, r.ext);
+    b += `<text x="160" y="${y - 6}" text-anchor="end" class="tg">${esc(r.tag)}</text><text x="250" y="${y - 6}" class="c">${esc(trunc(r.type, 18))}</text>`;
+    b += L(240, y, 520, y) + `<text x="470" y="${y - 5}" text-anchor="middle" class="wn">${r.dev}</text>`;
+    b += `<circle cx="540" cy="${y}" r="7" class="tb"/><text x="540" y="${y - 11}" text-anchor="middle" class="n">${r.term}</text>` + L(547, y, PX, y);
+    b += `<text x="${PX + 10}" y="${y + 4}" class="t">${r.dev}</text><text x="${PX + 52}" y="${y + 4}" class="c">${esc(trunc(r.cmt, 13))}</text>${dir === "Y" ? `<text x="${PX + 240}" y="${y + 4}" text-anchor="end" class="n">${r.com}</text>` : ""}`;
+    if (r.load) b += `<text x="250" y="${y + 15}" class="n">${esc(r.tag)} 接點 → ${esc(r.load)}</text>`;
+    if (r.note) b += `<text x="250" y="${y + 15}" class="n">${esc(r.note)}</text>`;
+  });
+  const yb = top + list.length * RH + 8;
+  if (dir === "X") b += `<text x="${PX + 10}" y="${yb + 14}" class="t">S/S → ${sink ? "+24V (P24)" : "0V"}</text>`;
+  else { const coms = [...new Set(list.map((r) => r.com))]; b += `<text x="${PX + 10}" y="${yb + 14}" class="t">${coms.join("、")} → ${WCFG.outType === "tsink" ? "0V" : "+24V（危險群組接 P24S）"}</text>`; }
+  return svgWrap(W, H, b + frame(W, H, sheetNo, `PLC ${dir === "X" ? "輸入" : "輸出"}接線`, w.plc, ex), ex);
+}
+function wiringSheets(p, ex) {
+  const w = buildWiring(p); const out = [sheetPower(w, p, ex), sheetSafety(w, p, ex)];
+  const chunks = (a) => { const r = []; for (let i = 0; i < a.length; i += 16) r.push(a.slice(i, i + 16)); return r.length ? r : [[]]; };
+  let no = 3; const ci = chunks(w.ins), co = chunks(w.outs);
+  ci.forEach((c, i) => out.push(sheetIO(w, c, "X", i + 1, ci.length, `E-${String(no++).padStart(2, "0")}`, ex)));
+  co.forEach((c, i) => out.push(sheetIO(w, c, "Y", i + 1, co.length, `E-${String(no++).padStart(2, "0")}`, ex)));
+  return { w, sheets: out };
+}
+function terminalRows(w) {
+  const color = (k) => (k === "in" ? "黃 0.5 平方" : "白 0.75 平方");
+  const rows = [["TB0-1", "P24", "電源", "PS1 +V", "+24V 控制電源", "紅 1.25 平方"], ["TB0-2", "0V", "電源", "PS1 -V", "0V 共通", "藍 1.25 平方"], ["TB0-3", "P24S", "安全電源", "K10 14", "安全 24V（危險輸出負載）", "紅/白 1.25 平方"]];
+  w.ins.forEach((r) => rows.push([r.term, r.dev, `PLC ${r.dev}`, r.tag, `${r.cmt}｜${r.type}`, color("in")]));
+  w.outs.forEach((r) => rows.push([r.term, r.dev, `PLC ${r.dev}（${r.com}）`, r.tag, `${r.cmt}｜${r.type}${r.load ? "｜接點→" + r.load : ""}${r.safe ? "｜電源 P24S" : ""}`, color("out")]));
+  return rows;
+}
+function renderWiring() {
+  const el = $("#wiring"); if (!el) return;
+  const { w, sheets } = wiringSheets(readProject(), false);
+  if (!WCFG.plc) $("#wPlc").placeholder = w.plc;
+  $("#wInfo").textContent = `輸入 ${w.ins.length} 點（需 ${w.needIn}）、輸出 ${w.outs.length} 點（需 ${w.needOut}，含 20% 預留）；建議 PLC：${w.plc}；24V 負載約 ${w.amps.toFixed(2)}A → 電源 ${w.psA}A`;
+  const rows = terminalRows(w);
+  el.innerHTML = sheets.map((s) => `<div class="sheet">${s}</div>`).join("") +
+    `<h3 class="sub">端子台／線號表</h3><div class="tw"><table class="grid"><thead><tr><th>端子</th><th>線號</th><th>連接 PLC</th><th>元件代號</th><th>說明</th><th>線色／線徑（建議）</th></tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i < 4 ? ' class="mono"' : ""}>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+/* ---------- 時序圖：以自動通過模擬跑一個循環並記錄訊號 ---------- */
+function recordTiming() {
+  if (!st.parsed?.count || !st.flowsBuilt || st.ilSource === "manual") { toast("需由流程產生的程式才能產生時序圖"); return null; }
+  simReset(); sim.forceMode = "auto"; simCompile(); sim.dirty = false;
+  const p = readProject(); const base = SERIES[p.series].base;
+  const ys = p.io.map(([d]) => normDev(d)).filter((d) => /^Y/.test(d)).sort((a, b) => parseInt(a.slice(1), base) - parseInt(b.slice(1), base));
+  const xs = p.io.map(([d]) => normDev(d)).filter((d) => /^X/.test(d)).sort((a, b) => parseInt(a.slice(1), base) - parseInt(b.slice(1), base));
+  const sigs = [...ys, ...xs]; const tr = new Map(sigs.map((d) => [d, []])); const steps = new Map(st.flowsBuilt.map((f) => [f.fi, []]));
+  const dt = 10; let t = 0; const maxT = 300000;
+  const snap = () => {
+    sigs.forEach((d) => { const v = sbit(d); const a = tr.get(d); if (!a.length || a[a.length - 1][1] !== v) a.push([t, v]); });
+    st.flowsBuilt.forEach((f) => { const k = [0, ...f.steps.map((s) => s.k)].find((i) => sbit(f.M(i))) ?? -1; const a = steps.get(f.fi); if (!a.length || a[a.length - 1][1] !== k) a.push([t, k]); });
+  };
+  try {
+    while (t < maxT) {
+      autoPass(); const held = heldAtS0(); simScan(dt); revertHeld(held); t += dt;
+      const sig = activeSteps().join(); if (sig !== sim.stepSig) { onStepChange(sim.stepSig, sig); sim.stepSig = sig; }
+      snap(); if (sim.allDone) break;
+    }
+  } finally { sim.forceMode = null; }
+  const T = t; simReset();
+  return { T, tr, steps, ys, xs };
+}
+function renderTiming(rec, ex) {
+  const cm = cmAll(); const LW = 230, RH = 22, pps = Math.max(18, Math.min(120, 1100 / (rec.T / 1000)));
+  const rowsS = st.flowsBuilt.length, rowsY = rec.ys.length, rowsX = rec.xs.length;
+  const W = LW + Math.ceil(rec.T / 1000 * pps) + 30, H = 70 + (rowsS + rowsY + rowsX + 2) * RH + 60;
+  const X = (ms) => LW + ms / 1000 * pps; let b = "", y = 48;
+  const css = ex ? `.g{stroke:#e3ebe7}.gl{stroke:#cdd6d1}.t{font:11px Consolas,monospace;fill:#18211d}.c{font:10.5px "Microsoft JhengHei",sans-serif;fill:#3d6b8f}.h{font:600 12px "Microsoft JhengHei",sans-serif;fill:#0b7a57}.sy{stroke:#0a63b8;stroke-width:1.6;fill:none}.sx{stroke:#0b7a57;stroke-width:1.6;fill:none}.st{fill:#d3e6fa;stroke:#0a63b8}.st2{fill:#dcf1e7;stroke:#0b7a57}.sn{font:10px Consolas,monospace;fill:#18211d}`
+    : `.g{stroke:var(--soft)}.gl{stroke:var(--line)}.t{font-size:11px;fill:var(--ink)}.c{font:10.5px var(--sans);fill:var(--cmt)}.h{font:600 12px var(--sans);fill:var(--accent)}.sy{stroke:var(--live);stroke-width:1.6;fill:none}.sx{stroke:var(--accent);stroke-width:1.6;fill:none}.st{fill:var(--live-bg);stroke:var(--live)}.st2{fill:var(--done-bg);stroke:var(--accent)}.sn{font-size:10px;fill:var(--ink)}`;
+  for (let s = 0; s <= rec.T / 1000; s += (pps < 30 ? 5 : 1)) b += `<line x1="${X(s * 1000)}" y1="42" x2="${X(s * 1000)}" y2="${H - 50}" class="${s % 5 ? "g" : "gl"}"/><text x="${X(s * 1000)}" y="38" text-anchor="middle" class="t">${s}s</text>`;
+  const row = (label, sub, cls, draw) => { b += `<text x="8" y="${y + 15}" class="t">${esc(label)}</text>${sub ? `<text x="52" y="${y + 15}" class="c">${esc(trunc(sub, 14))}</text>` : ""}` + draw(y) + `<line x1="0" y1="${y + RH}" x2="${W}" y2="${y + RH}" class="g"/>`; y += RH; };
+  st.flowsBuilt.forEach((f) => row(`${f.name} 步序`, "", "", (yy) => {
+    const a = rec.steps.get(f.fi); let s = "";
+    a.forEach(([t0, k], i) => { const t1 = i + 1 < a.length ? a[i + 1][0] : rec.T; if (k < 0) return; const w2 = X(t1) - X(t0); s += `<rect x="${X(t0)}" y="${yy + 3}" width="${Math.max(1, w2)}" height="${RH - 6}" class="${k % 2 ? "st" : "st2"}"/>${w2 > 16 ? `<text x="${X(t0) + 3}" y="${yy + 15}" class="sn">S${k}</text>` : ""}`; });
+    return s;
+  }));
+  const wave = (d, cls) => (yy) => { const a = rec.tr.get(d); const Yv = (v) => (v ? yy + 4 : yy + RH - 4); const pts = []; a.forEach(([t0, v], i) => { if (i) pts.push(`${X(t0).toFixed(1)},${Yv(a[i - 1][1])}`); pts.push(`${X(t0).toFixed(1)},${Yv(v)}`); }); if (a.length) pts.push(`${X(rec.T).toFixed(1)},${Yv(a[a.length - 1][1])}`); return `<polyline points="${pts.join(" ")}" class="${cls}"/>`; };
+  b += `<text x="8" y="${y + 15}" class="h">輸出 Y</text>`; y += RH;
+  rec.ys.forEach((d) => row(d, cm.get(d) || "", "sy", wave(d, "sy")));
+  b += `<text x="8" y="${y + 15}" class="h">輸入 X</text>`; y += RH;
+  rec.xs.forEach((d) => row(d, cm.get(d) || "", "sx", wave(d, "sx")));
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${y + 30}" viewBox="0 0 ${W} ${y + 30}"><style>${css}</style>${ex ? `<rect width="${W}" height="${y + 30}" fill="#fff"/>` : ""}<text x="8" y="18" class="h">時序圖：自動通過一個循環（共 ${(rec.T / 1000).toFixed(1)} 秒）</text>${b}</svg>`;
+}
+
+function exportWiringSvg() {
+  const { sheets } = wiringSheets(readProject(), true); let y = 0, W = 0; const parts = [];
+  sheets.forEach((sv) => { const m = sv.match(/width="(\d+)" height="(\d+)"/); const w2 = +m[1], h = +m[2]; parts.push(sv.replace("<svg ", `<svg x="0" y="${y}" `)); y += h + 20; W = Math.max(W, w2); });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${y}" viewBox="0 0 ${W} ${y}"><rect width="${W}" height="${y}" fill="#fff"/>${parts.join("")}</svg>`;
+}
+let timingRec = null;
+$("#tmGen").onclick = () => { const r = recordTiming(); if (!r) return; timingRec = r; $("#timing").innerHTML = renderTiming(r, false); $("#tmNote").textContent = `已記錄 ${(r.T / 1000).toFixed(1)} 秒、${r.ys.length} 個輸出、${r.xs.length} 個輸入`; };
+["wIn", "wOut", "wPlc"].forEach((id) => $("#" + id).addEventListener("change", () => { WCFG.inType = $("#wIn").value; WCFG.outType = $("#wOut").value; WCFG.plc = $("#wPlc").value.trim(); renderWiring(); saveLocal(); }));
 
 /* ---------- 共用專案（線上版：雙方可編輯） ---------- */
 const shared = { db: null, user: null, me: null, docs: [], names: {}, cur: null, curAt: 0, confirm: null };
@@ -1850,11 +2118,12 @@ $("#shList").onchange = () => { const d = shared.docs.find((x) => x.id === $("#s
 
 /* ---------- 分頁 / 事件 ---------- */
 function selectTab(name) {
-  ["flow", "ladder", "il", "export"].forEach((t) => { $("#tab-" + t).setAttribute("aria-selected", String(t === name)); $("#pane-" + t).hidden = t !== name; });
+  ["flow", "ladder", "timing", "wiring", "il", "export"].forEach((t) => { $("#tab-" + t).setAttribute("aria-selected", String(t === name)); $("#pane-" + t).hidden = t !== name; });
   $("#simBox").hidden = !(name === "flow" || name === "ladder");
+  if (name === "wiring") renderWiring();
   try { localStorage.setItem("mlg-tab", name); } catch {}
 }
-["flow", "ladder", "il", "export"].forEach((t) => ($("#tab-" + t).onclick = () => selectTab(t)));
+["flow", "ladder", "timing", "wiring", "il", "export"].forEach((t) => ($("#tab-" + t).onclick = () => selectTab(t)));
 $("#addIo").onclick = () => ioRow();
 $("#addAlm").onclick = () => alarmRow();
 $("#addStep").onclick = () => { stepRow(); syncFlow(); };
