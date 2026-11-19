@@ -13,18 +13,18 @@
 :root {
   --bg: #eef1ef; --panel: #ffffff; --ink: #18211d; --muted: #5b6a63; --line: #cdd6d1;
   --rail: #24312b; --accent: #0b7a57; --accent-ink: #ffffff; --warn: #a15c00; --warn-bg: #fff3df;
-  --err: #b42318; --err-bg: #fdecea; --soft: #e3ebe7; --wire: #1d2a24; --cmt: #3d6b8f; --live: #0a63b8; --live-bg: #d3e6fa;
+  --err: #b42318; --err-bg: #fdecea; --soft: #e3ebe7; --wire: #1d2a24; --cmt: #3d6b8f; --live: #0a63b8; --live-bg: #d3e6fa; --done-bg: #dcf1e7;
   --sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
   --mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #121815; --panel: #1a221e; --ink: #e3ebe6; --muted: #92a39a; --line: #2f3c35;
   --rail: #c9d6cf; --accent: #3fc596; --accent-ink: #08130e; --warn: #f0b45c; --warn-bg: #33270f;
-  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; --live: #5ab8ff; --live-bg: #123553; color-scheme: dark; } }
+  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; --live: #5ab8ff; --live-bg: #123553; --done-bg: #16362a; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #121815; --panel: #1a221e; --ink: #e3ebe6; --muted: #92a39a; --line: #2f3c35;
   --rail: #c9d6cf; --accent: #3fc596; --accent-ink: #08130e; --warn: #f0b45c; --warn-bg: #33270f;
-  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; --live: #5ab8ff; --live-bg: #123553; color-scheme: dark; }
+  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; --live: #5ab8ff; --live-bg: #123553; --done-bg: #16362a; color-scheme: dark; }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
@@ -133,6 +133,16 @@ svg text { font-family: var(--mono); }
 .a-j { fill: var(--panel); stroke: var(--wire); }
 .a-job { font: 600 9px var(--mono); fill: var(--live); }
 .narr { display: grid; gap: 6px; }
+.mctl { display: grid; gap: 5px; margin-bottom: 6px; }
+.mrow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12.5px; }
+.mrow b { margin-right: 4px; }
+.mrow button { padding: 3px 9px; font-size: 12.5px; }
+.fzt { color: var(--warn); }
+.pad.fz { outline: 2px solid var(--warn); outline-offset: 1px; }
+.tile.mv { border-color: var(--warn); background: var(--warn-bg); }
+.tile.mv .a-body { stroke: var(--warn); }
+.dots i.done { background: var(--accent); border-color: var(--accent); }
+#flow g.st { cursor: pointer; }
 .nf { border: 1px solid var(--line); border-radius: 4px; padding: 6px 9px; display: grid; gap: 3px; font-size: 12.5px; }
 .nf.on { border-color: var(--live); }
 .nf p { margin: 0; }
@@ -236,13 +246,15 @@ svg .cm { font-family: var(--sans); }
         <div class="head">
           <div class="ctl"><button id="simRun" class="primary" type="button">▶ 模擬運轉</button><button id="simReset" type="button">重置</button>
             <label class="inline" for="simSpeed">速度<select id="simSpeed"><option value="0.1">慢動作 ×0.1</option><option value="0.25">慢動作 ×0.25</option><option value="0.5">慢動作 ×0.5</option><option value="1" selected>實速 ×1</option><option value="2">×2</option><option value="5">×5</option><option value="10">×10</option></select></label>
+            <label class="inline" for="simMode">模式<select id="simMode"><option value="auto">自動通過（從頭至尾）</option><option value="manual">手動（逐階段／點步序）</option><option value="input">手動輸入（自行點 X）</option></select></label>
+            <span id="autoOpts" class="ctl"><label class="inline" for="simDwell">每步停留 s<input id="simDwell" class="mono" value="0.8" inputmode="decimal" style="width:52px"></label><label class="inline" id="loopOpt" for="simLoop"><input type="checkbox" id="simLoop"> 連續循環</label></span>
             <label class="inline" for="simPause"><input type="checkbox" id="simPause"> 換步時暫停</label>
             <label class="inline" for="simVoice"><input type="checkbox" id="simVoice"> 語音講述</label></div>
           <div class="simstate" id="simState"></div>
         </div>
         <div class="simview">
           <div><h4>動作示意（依輸出註解自動選圖示：缸、轉盤、震動盤、Robot、視覺、夾爪、燈）</h4><div id="anim" class="anim"></div></div>
-          <div><h4>目前階段與步序</h4><div id="narr" class="narr"></div>
+          <div><h4>目前階段與步序</h4><div id="manualCtl" class="mctl" hidden></div><label class="inline" for="holdOthers" id="holdWrap"><input type="checkbox" id="holdOthers" checked> 手動時其他流程維持待機</label><div id="narr" class="narr"></div>
             <details class="mech" open><summary>講述紀錄（最新在上）</summary><ol id="narrLog" class="nlog"></ol></details></div>
         </div>
         <details class="mech" open><summary>輸入 / 輸出點：X 點擊切換；虛線框為按鈕（按住 ON）；淡色由虛擬機構驅動</summary>
@@ -407,26 +419,26 @@ const SAMPLE2 = {
     { name: "左站PLATE", base: "M100", startCond: "X4 & X5", steps: [
       ["左轉盤分度", "Y0,-M31", "X10", "", "", "", "", "5"],
       ["XY鏡頭取像 PLATE定位", "Y2", "X20 & X16", "", "X20 & !X16", "1", "0.2", "3"],
-      ["等待Robot（右站未使用）", "", "X13 & !M204 & !M207 & !M210", "", "", "", "", ""],
+      ["等待Robot（右站未使用）", "", "X13 & !X14 & !M204 & !M207 & !M210", "", "", "", "", ""],
       ["Robot取PLATE放壓入治具 Job1", "Y4,Y5", "X14", "", "", "", "", "10"],
       ["導套震動送料", "Y10", "X21", "", "", "", "", "5"],
       ["導套插入", "Y11", "", "", "", "", "0.5", ""],
       ["氣缸壓入＋壓力判定", "Y11,Y12", "X22 & X24", "", "X22 & !X24", "11", "0.3", "3"],
       ["壓入缸回程", "", "X23", "", "", "", "", "3"],
-      ["等待Robot出料", "", "X13 & !M204 & !M207 & !M210", "", "", "", "", ""],
+      ["等待Robot出料", "", "X13 & !X14 & !M204 & !M207 & !M210", "", "", "", "", ""],
       ["Robot放PLATE完成品 Job4", "Y4,Y7", "X14", "0", "", "", "", "10"],
       ["壓入NG 停站待確認", "+M31", "X3", "0", "", "", "", ""]
     ] },
     { name: "右站普利珠", base: "M200", startCond: "X4 & X6", steps: [
       ["右轉盤分度", "Y1,-M32", "X12", "", "", "", "", "5"],
       ["XY鏡頭取像 普利珠盤定位", "Y3", "X20 & X17", "", "X20 & !X17", "1", "0.2", "3"],
-      ["等待Robot（左站未使用）", "", "X13 & !M104 & !M110", "", "", "", "", ""],
+      ["等待Robot（左站未使用）", "", "X13 & !X14 & !M104 & !M110", "", "", "", "", ""],
       ["Robot取普利珠盤放定位治具 Job2", "Y4,Y6", "X14", "", "", "", "", "10"],
       ["普利珠震動送料", "Y13", "X25", "", "", "", "", "5"],
-      ["等待Robot", "", "X13 & !M104 & !M110", "", "", "", "", ""],
+      ["等待Robot", "", "X13 & !X14 & !M104 & !M110", "", "", "", "", ""],
       ["Robot逐顆放入 Job3", "Y4,Y5,Y6", "X14", "", "", "", "", "15"],
       ["漏珠/落座檢查", "Y3", "X20 & X26", "", "X20 & !X26", "11", "0.2", "3"],
-      ["等待Robot出料", "", "X13 & !M104 & !M110", "", "", "", "", ""],
+      ["等待Robot出料", "", "X13 & !X14 & !M104 & !M110", "", "", "", "", ""],
       ["Robot放普利珠完成品 Job5", "Y4,Y5,Y7", "X14", "0", "", "", "", "10"],
       ["檢查NG 停站待確認", "+M32", "X3", "0", "", "", "", ""]
     ] }
@@ -677,7 +689,7 @@ function renderFlowchart(p, cm, forExport = false) {
   const W = 20 + F.length * COLW;
   const css = forExport
     ? `.sb{fill:#fff;stroke:#1d2a24;stroke-width:1.6}.sb2{fill:none;stroke:#1d2a24}.ab{fill:#f3f6f4;stroke:#9aa8a1}.fw{stroke:#1d2a24;stroke-width:1.4;fill:none}.jp{stroke-dasharray:5 3}.br,.br.tl{stroke:#b45309;fill:none}.tl.br{fill:#b45309;stroke:none}.tb{stroke:#1d2a24;stroke-width:3}.ft{font:600 15px "Microsoft JhengHei",sans-serif;fill:#0b7a57}.fs{font:11px Consolas,monospace;fill:#5b6a63}.sn{font:600 11.5px Consolas,monospace;fill:#18211d}.sl{font:12px "Microsoft JhengHei",sans-serif;fill:#18211d}.at{font:11.5px "Microsoft JhengHei",sans-serif;fill:#18211d}.tl{font:11.5px "Microsoft JhengHei",sans-serif;fill:#3d6b8f}#ar path{fill:#1d2a24}.sg{font:10.5px "Microsoft JhengHei",sans-serif;fill:#b45309}`
-    : `.sb{fill:var(--panel);stroke:var(--wire);stroke-width:1.6}.sb2{fill:none;stroke:var(--wire)}.ab{fill:var(--soft);stroke:var(--line)}.fw{stroke:var(--wire);stroke-width:1.4;fill:none}.jp{stroke-dasharray:5 3}.br{stroke:var(--warn)}.tl.br{fill:var(--warn);stroke:none}.tb{stroke:var(--wire);stroke-width:3}.tb.br{stroke:var(--warn)}.ft{font:600 15px var(--sans);fill:var(--accent)}.fs{font-size:11px;fill:var(--muted)}.sn{font-size:11.5px;font-weight:600;fill:var(--ink)}.sl{font:12px var(--sans);fill:var(--ink)}.at{font:11.5px var(--sans);fill:var(--ink)}.tl{font:11.5px var(--sans);fill:var(--cmt)}#ar path{fill:var(--wire)}.st.on .sb{fill:var(--live-bg);stroke:var(--live);stroke-width:3}.sg{font:10.5px var(--sans);fill:var(--warn)}`;
+    : `.sb{fill:var(--panel);stroke:var(--wire);stroke-width:1.6}.sb2{fill:none;stroke:var(--wire)}.ab{fill:var(--soft);stroke:var(--line)}.fw{stroke:var(--wire);stroke-width:1.4;fill:none}.jp{stroke-dasharray:5 3}.br{stroke:var(--warn)}.tl.br{fill:var(--warn);stroke:none}.tb{stroke:var(--wire);stroke-width:3}.tb.br{stroke:var(--warn)}.ft{font:600 15px var(--sans);fill:var(--accent)}.fs{font-size:11px;fill:var(--muted)}.sn{font-size:11.5px;font-weight:600;fill:var(--ink)}.sl{font:12px var(--sans);fill:var(--ink)}.at{font:11.5px var(--sans);fill:var(--ink)}.tl{font:11.5px var(--sans);fill:var(--cmt)}#ar path{fill:var(--wire)}.st.on .sb{fill:var(--live-bg);stroke:var(--live);stroke-width:3}.st.done .sb{fill:var(--done-bg);stroke:var(--accent);stroke-width:2}.sg{font:10.5px var(--sans);fill:var(--warn)}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z"/></marker></defs><style>${css}</style>${forExport ? `<rect width="${W}" height="${H}" fill="#fff"/>` : ""}${body}</svg>`;
 }
 
@@ -906,7 +918,7 @@ function analyze() {
 }
 function runGenerate() {
   const p = readProject(); const g = generate(p);
-  st.genWarn = g.warn; st.cm = g.cm; st.stepDevs = g.stepDevs; st.ilSource = "gen"; buildStepInfo(p); $("#il").value = g.il; analyze(); if (typeof renderPads === "function" && $("#simIn")) renderPads(); saveLocal();
+  st.genWarn = g.warn; st.cm = g.cm; st.stepDevs = g.stepDevs; st.ilSource = "gen"; buildStepInfo(p); if (typeof renderManual === "function" && $("#manualCtl")) renderManual(); $("#il").value = g.il; analyze(); if (typeof renderPads === "function" && $("#simIn")) renderPads(); saveLocal();
 }
 function buildStepInfo(p) {
   st.flowsBuilt = buildFlows(normalizeProject(p)); st.stepInfo = new Map();
@@ -1232,6 +1244,7 @@ function mechStep(dt) {
     if (r[1]) or(normDev(r[1]), p >= 1); if (r[2]) or(normDev(r[2]), p <= 0);
   });
   v.forEach((b, x) => sim.bits.set(x, b));
+  sim.forced.forEach((o, d) => sim.bits.set(d, o.v));
 }
 function simOut(i, op, ops, d, acc, dt) {
   const P = sim.prev; const edge = acc && !P[i], fall = !acc && P[i]; P[i] = acc;
@@ -1292,11 +1305,12 @@ function simTick() {
   const now = performance.now(); const dt = (now - sim.last) * Number($("#simSpeed").value || 1); sim.last = now;
   const n = Math.min(60, Math.max(1, Math.ceil(dt / 20)));
   for (let k = 0; k < n; k++) {
-    simScan(dt / n);
+    autoPass(); const held = heldAtS0();
+    simScan(dt / n); revertHeld(held);
     const sig = activeSteps().join();
     if (sig !== sim.stepSig) {
-      const prev = sim.stepSig; onStepChange(prev, sig); sim.stepSig = sig;
-      if ($("#simPause").checked && prev) { simPause(); break; }
+      const prev = sim.stepSig; const stop = onStepChange(prev, sig); sim.stepSig = sig;
+      if (stop || ($("#simPause").checked && prev)) { simPause(); break; }
     }
   }
   simPaint();
@@ -1304,13 +1318,14 @@ function simTick() {
 function simStart() {
   if (!st.parsed || !st.parsed.count) { toast("沒有可模擬的程式"); return; }
   if (sim.dirty || !sim.prog.length) { simCompile(); sim.dirty = false; }
+  if (sim.allDone) { sim.allDone = false; sim.flowState.clear(); sim.visited.clear(); }
   sim.on = true; sim.paused = false; sim.last = performance.now(); clearInterval(sim.timer); sim.timer = setInterval(simTick, 25);
   $("#simRun").textContent = "■ 暫停"; paintState();
 }
 function simPause() { clearInterval(sim.timer); sim.on = false; sim.paused = true; $("#simRun").textContent = "▶ 繼續（下一步）"; paintState(); simPaint(); }
 function simStop() { clearInterval(sim.timer); sim.on = false; if ($("#simRun")) $("#simRun").textContent = sim.clock > 0 ? "▶ 繼續" : "▶ 模擬運轉"; paintState(); }
 function simReset() {
-  simStop(); sim.prog = []; sim.stepSig = ""; sim.bits = new Map(); if ($("#narrLog")) $("#narrLog").innerHTML = ""; sim.cur = new Map(); sim.words = new Map(); sim.mech = new Map(); sim.warned = new Set(); sim.first = true; sim.clock = 0;
+  simStop(); sim.prog = []; sim.stepSig = ""; sim.forced = new Map(); sim.since = new Map(); sim.visited = new Set(); sim.flowState = new Map(); sim.stageRun = new Map(); sim.allDone = false; sim.bits = new Map(); if ($("#narrLog")) $("#narrLog").innerHTML = ""; sim.cur = new Map(); sim.words = new Map(); sim.mech = new Map(); sim.warned = new Set(); sim.first = true; sim.clock = 0;
   const pr = readProject(); const emg = normDev(pr.cfg.emg); if (emg) sim.bits.set(emg, true);
   String(pr.simInit || "").split(/[,\s、，]+/).filter(Boolean).forEach((d) => sim.bits.set(normDev(d), true));
   readMech().forEach((r) => { if (r[2]) sim.bits.set(normDev(r[2]), true); });
@@ -1334,12 +1349,12 @@ function paintState() {
   const el = $("#simState"); if (!el) return;
   const cm = cmAll(); const sd = new Set(st.stepDevs || []); const steps = [...sim.bits].filter(([d, v]) => v && sd.has(d)).map(([d]) => `${d} ${cm.get(d) || ""}`);
   const alarm = [...sim.bits].some(([d, v]) => v && /異常/.test(cm.get(d) || "") && /^M/.test(d));
-  el.innerHTML = `<span class="chip ${sim.on ? "run" : ""}">${sim.on ? `模擬中 ×${$("#simSpeed").value}` : sim.paused ? "已暫停（換步）" : "停止"}</span><span class="hint" id="simTime">模擬時間 ${simTime(sim.clock)}</span>` + (steps.length ? `<span>目前：<b>${esc(steps.join("、"))}</b></span>` : "") + (alarm ? `<span class="chip alm">異常</span>` : "") + (sim.warned.size ? `<span class="hint">不模擬：${esc([...sim.warned].join("、"))}</span>` : "");
+  el.innerHTML = `<span class="chip ${sim.on ? "run" : ""}">${sim.on ? `模擬中 ×${$("#simSpeed").value}` : sim.paused ? "已暫停" : "停止"}</span><span class="chip">${{ auto: "自動通過", manual: "手動逐階段", input: "手動輸入" }[simMode()]}</span><span class="hint" id="simTime">模擬時間 ${simTime(sim.clock)}</span>` + (steps.length ? `<span>目前：<b>${esc(steps.join("、"))}</b></span>` : "") + (alarm ? `<span class="chip alm">異常</span>` : "") + (sim.warned.size ? `<span class="hint">不模擬：${esc([...sim.warned].join("、"))}</span>` : "");
 }
 let lastState = "";
 function simPaint() {
-  document.querySelectorAll("#simIn .pad, #simOut .pad").forEach((b) => b.classList.toggle("on", sbit(b.dataset.d)));
-  (sim.steps || []).forEach((g) => g.classList.toggle("on", (sim.on || sim.clock > 0) && sbit(g.dataset.d)));
+  document.querySelectorAll("#simIn .pad, #simOut .pad").forEach((b) => { b.classList.toggle("on", sbit(b.dataset.d)); b.classList.toggle("fz", sim.forced.has(b.dataset.d)); });
+  (sim.steps || []).forEach((g) => { const a = (sim.on || sim.clock > 0) && sbit(g.dataset.d); g.classList.toggle("on", a); g.classList.toggle("done", !a && sim.visited.has(g.dataset.d)); });
   paintAnim();
   const stEl = $("#simTime"); if (stEl) stEl.textContent = `模擬時間 ${simTime(sim.clock)}`;
   const nowR = performance.now(); if (!sim.on || nowR - (sim.lastNarr || 0) > 120) { sim.lastNarr = nowR; renderNarr(); }
@@ -1382,6 +1397,7 @@ function tmrText(g, sec, cm) { const ms = sim.words.get("#T" + g) || 0; return `
 function onStepChange(prevSig, sig) {
   const prev = new Set(prevSig ? prevSig.split(",") : []); const cm = cmAll();
   const entered = sig ? sig.split(",").filter((d) => !prev.has(d)) : [];
+  clearForced();
   const say = [];
   entered.forEach((d) => {
     const info = st.stepInfo?.get(d); if (!info) return;
@@ -1393,6 +1409,7 @@ function onStepChange(prevSig, sig) {
     say.push(`${f.name}${s.stage ? "，" + s.stage : ""}，${s.k === 0 ? "待機" : "第" + s.k + "步"}，${s.name}`);
   });
   if (say.length) speak(say.join("。"));
+  return stepBookkeeping(entered);
 }
 let ttsNs;
 async function speak(text) {
@@ -1409,7 +1426,7 @@ function renderNarr() {
     const cur = all.find((s) => sbit(f.M(s.k)));
     const stages = [...new Set(f.steps.map((s) => s.stage).filter(Boolean))];
     const stg = stages.length ? `<div class="stgs">${stages.map((x) => `<span class="${cur && cur.stage === x ? "cur" : ""}">${esc(x)}</span>`).join("<i>›</i>")}</div>` : "";
-    const dots = `<div class="dots">${all.map((s) => `<i class="${cur && cur.k === s.k ? "cur" : ""}" title="S${s.k} ${esc(s.name)}"></i>`).join("")}</div>`;
+    const dots = `<div class="dots">${all.map((s) => `<i class="${cur && cur.k === s.k ? "cur" : sim.visited.has(f.M(s.k)) ? "done" : ""}" title="S${s.k} ${esc(s.name)}"></i>`).join("")}</div>`;
     if (!cur) return `<div class="nf"><div class="nh"><b>${esc(f.name)}</b><span class="sk">未啟動</span></div>${stg}${dots}<p class="hint">按「重置」初始化後再按啟動按鈕。</p></div>`;
     const sec = [];
     if (cur.delay) sec.push(`延時 ${tmrText(cur.g, cur.delay, cm)}`);
@@ -1464,7 +1481,7 @@ function paintAnim() {
   const job = (sim.jobBits || []).reduce((a, [d, n]) => a + (sbit(d) ? 1 << n : 0), 0);
   (sim.tiles || []).forEach((t) => {
     const on = sbit(t.d); const p = t.m >= 0 ? sim.mech.get(t.m) ?? 0 : on ? 1 : 0; const el = t.el;
-    el.classList.toggle("on", on); el.querySelector(".ts").textContent = on ? "ON" : "OFF";
+    const mv = t.m >= 0 && p > 0.001 && p < 0.999; el.classList.toggle("on", on); el.classList.toggle("mv", mv); el.querySelector(".ts").textContent = mv ? (on ? "動作中" : "復歸中") : on ? "ON" : "OFF";
     el.querySelectorAll(".sens span").forEach((s) => s.classList.toggle("lit", sbit(s.dataset.x)));
     if (t.t === "cyl") { const w = 4 + p * 16; el.querySelector(".a-rod").setAttribute("width", w); el.querySelector(".a-head").setAttribute("x", 36 + w); }
     else if (t.t === "table") { if (on) t.ang = (t.ang + dts * 0.12) % 360; el.querySelector(".a-rot").setAttribute("transform", `rotate(${t.ang.toFixed(1)} 32 24)`); }
@@ -1481,6 +1498,115 @@ function paintAnim() {
     }
   });
 }
+
+/* ---------- 模擬模式：自動通過（從頭至尾）／手動（逐階段、點步序） ---------- */
+Object.assign(sim, { forced: new Map(), since: new Map(), visited: new Set(), flowState: new Map(), stageRun: new Map() });
+const simMode = () => $("#simMode").value;
+function condOk(groups) { return !groups.length || groups.some((g) => g.every((t) => (t.nc ? !sbit(t.dev) : sbit(t.dev)))); }
+function logLine(html) { const li = document.createElement("li"); li.innerHTML = `<time>${simTime(sim.clock)}</time> ${html}`; const log = $("#narrLog"); log.prepend(li); while (log.children.length > 80) log.lastChild.remove(); }
+function clearForced() { sim.forced.forEach((o, d) => sim.bits.set(d, o.orig)); sim.forced.clear(); }
+function forceTerms(groups, who) {
+  // 只在「非 X 條件（步序互鎖、計時器）已成立」的群組強制 X，避免流程間互搶
+  const g = groups.find((gr) => gr.every((t) => /^X/.test(t.dev) || (t.nc ? !sbit(t.dev) : sbit(t.dev)))); if (!g) return; const list = [];
+  g.forEach((t) => {
+    if (!/^X/.test(t.dev)) return; const want = !t.nc; if (sbit(t.dev) === want) return;
+    if (!sim.forced.has(t.dev)) sim.forced.set(t.dev, { v: want, orig: !!sim.bits.get(t.dev) }); else sim.forced.get(t.dev).v = want;
+    sim.bits.set(t.dev, want); list.push(`${t.dev} ${want ? "ON" : "OFF"}`);
+  });
+  if (list.length) logLine(`<span class="fzt">${esc(who)} 自動通過：強制 ${esc(list.join("、"))}</span>`);
+}
+function flowHeld(f) {
+  const m = simMode();
+  if (m === "manual") return $("#holdOthers").checked && !sim.stageRun.has(f.fi);
+  if (m === "auto") return !$("#simLoop").checked && !!sim.flowState.get(f.fi)?.done;
+  return false;
+}
+function autoPass() {
+  if (!st.flowsBuilt || st.ilSource === "manual") return;
+  const m = simMode(); if (m === "input") return;
+  if (m === "auto" && !sbit("M0") && !sim.allDone && !sim.bits.get("M50")) sim.bits.set("M0", true);
+  if (!sbit("M0")) return;
+  const dwell = Math.max(0, Number($("#simDwell").value) || 0) * 1000;
+  st.flowsBuilt.forEach((f) => {
+    if (!(m === "auto" || sim.stageRun.has(f.fi)) || flowHeld(f)) return;
+    const k = [0, ...f.steps.map((s) => s.k)].find((i) => sbit(f.M(i))); if (k == null) return;
+    const s = k === 0 ? { cond: f.start } : f.steps[k - 1]; const dev = f.M(k);
+    if (sim.clock - (sim.since.get(dev) ?? sim.clock) < dwell) return;
+    if (!condOk(s.cond)) forceTerms(s.cond, `${f.name} S${k}`);
+  });
+}
+// 維持待機的流程：掃描期間暫時關閉其 S0，使 S0→S1 不成立、也不會帶出輸出，掃描後恢復
+function heldAtS0() { const l = (st.flowsBuilt || []).filter((f) => flowHeld(f) && sbit(f.M(0))); l.forEach((f) => sim.bits.set(f.M(0), false)); return l; }
+function revertHeld(list) { list.forEach((f) => sim.bits.set(f.M(0), true)); }
+/* 換步後的狀態記錄；回傳 true 表示要暫停 */
+function stepBookkeeping(entered) {
+  let pause = false;
+  entered.forEach((d) => {
+    sim.since.set(d, sim.clock);
+    const info = st.stepInfo?.get(d); if (!info) return; const { f, s } = info;
+    const fs = sim.flowState.get(f.fi) || {}; 
+    if (s.k === 1) { for (let i = 0; i <= f.n; i++) sim.visited.delete(f.M(i)); fs.started = true; fs.done = false; }
+    if (s.k === 0 && fs.started) { fs.done = true; fs.started = false; logLine(`<b>${esc(f.name)}</b> ✔ 完成一個循環`); }
+    sim.flowState.set(f.fi, fs); sim.visited.add(d);
+    const r = sim.stageRun.get(f.fi);
+    if (r && !r.fresh) {
+      const end = r.once || (r.all ? s.k === 0 : (s.k === 0 || s.stage !== r.stage));
+      if (end) { sim.stageRun.delete(f.fi); pause = true; logLine(`<b>${esc(f.name)}</b> ${r.once ? "單步完成" : r.all ? "整個流程完成" : `階段「${esc(r.stage || "S" + r.k)}」完成`}，已暫停`); }
+    }
+    if (r) r.fresh = false;
+  });
+  if (simMode() === "auto" && !$("#simLoop").checked && st.flowsBuilt?.length && st.flowsBuilt.every((f) => sim.flowState.get(f.fi)?.done)) {
+    if (!sim.allDone) { sim.allDone = true; pause = true; logLine("<b>全部流程已從頭到尾完成一個循環</b>"); toast("自動通過：全部流程完成一個循環"); }
+  }
+  return pause;
+}
+function ensureSimReady() {
+  if (sim.dirty || !sim.prog.length) { simCompile(); sim.dirty = false; }
+  if (sim.first) { simScan(1); const sig = activeSteps().join(); onStepChange(sim.stepSig, sig); sim.stepSig = sig; }
+}
+function jumpTo(fi, k, run) {
+  const f = st.flowsBuilt?.[fi]; if (!f) return;
+  ensureSimReady(); clearForced();
+  for (let i = 0; i <= f.n; i++) sim.bits.set(f.M(i), false);
+  sim.bits.set(f.M(k), true); sim.bits.set("M50", false); sim.bits.set("M0", true);
+  const s = k === 0 ? { name: "待機", stage: "" } : f.steps[k - 1];
+  if (run) sim.stageRun.set(fi, { ...run, stage: run.stage ?? s.stage, k, fresh: true }); else sim.stageRun.delete(fi);
+  logLine(`<b>手動</b>：${esc(f.name)} 跳至 S${k} ${esc(s.name)}${run ? (run.all ? "，自動通過到流程結束" : run.once ? "" : `，自動通過階段「${esc(s.stage || "S" + k)}」`) : ""}`);
+  const sig = activeSteps().join(); onStepChange(sim.stepSig, sig); sim.stepSig = sig;
+  if (run && !sim.on) simStart(); else simPaint();
+}
+function stepOnce(fi) {
+  const f = st.flowsBuilt?.[fi]; if (!f) return; ensureSimReady();
+  const k = [0, ...f.steps.map((s) => s.k)].find((i) => sbit(f.M(i)));
+  if (k == null) { jumpTo(fi, 0, null); return; }
+  sim.bits.set("M0", true); sim.since.set(f.M(k), -1e12);
+  sim.stageRun.set(fi, { once: true, k, stage: "", fresh: false });
+  if (!sim.on) simStart();
+}
+function renderManual() {
+  const el = $("#manualCtl"); if (!el) return;
+  el.hidden = simMode() !== "manual";
+  if (!st.flowsBuilt || st.ilSource === "manual") { el.innerHTML = `<p class="hint">手動指令表沒有步序資訊，無法逐階段操作。</p>`; return; }
+  el.innerHTML = st.flowsBuilt.map((f) => {
+    const stages = []; f.steps.forEach((s) => { if (s.stage && !stages.some((x) => x.stage === s.stage)) stages.push({ stage: s.stage, k: s.k }); });
+    return `<div class="mrow"><b>${esc(f.name)}</b>${stages.map((x) => `<button type="button" data-mf="${f.fi}" data-act="stage" data-k="${x.k}">${esc(x.stage)}</button>`).join("")}<button type="button" data-mf="${f.fi}" data-act="step" title="強制目前步序的條件成立，前進一步後暫停">單步 ▶</button><button type="button" data-mf="${f.fi}" data-act="all">從 S1 跑完整流程</button><button type="button" data-mf="${f.fi}" data-act="home">回待機</button></div>`;
+  }).join("") + `<p class="hint">點階段按鈕：跳到該階段第一步並自動通過該階段，完成後暫停。也可以直接點流程圖上的任一步序框。</p>`;
+}
+$("#manualCtl").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-act]"); if (!b) return; const fi = Number(b.dataset.mf);
+  if (b.dataset.act === "stage") jumpTo(fi, Number(b.dataset.k), { stage: undefined });
+  else if (b.dataset.act === "all") jumpTo(fi, 1, { all: true });
+  else if (b.dataset.act === "step") stepOnce(fi);
+  else jumpTo(fi, 0, null);
+});
+$("#flow").addEventListener("click", (e) => {
+  const g = e.target.closest("g.st"); if (!g) return;
+  if (simMode() !== "manual") { toast("切換到「手動（逐階段）」模式，即可點選步序跳步執行"); return; }
+  const info = st.stepInfo?.get(g.dataset.d); if (!info) return;
+  jumpTo(info.f.fi, info.s.k, info.s.k === 0 ? null : { stage: undefined });
+});
+$("#simMode").onchange = () => { sim.stageRun.clear(); clearForced(); sim.allDone = false; renderManual(); updateModeUi(); paintState(); };
+function updateModeUi() { const m = simMode(); $("#autoOpts").hidden = m === "input"; $("#loopOpt").hidden = m !== "auto"; $("#manualCtl").hidden = m !== "manual"; $("#holdWrap").hidden = m !== "manual"; }
 
 /* ---------- 共用專案（線上版：雙方可編輯） ---------- */
 const shared = { db: null, user: null, me: null, docs: [], names: {}, cur: null, curAt: 0, confirm: null };
@@ -1593,7 +1719,7 @@ $("#il").addEventListener("change", saveLocal);
 
 let initial = JSON.parse(JSON.stringify(SAMPLE2));
 try { const s = localStorage.getItem("mlg-project"); if (s) initial = JSON.parse(s); } catch {}
-loadFmt(); applyProject(initial); showFmt(); initShared();
+loadFmt(); applyProject(initial); showFmt(); initShared(); updateModeUi(); renderManual();
 try { const t = localStorage.getItem("mlg-tab"); if (t) selectTab(t); } catch {}
 </script>
 
