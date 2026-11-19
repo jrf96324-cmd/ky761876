@@ -186,7 +186,10 @@ const PRINT_CSS = `#plan text{font-family:${PFONT};fill:#111;paint-order:stroke;
 #plan .dim rect{fill:#fff;stroke:#333;stroke-width:.6}
 #plan .dim.o rect{fill:#fff3e8;stroke:#c25b12}
 #plan .dim text{fill:#111;stroke:none;font-family:Consolas,"Courier New",monospace}
-#plan .it .body{stroke:#222}`;
+#plan .it .body{stroke:#222}
+#plan .it.ceil .body{fill-opacity:.08;stroke:#1d6fb8;stroke-dasharray:6 4}
+#plan .it.ceil .ln{stroke:#1d6fb8}
+#plan .rot-h,#plan .rot-l{display:none}`;
 
 function newPage() {
   const cv = document.createElement('canvas'); cv.width = Math.round(PG.w * PX); cv.height = Math.round(PG.h * PX);
@@ -217,8 +220,8 @@ async function svgImage(xml) {
   img.src = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
   await img.decode(); return img;
 }
-async function planPage() {
-  const keep = sel; sel = null; PRINT = true; checks = runChecks(); renderPlan(true); PRINT = false;
+async function planPage(layer = 'floor') {
+  const keep = sel; sel = null; PRINT = layer; checks = runChecks(); renderPlan(true); PRINT = false;
   const clone = svg.cloneNode(true), vb = svg.viewBox.baseVal;
   sel = keep; renderPlan();
   const areaW = PG.w - 30, areaH = PG.h - 20 - 40;
@@ -230,10 +233,11 @@ async function planPage() {
   const img = await svgImage(new XMLSerializer().serializeToString(clone));
   const pg = newPage(), x0 = 15 + (areaW - wmm) / 2, y0 = 14 + (areaH - hmm) / 2;
   pg.x.drawImage(img, x0, y0, wmm, hmm);
-  const c = calc(); pg.x.fillStyle = '#111'; pg.x.font = `600 4px ${PFONT}`; pg.x.fillText('平面配置圖', 15, 17);
+  const c = calc(); pg.x.fillStyle = '#111'; pg.x.font = `600 4px ${PFONT}`; pg.x.fillText(layer === 'ceil' ? '天花配置圖（由上往下看，虛線為天花設備）' : '平面配置圖', 15, 17);
   pg.x.font = `2.8px ${PFONT}`; pg.x.fillStyle = '#444';
   pg.x.fillText(`室內淨面積 ${fx(c.A)} m²（${fx(c.ping)} 坪）・地板 ${c.fl.name}・家具 ${S.items.length} 件・佔地 ${fx(c.foot / c.A * 100, 1)}%・動線檢查 ${checks.list.length ? checks.list.length + ' 項待確認' : '全部通過'}`, 15, 22.5);
-  pg.title = '平面配置圖'; pg.scale = `1:${sc}（A3）`; return pg;
+  if (layer === 'ceil') { const cs = S.items.filter(i => LIB[i.type].mount === 'ceiling'); pg.x.fillText(`天花高 ${S.room.H} mm・${S.room.ceiling === 'grid' ? '輕鋼架天花' : S.room.ceiling === 'flat' ? '平釘天花' : '不做天花'}・天花設備 ${cs.length} 件・燈具 ${fmt(cs.reduce((s, i) => s + (LIB[i.type].lm ? (i.lm || LIB[i.type].lm) : 0), 0))} lm`, 15, 27); }
+  pg.title = layer === 'ceil' ? '天花配置圖' : '平面配置圖'; pg.scale = `1:${sc}（A3）`; return pg;
 }
 function viewsPage() {
   const keepCam = { th: cam.th, ph: cam.ph, r: cam.r, tg: cam.tg.clone() }, keepSel = sel, el = renderer.domElement;
@@ -337,7 +341,9 @@ async function exportPDF() {
   const btn = $('#pdfBtn'); btn.disabled = true; toast('正在產生 PDF…');
   try {
     checks = runChecks();
-    const pages = [await planPage(), viewsPage(), ...tablePages(reportSections())];
+    const pages = [await planPage('floor')];
+    if (S.items.some(i => LIB[i.type].mount === 'ceiling')) pages.push(await planPage('ceil'));
+    pages.push(viewsPage(), ...tablePages(reportSections()));
     pages.forEach((p, i) => frame(p, p.title, p.scale, i + 1, pages.length));
     await download(`${safeName(S.meta.name)}_${stamp()}.pdf`, buildPDF(pages), 'application/pdf', 'pdf', 'PDF 圖面');
   } catch (e) { console.error(e); toast('PDF 輸出失敗：' + e.message); }

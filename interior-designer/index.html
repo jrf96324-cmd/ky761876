@@ -123,6 +123,12 @@ dialog img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
 #plan .it.sel .body{stroke:var(--accent-2);stroke-width:2.4;stroke-opacity:1}
 #plan .it.bad .body{stroke:var(--err);stroke-width:2.4;stroke-opacity:1}
 #plan .it.warn .body{stroke:var(--warn);stroke-width:2;stroke-opacity:1}
+#plan .it.ceil .body{fill-opacity:.12;stroke-dasharray:6 4;stroke:#9cc4ff}
+#plan .it.ceil .ln{stroke:#9cc4ff}
+#plan .it.wallm .body{fill-opacity:.35;stroke-dasharray:2 3}
+#plan .it.lock .body{stroke-width:2.2}
+#plan .rot-h{fill:#f0883e;stroke:#fff;stroke-width:1.5;cursor:grab}
+#plan .rot-l{stroke:#f0883e;stroke-width:1.2;stroke-dasharray:4 3}
 #plan .wall{fill:#46576b;stroke:#6f8399;stroke-width:1}
 #plan .floor{fill:#16212f}
 #plan .gridl{stroke:#22344a;stroke-width:1}
@@ -178,7 +184,7 @@ dialog img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
     <label class="f"><span>牆厚 (mm)</span><input id="rT" type="number" step="10" min="60"></label>
     <label class="f"><span>空間用途</span><select id="rType"></select></label>
     <label class="f"><span>地板材質</span><select id="rFloor"></select></label>
-    <label class="f"><span>天花板</span><select id="rCeil"><option value="flat">平釘天花（矽酸鈣板）</option><option value="none">不做天花（直接油漆）</option></select></label>
+    <label class="f"><span>天花板</span><select id="rCeil"><option value="flat">平釘天花（矽酸鈣板）</option><option value="grid">輕鋼架天花（礦纖板）</option><option value="none">不做天花（直接油漆）</option></select></label>
     <div class="f"><span>牆面顏色</span><div class="sw-row" id="wallSw"></div></div>
     <label class="f"><span>吸附格點</span><select id="sSnap"><option value="10">10 mm</option><option value="50">50 mm</option><option value="100">100 mm</option></select></label>
     <label class="f"><span>最小通道 (mm)</span><input id="sPath" type="number" step="50" min="300"></label>
@@ -195,8 +201,11 @@ dialog img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
           <button class="btn sm" data-cam="front" type="button">前視</button>
           <button class="btn sm" data-cam="right" type="button">右視</button>
           <button class="btn sm" data-cam="top" type="button">俯視</button>
+          <button class="btn sm" data-cam="in" type="button">室內</button>
           <label class="chk" style="padding:0 0 0 4px"><input type="checkbox" id="sCut">自動剖切牆</label>
         </span>
+        <label class="chk" style="padding:0"><input type="checkbox" id="sCeil">天花板</label>
+        <label class="chk" style="padding:0"><input type="checkbox" id="sCeilL">平面顯示天花層</label>
       </div>
       <div class="viewport" id="viewport">
         <div id="v3d"></div>
@@ -223,7 +232,9 @@ dialog img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
           <button class="btn sm" data-addop="window" type="button">＋窗</button>
           <button class="btn sm" data-addop="open" type="button">＋開口</button>
         </div>
-        <p class="note">在平面配置圖拖曳門窗可沿牆移動；點選後可修改尺寸。</p>
+        <p class="note">門窗可在平面圖或 3D 中直接拖曳沿牆移動，點選後可修改尺寸、方向鍵微調。</p>
+        <button class="btn primary" data-opt="1" type="button">一鍵優化配置</button>
+        <p class="note">依目前門窗位置自動避開擋門、重疊、通道不足、遮窗等問題；勾選「鎖定位置」的家具不會移動。</p>
       </div>
     </aside>
   </div>
