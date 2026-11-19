@@ -214,6 +214,25 @@ tfoot td{font-weight:700;background:var(--panel-2);position:sticky;bottom:0}
 .hint{font-size:12px;color:var(--text-2)}
 .big-pct{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
 
+/* Issues */
+.iss{border:1px solid var(--border);border-left:4px solid var(--sev);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--panel-2)}
+.iss.closed{opacity:.72}
+.iss-grid{display:grid;grid-template-columns:130px 120px 76px 1fr 120px;gap:6px;margin-bottom:6px}
+.iss-grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.iss-foot{display:grid;grid-template-columns:140px 110px 110px 100px 1fr;gap:6px;margin-top:6px;align-items:end}
+@media (max-width:720px){.iss-grid,.iss-foot,.iss-grid2{grid-template-columns:1fr 1fr}}
+.iss textarea{resize:vertical}
+.iss .fld label{font-size:11px}
+.flag{display:inline-flex;align-items:center;gap:1px;font-size:11px;font-weight:800;color:var(--warn)}
+.flag.hi{color:var(--bad)}
+.stack{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--panel-3);min-width:110px}
+.stack i{display:block;height:100%}
+td.wrap{white-space:normal;min-width:150px;max-width:280px;font-size:12px}
+.sel-sm{padding:2px 6px;font-size:12px}
+.iss-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 12px}
+.grp-h{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel-2);font-weight:700}
+.sec h4 .spacer{flex:1}
+
 /* Tooltip & Toast */
 .tip{position:fixed;z-index:2000;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow-lg);padding:9px 11px;font-size:12px;max-width:320px;line-height:1.55}
 .tip .t{font-weight:700;font-size:13px;margin-bottom:3px}
@@ -275,6 +294,7 @@ tfoot td{font-weight:700;background:var(--panel-2);position:sticky;bottom:0}
       <button data-v="gantt">甘特圖</button>
       <button data-v="table">明細表</button>
       <button data-v="analysis">追蹤分析</button>
+      <button data-v="issues">問題管理</button>
     </div>
     <input type="search" id="fSearch" placeholder="搜尋名稱/負責人/備註">
     <select id="fCat" title="類別"></select>
@@ -307,6 +327,7 @@ tfoot td{font-weight:700;background:var(--panel-2);position:sticky;bottom:0}
   </div>
   <div class="card hidden" id="viewTable"><div class="tbl-wrap" id="tableWrap"></div></div>
   <div class="hidden" id="viewAnalysis"></div>
+  <div class="hidden" id="viewIssues"></div>
 </div>
 
 <datalist id="catList"></datalist>
@@ -393,6 +414,11 @@ tfoot td{font-weight:700;background:var(--panel-2);position:sticky;bottom:0}
         <div class="fld" style="margin-top:8px"><label>備註</label><textarea id="eNote" rows="3"></textarea></div>
       </div>
 
+      <div class="sec full" id="issSec">
+        <h4>⚑ 問題 / 異常紀錄 <span class="hint" id="issCount"></span><span class="spacer"></span><button class="btn sm primary" onclick="addIssue()">＋ 新增問題</button></h4>
+        <div id="issueList"></div>
+      </div>
+
       <div class="sec full">
         <h4>進度紀錄（S 曲線依此計算）</h4>
         <div id="logList"></div>
@@ -425,6 +451,10 @@ const STATUS={
   done:{label:'完成',color:'#16a34a'},
   doneLate:{label:'逾期完成',color:'#0d9488'},
 };
+const ISSUE_TYPES=['設計問題','規格變更','採購交期','加工品質','組立問題','電控/程式','人力不足','客戶因素','其他'];
+const ISSUE_ST={open:{label:'待處理',color:'#dc2626'},doing:{label:'改善中',color:'#d97706'},closed:{label:'已結案',color:'#16a34a'}};
+const SEV={'高':'#dc2626','中':'#d97706','低':'#64748b'};
+const EFFECT={'':'未驗證',yes:'已改善',no:'未改善'};
 const ZOOM={day:32,week:12,month:4};
 const WD='日一二三四五六';
 const RH={grp:36,task:46};
@@ -457,7 +487,8 @@ let didInitialScroll=false;
 
 function normTask(t){
   const n=Object.assign({id:uid(),category:'未分類',name:'',owner:'',priority:'中',weight:1,milestone:false,hold:false,
-    planStart:D.today(),planEnd:D.today(),actualStart:'',actualEnd:'',progress:0,deps:[],checklist:[],logs:[],budget:0,cost:0,note:''},t||{});
+    planStart:D.today(),planEnd:D.today(),actualStart:'',actualEnd:'',progress:0,deps:[],checklist:[],logs:[],issues:[],budget:0,cost:0,note:''},t||{});
+  n.issues=Array.isArray(n.issues)?n.issues.map(normIssue):[];
   n.id=String(n.id);
   n.progress=clamp(parseInt(n.progress)||0,0,100);
   n.weight=Number(n.weight)>0?Number(n.weight):1;
@@ -475,6 +506,14 @@ function normTask(t){
   sortLogs(n);
   return n;
 }
+function normIssue(x){
+  const n=Object.assign({id:uid(),date:D.today(),type:'其他',severity:'中',desc:'',cause:'',action:'',owner:'',due:'',status:'open',closedDate:'',effect:'',affectDays:0},x||{});
+  n.id=String(n.id);if(!ISSUE_ST[n.status])n.status='open';if(!(n.effect in EFFECT))n.effect='';if(!SEV[n.severity])n.severity='中';
+  n.affectDays=Math.max(0,+n.affectDays||0);return n;
+}
+const openIssues=t=>t.issues.filter(i=>i.status!=='closed');
+const issueOverdue=(i,T=D.today())=>i.status!=='closed'&&!!i.due&&i.due<T;
+function issueFlag(t){const o=openIssues(t);return o.length?`<span class="flag ${o.some(i=>i.severity==='高')?'hi':''}" title="未結問題 ${o.length} 筆">⚑${o.length}</span>`:''}
 function sortLogs(t){t.logs.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0)}
 function applyData(data){
   if(Array.isArray(data))data={tasks:data};
@@ -569,10 +608,11 @@ function filtered(){
       const s=statusOf(t);
       if(ui.status==='open'){if(t.progress>=100)return false}
       else if(ui.status==='late'){if(!isLate(t))return false}
+      else if(ui.status==='issue'){if(!openIssues(t).length)return false}
       else if(ui.status==='week'){const T=D.today(),E=D.add(T,7);if(t.progress>=100||!(t.planStart<=E&&t.planEnd>=T))return false}
       else if(s!==ui.status)return false;
     }
-    if(q&&!(t.name+' '+t.owner+' '+t.note+' '+t.category+' '+t.checklist.map(c=>c.text).join(' ')).toLowerCase().includes(q))return false;
+    if(q&&!(t.name+' '+t.owner+' '+t.note+' '+t.category+' '+t.checklist.map(c=>c.text).join(' ')+' '+t.issues.map(i=>i.desc+' '+i.cause+' '+i.action+' '+i.owner).join(' ')).toLowerCase().includes(q))return false;
     return true;
   }).sort((a,b)=>catIndex(a.category)-catIndex(b.category)||(a.planStart<b.planStart?-1:a.planStart>b.planStart?1:0)||(a.planEnd<b.planEnd?-1:1));
 }
@@ -582,13 +622,14 @@ function renderAll(){
   renderFilters();
   const list=filtered();
   renderKPIs(list);
-  ['gantt','table','analysis'].forEach(v=>{
+  ['gantt','table','analysis','issues'].forEach(v=>{
     $('#view'+v[0].toUpperCase()+v.slice(1)).classList.toggle('hidden',ui.view!==v);
   });
   document.querySelectorAll('#viewTabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===ui.view));
   $('#ganttTools').classList.toggle('hidden',ui.view!=='gantt');
   if(ui.view==='gantt')renderGantt(list);
   else if(ui.view==='table')renderTable(list);
+  else if(ui.view==='issues')renderIssuesView(list);
   else renderAnalysis(list);
 }
 
@@ -601,7 +642,7 @@ function renderFilters(){
   if(ui.owner!=='ALL'&&!owners.includes(ui.owner))ui.owner='ALL';
   $('#fCat').innerHTML=`<option value="ALL">全部類別</option>`+cats.map(c=>`<option value="${esc(c)}">${esc(c)}（${state.tasks.filter(t=>t.category===c).length}）</option>`).join('');
   $('#fOwner').innerHTML=`<option value="ALL">全部負責人</option>`+owners.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
-  const sOpts=[['ALL','全部狀態'],['open','未完成'],['late','⚠ 落後＋逾期'],['week','本週需處理'],...Object.entries(STATUS).map(([k,v])=>[k,v.label])];
+  const sOpts=[['ALL','全部狀態'],['open','未完成'],['late','⚠ 落後＋逾期'],['issue','⚑ 有未結問題'],['week','本週需處理'],...Object.entries(STATUS).map(([k,v])=>[k,v.label])];
   $('#fStatus').innerHTML=sOpts.map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   $('#fCat').value=ui.cat;$('#fOwner').value=ui.owner;$('#fStatus').value=ui.status;
   $('#fZoom').value=ui.zoom;$('#optDeps').checked=ui.showDeps;$('#optCascade').checked=ui.cascade;
@@ -622,6 +663,9 @@ function renderKPIs(list){
   const ms=list.filter(t=>t.milestone&&t.progress<100).sort((a,b)=>a.planEnd<b.planEnd?-1:1)[0];
   const spiColor=spi===null?'var(--text)':spi>=.95?'var(--ok)':spi>=.85?'var(--warn)':'var(--bad)';
   const diff=act-plan;
+  const iss=list.flatMap(t=>t.issues), io=iss.filter(i=>i.status!=='closed');
+  const iod=io.filter(i=>issueOverdue(i,T)).length, ihi=io.filter(i=>i.severity==='高').length;
+  const iy=iss.filter(i=>i.effect==='yes').length, inn=iss.filter(i=>i.effect==='no').length;
   const filt=list.length!==state.tasks.length?`<span class="faint">（篩選 ${list.length}/${state.tasks.length}）</span>`:'';
   $('#kpis').innerHTML=`
     <div class="card kpi"><div class="lbl">實際進度（加權）${filt}</div>
@@ -640,6 +684,9 @@ function renderKPIs(list){
     <div class="card kpi" style="cursor:pointer" onclick="quickFilter('week')" title="點擊篩選本週"><div class="lbl">今日（${T}）</div>
       <div class="val">${activeToday}<small>項進行中</small></div>
       <div class="sub">${ms?`下個里程碑：${esc(ms.name)} ${D.short(ms.planEnd)}`:'無待達成里程碑'}</div></div>
+    <div class="card kpi" style="cursor:pointer" onclick="ui.view='issues';persistUI();renderAll()" title="點擊進入問題管理"><div class="lbl">⚑ 問題管理</div>
+      <div class="val" style="color:${io.length?'var(--bad)':'var(--ok)'}">${io.length}<small>未結 / 共 ${iss.length}</small></div>
+      <div class="sub">高嚴重 ${ihi}　對策逾期 <b style="color:${iod?'var(--bad)':'inherit'}">${iod}</b>　改善有效 ${iy+inn?Math.round(iy/(iy+inn)*100)+'%':'—'}</div></div>
     <div class="card kpi"><div class="lbl">專案期間</div>
       <div class="val" style="font-size:17px;margin-top:6px">${pStart?D.short(pStart)+' ~ '+D.short(pEnd):'—'}</div>
       <div class="sub">${pEnd?(remain>=0?`剩餘 ${remain} 天`:`已超過 ${-remain} 天`)+`　總工期 ${D.diff(pStart,pEnd)+1} 天`:''}</div></div>
@@ -699,9 +746,10 @@ function renderGantt(list){
     const c=catColor(cat), col=!!state.collapsed[cat];
     const gs=minD(...ts.map(t=>t.planStart)), ge=maxD(...ts.map(t=>t.planEnd));
     const gp=weighted(ts,t=>t.progress), gl=ts.filter(isLate).length;
+    const gio=ts.reduce((s,t)=>s+openIssues(t).length,0), ghi=ts.some(t=>openIssues(t).some(i=>i.severity==='高'));
     rows+=`<div class="g-row grp ${col?'collapsed':''}" style="height:${RH.grp}px">
       <div class="g-left" data-toggle="${esc(cat)}"><span class="caret">▾</span><span class="dot" style="background:${c};margin:9px 0"></span>
-        <div class="gl-main"><div class="gl-name">${esc(cat)} <span class="faint" style="font-weight:400">(${ts.length})</span>${gl?` <span class="late-t">⚠${gl}</span>`:''}</div></div>
+        <div class="gl-main"><div class="gl-name">${esc(cat)} <span class="faint" style="font-weight:400">(${ts.length})</span>${gl?` <span class="late-t">⚠${gl}</span>`:''}${gio?` <span class="flag ${ghi?'hi':''}" title="此大項未結問題">⚑${gio}</span>`:''}</div></div>
         <div class="gl-pct"><b>${gp.toFixed(0)}%</b></div></div>
       <div class="g-track" style="width:${W}px">
         <div class="gs" style="left:${X(gs)}px;width:${(D.diff(gs,ge)+1)*dayW}px;--c:${c}"><i style="width:${gp}%"></i></div>
@@ -767,7 +815,7 @@ function taskRow(t,c,X,dayW,W,T){
   return `<div class="g-row" style="height:${RH.task}px" data-row="${t.id}">
     <div class="g-left" data-open="${t.id}" data-tip="${t.id}"><span class="dot" style="background:${c}"></span>
       <div class="gl-main"><div class="gl-name">${t.milestone?'◆ ':''}${t.priority==='高'?'<span class="late-t">!</span> ':''}${esc(t.name)}</div>
-        <div class="gl-sub"><span class="chip" style="--s:${sm.color}">${sm.label}</span>${t.owner?`<span>${esc(t.owner)}</span>`:''}${ck}${conf}</div></div>
+        <div class="gl-sub"><span class="chip" style="--s:${sm.color}">${sm.label}</span>${issueFlag(t)}${t.owner?`<span>${esc(t.owner)}</span>`:''}${ck}${conf}</div></div>
       <div class="gl-pct"><b>${t.progress}%</b><div class="mini"><i style="width:${t.progress}%;background:${c}"></i></div></div></div>
     <div class="g-track" style="width:${W}px">${bars}
       <div class="bl" style="left:${xr+6}px">${D.short(t.planStart)}–${D.short(t.planEnd)}${dl?` <span class="late-t">+${dl}天</span>`:''}</div>
@@ -837,6 +885,7 @@ function initGanttEvents(){
 function tipHTML(t){
   const T=D.today(), st=STATUS[statusOf(t)], dl=delayDays(t), ex=expectedPct(t,T);
   const deps=t.deps.map(id=>getTask(id)).filter(Boolean).map(p=>esc(p.name)).join('、');
+  const oi=openIssues(t);
   return `<div class="t">${t.milestone?'◆ ':''}${esc(t.name)}</div>
     <span class="k">類別</span>${esc(t.category)}　<span class="chip" style="--s:${st.color}">${st.label}</span><br>
     ${t.owner?`<span class="k">負責人</span>${esc(t.owner)}<br>`:''}
@@ -846,6 +895,7 @@ function tipHTML(t){
     ${dl?`<span class="k">延遲</span><span class="late-t">${dl} 天</span><br>`:''}
     ${deps?`<span class="k">前置</span>${deps}<br>`:''}
     ${t.checklist.length?`<span class="k">檢核</span>${t.checklist.filter(c=>c.done).length}/${t.checklist.length} 完成<br>`:''}
+    ${oi.length?`<span class="k">問題</span><span class="late-t">未結 ${oi.length}</span>：${oi.slice(0,3).map(i=>esc(i.desc||i.type)).join('；')}<br>`:''}
     ${t.budget||t.cost?`<span class="k">成本</span>${money(t.cost)} / ${money(t.budget)}<br>`:''}
     ${t.note?`<span class="k">備註</span>${esc(t.note)}`:''}`;
 }
@@ -863,7 +913,7 @@ function hideTip(){$('#tip').classList.add('hidden')}
 const COLS=[
   ['category','類別'],['name','細項名稱'],['owner','負責人'],['priority','優先'],['planStart','預計開始'],['planEnd','預計結束'],
   ['dur','工期',1],['actualStart','實際開始'],['actualEnd','實際完成'],['progress','進度%',1],['expected','應達%',1],['gap','差異',1],
-  ['status','狀態'],['delay','延遲(天)',1],['budget','預算',1],['cost','實際成本',1],['note','備註']
+  ['status','狀態'],['delay','延遲(天)',1],['issues','問題(未結/全)',1],['budget','預算',1],['cost','實際成本',1],['note','備註']
 ];
 function colVal(t,k,T){
   switch(k){
@@ -872,6 +922,7 @@ function colVal(t,k,T){
     case'gap':return t.progress-expectedPct(t,T);
     case'status':return STATUS[statusOf(t,T)].label;
     case'delay':return delayDays(t,T);
+    case'issues':return openIssues(t).length;
     default:return t[k];
   }
 }
@@ -893,13 +944,14 @@ function renderTable(list){
       <td class="num" style="color:${gap<-10?'var(--bad)':gap<0?'var(--warn)':'var(--ok)'}">${gap>0?'+':''}${gap}</td>
       <td><span class="chip" style="--s:${st.color}">${st.label}</span></td>
       <td class="num ${dl?'late-t':''}">${dl||''}</td>
+      <td class="num">${issueFlag(t)}${t.issues.length?`<span class="faint"> /${t.issues.length}</span>`:''}</td>
       <td class="num">${t.budget?t.budget.toLocaleString():''}</td>
       <td class="num" style="${t.budget&&t.cost>t.budget?'color:var(--bad);font-weight:700':''}">${t.cost?t.cost.toLocaleString():''}</td>
       <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${esc(t.note)}">${esc(t.note)}</td></tr>`;
   }).join('');
   const b=list.reduce((s,t)=>s+t.budget,0),c=list.reduce((s,t)=>s+t.cost,0);
   $('#tableWrap').innerHTML=list.length?`<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody>
-    <tfoot><tr><td colspan="9">合計 ${list.length} 項（加權）</td><td class="num">${weighted(list,t=>t.progress).toFixed(1)}</td><td class="num">${weighted(list,t=>expectedPct(t,T)).toFixed(1)}</td><td colspan="3"></td><td class="num">${b.toLocaleString()}</td><td class="num">${c.toLocaleString()}</td><td></td></tr></tfoot></table>`
+    <tfoot><tr><td colspan="9">合計 ${list.length} 項（加權）</td><td class="num">${weighted(list,t=>t.progress).toFixed(1)}</td><td class="num">${weighted(list,t=>expectedPct(t,T)).toFixed(1)}</td><td colspan="3"></td><td class="num">${list.reduce((s,t)=>s+openIssues(t).length,0)}</td><td class="num">${b.toLocaleString()}</td><td class="num">${c.toLocaleString()}</td><td></td></tr></tfoot></table>`
     :`<div class="empty">沒有資料</div>`;
 }
 function initTableEvents(){
@@ -976,9 +1028,158 @@ function ownerSummary(list,T){
       <td class="num ${late?'late-t':''}">${late}</td><td class="num">${weighted(ts,t=>t.progress).toFixed(0)}%</td></tr>`}).join('')+`</tbody></table><div class="hint" style="margin-top:6px">點擊列可在甘特圖篩選該負責人</div>`;
 }
 
+/* ============ 問題管理 ============ */
+function issueRate(arr){const y=arr.filter(i=>i.effect==='yes').length,n=arr.filter(i=>i.effect==='no').length;return y+n?Math.round(y/(y+n)*100)+'%':'—'}
+function renderIssuesView(list){
+  const box=$('#viewIssues'), T=D.today();
+  const fs=ui.issueStatus||'active', ft=ui.issueType||'ALL';
+  const all=[];list.forEach(t=>t.issues.forEach(x=>all.push({t,x})));
+  const match=({x})=>(ft==='ALL'||x.type===ft)&&(fs==='ALL'||(fs==='active'?x.status!=='closed':fs==='overdue'?issueOverdue(x,T):fs==='noeffect'?x.effect==='no':fs==='unverified'?(x.status==='closed'&&!x.effect):x.status===fs));
+  const shown=all.filter(match);
+  const opt=(arr,v)=>arr.map(([k,l])=>`<option value="${esc(k)}" ${k===v?'selected':''}>${esc(l)}</option>`).join('');
+
+  // 大項彙總
+  const cats=new Map();list.forEach(t=>{if(!cats.has(t.category))cats.set(t.category,[]);cats.get(t.category).push(t)});
+  const sumRow=(name,ts,isTotal)=>{
+    const a=ts.flatMap(t=>t.issues), c=k=>a.filter(i=>i.status===k).length, od=a.filter(i=>issueOverdue(i,T)).length;
+    const hi=a.filter(i=>i.status!=='closed'&&i.severity==='高').length, n=a.length||1;
+    return `<tr ${isTotal?'':`style="cursor:pointer" onclick="ui.cat=${esc(JSON.stringify(name))};persistUI();renderAll()" title="點擊只看此大項"`}>
+      <td>${isTotal?'<b>合計</b>':`<span class="chip" style="--s:${catColor(name)}">${esc(name)}</span>`}</td>
+      <td class="num">${ts.length}</td><td class="num">${ts.filter(t=>t.issues.length).length}</td><td class="num"><b>${a.length}</b></td>
+      <td class="num" style="color:${c('open')?ISSUE_ST.open.color:''}">${c('open')}</td>
+      <td class="num" style="color:${c('doing')?ISSUE_ST.doing.color:''}">${c('doing')}</td>
+      <td class="num">${c('closed')}</td>
+      <td class="num ${od?'late-t':''}">${od}</td><td class="num ${hi?'late-t':''}">${hi}</td>
+      <td class="num">${a.filter(i=>i.effect==='yes').length} / ${a.filter(i=>i.effect==='no').length}</td>
+      <td class="num">${issueRate(a)}</td>
+      <td class="num">${a.reduce((s,i)=>s+i.affectDays,0)||''}</td>
+      <td><div class="stack" title="待處理/改善中/已結案">${a.length?`<i style="width:${c('open')/n*100}%;background:${ISSUE_ST.open.color}"></i><i style="width:${c('doing')/n*100}%;background:${ISSUE_ST.doing.color}"></i><i style="width:${c('closed')/n*100}%;background:${ISSUE_ST.closed.color}"></i>`:''}</div></td></tr>`;
+  };
+  const summary=`<table><thead><tr><th>大項</th><th class="num">細項</th><th class="num">有問題細項</th><th class="num">問題數</th><th class="num">待處理</th><th class="num">改善中</th><th class="num">已結案</th><th class="num">對策逾期</th><th class="num">高嚴重未結</th><th class="num">已改善/未改善</th><th class="num">改善有效率</th><th class="num">影響工期(天)</th><th>結案進度</th></tr></thead>
+    <tbody>${[...cats].map(([c,ts])=>sumRow(c,ts)).join('')}</tbody><tfoot>${sumRow('',list,true)}</tfoot></table>`;
+
+  // 原因分類柏拉圖
+  const cnt={};all.forEach(({x})=>cnt[x.type]=(cnt[x.type]||0)+1);
+  const pr=Object.entries(cnt).sort((a,b)=>b[1]-a[1]), mx=pr.length?pr[0][1]:1;let cum=0;
+  const pareto=pr.length?`<table><thead><tr><th>原因分類</th><th class="num">件數</th><th>分布</th><th class="num">累計%</th><th class="num">未結</th></tr></thead><tbody>${pr.map(([k,v])=>{cum+=v;const op=all.filter(({x})=>x.type===k&&x.status!=='closed').length;
+    return`<tr style="cursor:pointer" onclick="ui.issueType=${esc(JSON.stringify(k))};persistUI();renderAll()"><td>${esc(k)}</td><td class="num"><b>${v}</b></td><td style="width:40%"><div class="mini" style="height:10px"><i style="width:${v/mx*100}%;background:var(--primary)"></i></div></td><td class="num">${Math.round(cum/all.length*100)}%</td><td class="num ${op?'late-t':''}">${op||''}</td></tr>`}).join('')}</tbody></table>
+    <div class="hint" style="margin-top:6px">累計 80% 內的分類為優先改善重點；點擊列可篩選</div>`:`<div class="faint">尚無問題紀錄</div>`;
+
+  // 依大項分組清單
+  const order={open:0,doing:1,closed:2}, so={'高':0,'中':1,'低':2};
+  const groups=new Map();shown.forEach(r=>{if(!groups.has(r.t.category))groups.set(r.t.category,[]);groups.get(r.t.category).push(r)});
+  const rowsHTML=[...groups].map(([cat,rs])=>{
+    rs.sort((a,b)=>order[a.x.status]-order[b.x.status]||so[a.x.severity]-so[b.x.severity]||a.x.date.localeCompare(b.x.date));
+    return `<div class="card" style="margin-bottom:12px;overflow:hidden">
+      <div class="grp-h"><span class="dot" style="width:4px;height:18px;border-radius:3px;background:${catColor(cat)}"></span>${esc(cat)}
+        <span class="faint" style="font-weight:400">${rs.length} 筆　未結 ${rs.filter(r=>r.x.status!=='closed').length}　改善有效率 ${issueRate(rs.map(r=>r.x))}</span></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>狀態</th><th>嚴重</th><th>發生日</th><th>細項</th><th>原因分類</th><th>問題描述</th><th>原因分析</th><th>改善對策</th><th>負責人</th><th>對策期限</th><th>是否改善</th><th class="num">影響(天)</th></tr></thead><tbody>
+      ${rs.map(({t,x})=>{const od=issueOverdue(x,T);return`<tr>
+        <td><select class="sel-sm" style="color:${ISSUE_ST[x.status].color};font-weight:700" onchange="setIssueField('${t.id}','${x.id}','status',this.value)">${opt(Object.entries(ISSUE_ST).map(([k,v])=>[k,v.label]),x.status)}</select>${x.closedDate?`<div class="hint">${x.closedDate}</div>`:''}</td>
+        <td><span class="chip" style="--s:${SEV[x.severity]}">${x.severity}</span></td>
+        <td>${D.short(x.date)}</td>
+        <td><span class="lnk" data-open="${t.id}" data-issue="1">${esc(t.name)}</span></td>
+        <td>${esc(x.type)}</td>
+        <td class="wrap"><b>${esc(x.desc)}</b></td><td class="wrap">${esc(x.cause)||'<span class="late-t">未填原因</span>'}</td>
+        <td class="wrap">${esc(x.action)||'<span class="late-t">未填對策</span>'}</td>
+        <td>${esc(x.owner)}</td>
+        <td class="${od?'late-t':''}">${x.due?D.short(x.due)+(od?`<br>逾 ${D.diff(x.due,T)} 天`:''):''}</td>
+        <td><select class="sel-sm" style="color:${x.effect==='yes'?'var(--ok)':x.effect==='no'?'var(--bad)':''}" onchange="setIssueField('${t.id}','${x.id}','effect',this.value)">${opt(Object.entries(EFFECT),x.effect)}</select></td>
+        <td class="num">${x.affectDays||''}</td></tr>`}).join('')}</tbody></table></div></div>`;
+  }).join('');
+
+  box.innerHTML=`
+    <div class="card iss-bar">
+      <b>問題篩選</b>
+      <select id="isF">${opt([['active','未結（待處理＋改善中）'],['ALL','全部'],['open','待處理'],['doing','改善中'],['closed','已結案'],['overdue','⚠ 對策逾期'],['noeffect','✕ 未改善（需再對策）'],['unverified','已結案未驗證成效']],fs)}</select>
+      <select id="itF">${opt([['ALL','全部原因分類'],...ISSUE_TYPES.map(x=>[x,x])],ft)}</select>
+      <span class="spacer"></span>
+      <select id="isTask" title="選擇要登錄問題的細項">${list.map(t=>`<option value="${t.id}">${esc(t.category)}｜${esc(t.name)}</option>`).join('')}</select>
+      <button class="btn primary sm" onclick="const v=$('#isTask').value;if(v)openModal(v,{newIssue:true})">＋ 登錄問題</button>
+      <button class="btn sm" onclick="exportIssuesCSV()">⇩ 問題清單 CSV</button>
+    </div>
+    <div class="an-grid" style="margin-bottom:12px">
+      <div class="card an-card" style="grid-column:1/-1;overflow-x:auto"><h3>大項問題彙總</h3>${summary}</div>
+      <div class="card an-card"><h3>原因分類（柏拉圖）</h3>${pareto}</div>
+      <div class="card an-card"><h3>⚠ 需優先處理</h3>${(()=>{const pri=all.filter(({x})=>x.status!=='closed'&&(x.severity==='高'||issueOverdue(x,T)||x.effect==='no')).sort((a,b)=>so[a.x.severity]-so[b.x.severity]);
+        return pri.length?pri.map(({t,x})=>`<div class="list-item" data-open="${t.id}" data-issue="1"><span class="chip" style="--s:${SEV[x.severity]}">${x.severity}</span><span class="nm"><b>${esc(x.desc||x.type)}</b> <span class="faint">${esc(t.category)}｜${esc(t.name)}</span></span><span style="font-size:12px;white-space:nowrap">${esc(x.owner)} ${issueOverdue(x,T)?`<span class="late-t">逾期${D.diff(x.due,T)}天</span>`:x.effect==='no'?'<span class="late-t">未改善</span>':x.due?D.short(x.due):''}</span></div>`).join(''):'<div class="faint" style="padding:10px 0">沒有高嚴重、逾期或未改善的問題 👍</div>'})()}</div>
+    </div>
+    <h3 style="margin:4px 0 10px;font-size:15px">問題清單（${shown.length} 筆）</h3>
+    ${rowsHTML||`<div class="card empty">${all.length?'沒有符合篩選的問題':'尚無問題紀錄 — 在上方選擇細項後按「＋ 登錄問題」，或於細項編輯視窗中新增'}</div>`}`;
+  $('#isF').onchange=e=>{ui.issueStatus=e.target.value;persistUI();renderAll()};
+  $('#itF').onchange=e=>{ui.issueType=e.target.value;persistUI();renderAll()};
+}
+function setIssueField(tid,iid,f,v){
+  const t=getTask(tid),x=t&&t.issues.find(i=>i.id===iid);if(!x)return;
+  pushUndo();x[f]=v;
+  if(f==='status'){if(v==='closed'&&!x.closedDate)x.closedDate=D.today();if(v!=='closed')x.closedDate=''}
+  if(f==='effect'&&v==='no'&&x.status==='closed'){x.status='doing';x.closedDate='';toast('成效未改善，已重新開啟為「改善中」')}else toast('問題已更新');
+  commit();
+}
+function exportIssuesCSV(){
+  const head=['大項','細項','發生日','原因分類','嚴重度','問題描述','原因分析','改善對策','負責人','對策期限','狀態','結案日','是否改善','影響工期(天)','對策逾期'];
+  const q=v=>{v=String(v??'');return/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=[];filtered().forEach(t=>t.issues.forEach(x=>rows.push([t.category,t.name,x.date,x.type,x.severity,x.desc,x.cause,x.action,x.owner,x.due,ISSUE_ST[x.status].label,x.closedDate,EFFECT[x.effect],x.affectDays||'',issueOverdue(x)?'是':''])));
+  download(fname('問題清單.csv').replace('.問題清單.csv','_問題清單.csv'),'﻿'+[head,...rows].map(r=>r.map(q).join(',')).join('\r\n'),'text/csv;charset=utf-8');
+  toast(`已匯出 ${rows.length} 筆問題`);
+}
+/* 編輯視窗內的問題編輯 */
+function renderIssueEditor(){
+  if(!draft)return;
+  const T=D.today(), arr=draft.issues;
+  const opt=(a,v)=>a.map(([k,l])=>`<option value="${esc(k)}" ${k===v?'selected':''}>${esc(l)}</option>`).join('');
+  $('#issCount').textContent=arr.length?`共 ${arr.length} 筆，未結 ${arr.filter(i=>i.status!=='closed').length}`:'';
+  $('#issueList').innerHTML=arr.length?arr.map((x,i)=>{const od=issueOverdue(x,T);const A=f=>`data-i="${i}" data-f="${f}"`;
+    return `<div class="iss ${x.status==='closed'?'closed':''}" style="--sev:${SEV[x.severity]}">
+      <div class="iss-grid">
+        <div class="fld"><label>發生日</label><input type="date" ${A('date')} value="${x.date}"></div>
+        <div class="fld"><label>原因分類</label><select ${A('type')}>${opt(ISSUE_TYPES.map(t=>[t,t]),x.type)}</select></div>
+        <div class="fld"><label>嚴重度</label><select ${A('severity')}>${opt([['高','高'],['中','中'],['低','低']],x.severity)}</select></div>
+        <div class="fld"><label>問題描述 *</label><input ${A('desc')} value="${esc(x.desc)}" placeholder="發生什麼問題"></div>
+        <div class="fld"><label>改善負責人</label><input list="ownerList" ${A('owner')} value="${esc(x.owner)}"></div>
+      </div>
+      <div class="iss-grid2">
+        <div class="fld"><label>原因分析（為何發生）</label><textarea rows="2" ${A('cause')} placeholder="例：未做全行程干涉檢查">${esc(x.cause)}</textarea></div>
+        <div class="fld"><label>改善對策（矯正＋預防再發）</label><textarea rows="2" ${A('action')} placeholder="例：修改設計並納入檢查表">${esc(x.action)}</textarea></div>
+      </div>
+      <div class="iss-foot">
+        <div class="fld"><label>對策期限 ${od?`<span class="late-t">逾期 ${D.diff(x.due,T)} 天</span>`:''}</label><input type="date" ${A('due')} value="${x.due}"></div>
+        <div class="fld"><label>處理狀態</label><select ${A('status')} style="color:${ISSUE_ST[x.status].color};font-weight:700">${opt(Object.entries(ISSUE_ST).map(([k,v])=>[k,v.label]),x.status)}</select></div>
+        <div class="fld"><label>是否改善</label><select ${A('effect')} style="color:${x.effect==='yes'?'var(--ok)':x.effect==='no'?'var(--bad)':''}">${opt(Object.entries(EFFECT),x.effect)}</select></div>
+        <div class="fld"><label>影響工期(天)</label><input type="number" min="0" ${A('affectDays')} value="${x.affectDays||''}"></div>
+        <div class="row" style="justify-content:flex-end;align-self:end">${x.closedDate?`<span class="hint">結案 ${x.closedDate}</span>`:''}<button class="btn sm danger" data-del="${i}">刪除</button></div>
+      </div></div>`}).join('')
+    :`<div class="hint">尚無問題。遇到延誤、品質、交期、變更等狀況時登錄，記錄原因與對策，並追蹤是否改善。</div>`;
+}
+function addIssue(){
+  if(!draft)return;
+  draft.issues.unshift(normIssue({owner:$('#eOwner').value.trim(),due:D.add(D.today(),7)}));
+  renderIssueEditor();
+  const f=$('#issueList [data-f="desc"]');if(f){f.scrollIntoView({block:'center',behavior:'smooth'});f.focus()}
+}
+function initIssueEditorEvents(){
+  const il=$('#issueList');
+  il.addEventListener('input',e=>{
+    const el=e.target, f=el.dataset.f;if(!f||!draft)return;
+    const x=draft.issues[+el.dataset.i];if(!x)return;
+    x[f]=f==='affectDays'?Math.max(0,+el.value||0):el.value;
+  });
+  il.addEventListener('change',e=>{
+    const el=e.target, f=el.dataset.f;if(!f||!draft)return;
+    const x=draft.issues[+el.dataset.i];if(!x)return;
+    if(f==='status'){if(x.status==='closed'&&!x.closedDate)x.closedDate=D.today();if(x.status!=='closed')x.closedDate=''}
+    if(f==='effect'&&x.effect==='no'&&x.status==='closed'){x.status='doing';x.closedDate='';toast('成效未改善，已重新開啟為「改善中」')}
+    if(el.tagName==='SELECT'||f==='due')renderIssueEditor();
+  });
+  il.addEventListener('click',e=>{
+    const d=e.target.closest('[data-del]');if(!d||!draft)return;
+    if(confirm('刪除此問題紀錄？')){draft.issues.splice(+d.dataset.del,1);renderIssueEditor()}
+  });
+}
+
 /* ============ 編輯視窗 ============ */
 let draft=null, draftIsNew=false, origProgress=0;
-function openModal(id){
+function openModal(id,opts={}){
   hideTip();
   const src=id?getTask(id):null;
   draftIsNew=!src;
@@ -993,9 +1194,11 @@ function openModal(id){
   set('#ePS',draft.planStart);set('#ePE',draft.planEnd);set('#eAS',draft.actualStart);set('#eAE',draft.actualEnd);
   set('#eProg',draft.progress);set('#eLogNote','');set('#eBudget',draft.budget||'');set('#eCost',draft.cost||'');set('#eNote',draft.note);
   set('#depSearch','');set('#ckNew','');
-  renderModalParts();
+  renderModalParts();renderIssueEditor();
   $('#modal').classList.remove('hidden');
-  setTimeout(()=>$(draftIsNew?'#eCat':'#eProg').focus(),30);
+  if(opts.newIssue)setTimeout(addIssue,60);
+  else if(opts.focusIssue)setTimeout(()=>$('#issSec').scrollIntoView({block:'start',behavior:'smooth'}),60);
+  else setTimeout(()=>$(draftIsNew?'#eCat':'#eProg').focus(),30);
 }
 function readTimeFields(){draft.planStart=$('#ePS').value;draft.planEnd=$('#ePE').value;draft.actualStart=$('#eAS').value;draft.actualEnd=$('#eAE').value}
 function renderModalParts(){
@@ -1022,6 +1225,7 @@ function renderModalParts(){
   $('#eFromCk').classList.toggle('hidden',!ck.length);
   $('#ckList').innerHTML=ck.length?ck.map((x,i)=>`<div class="ck-item ${x.done?'done':''}"><input type="checkbox" ${x.done?'checked':''} onchange="draft.checklist[${i}].done=this.checked;renderModalParts()"><span>${esc(x.text)}</span><button class="btn ghost sm" onclick="draft.checklist.splice(${i},1);renderModalParts()">✕</button></div>`).join(''):`<div class="hint">例：圖面審查、材料到貨、首件檢驗…</div>`;
   renderDeps();
+  if(!$('#issueList').contains(document.activeElement))renderIssueEditor();
   // 紀錄
   const logs=[...draft.logs].reverse();
   $('#logList').innerHTML=logs.length?logs.map(l=>{const i=draft.logs.indexOf(l);return`<div class="log"><span>${l.date}</span><b>${l.progress}%</b><span>${esc(l.note)}</span><button class="btn ghost sm" title="刪除紀錄" onclick="draft.logs.splice(${i},1);renderModalParts()">✕</button></div>`}).join(''):`<div class="hint">尚無紀錄，儲存進度變更時會自動新增。</div>`;
@@ -1050,6 +1254,8 @@ function saveModal(){
   if(!draft.planStart||!draft.planEnd){alert('請填寫預計開始/結束日期');return}
   if(draft.planEnd<draft.planStart){alert('預計結束日不可早於開始日');return}
   if(draft.actualStart&&draft.actualEnd&&draft.actualEnd<draft.actualStart){alert('實際完成日不可早於實際開始日');return}
+  draft.issues=draft.issues.filter(i=>i.desc.trim()||i.cause.trim()||i.action.trim());
+  if(draft.issues.some(i=>!i.desc.trim())){alert('問題紀錄的「問題描述」不可空白');renderIssueEditor();return}
   Object.assign(draft,{category:cat,name,owner:$('#eOwner').value.trim(),priority:$('#ePriority').value,weight:+$('#eWeight').value>0?+$('#eWeight').value:1,
     milestone:$('#eMilestone').checked,hold:$('#eHold').checked,budget:+$('#eBudget').value||0,cost:+$('#eCost').value||0,note:$('#eNote').value.trim()});
   if(draft.milestone)draft.planStart=draft.planEnd;
@@ -1076,7 +1282,7 @@ function duplicateCurrent(){
   if(!draft||draftIsNew)return;
   const src=getTask(draft.id);if(!src)return;
   pushUndo();
-  const c=normTask({...JSON.parse(JSON.stringify(src)),id:uid(),name:src.name+'（複本）',actualStart:'',actualEnd:'',progress:0,logs:[],cost:0,checklist:src.checklist.map(x=>({text:x.text,done:false}))});
+  const c=normTask({...JSON.parse(JSON.stringify(src)),id:uid(),name:src.name+'（複本）',actualStart:'',actualEnd:'',progress:0,logs:[],issues:[],cost:0,checklist:src.checklist.map(x=>({text:x.text,done:false}))});
   state.tasks.push(c);closeModal();commit();openModal(c.id);toast('已複製，可直接修改');
 }
 
@@ -1102,9 +1308,9 @@ function fname(ext){return `${(state.project.name||'工程進度').replace(/[\\/
 function exportJSON(){download(fname('json'),JSON.stringify(serialize(),null,2),'application/json');toast('已存檔 JSON')}
 function exportCSV(){
   const T=D.today();
-  const head=['類別','細項名稱','負責人','優先','權重','里程碑','預計開始','預計結束','工期(天)','實際開始','實際完成','進度%','應達%','差異%','狀態','延遲(天)','前置作業','檢核完成','預算','實際成本','備註'];
+  const head=['類別','細項名稱','負責人','優先','權重','里程碑','預計開始','預計結束','工期(天)','實際開始','實際完成','進度%','應達%','差異%','狀態','延遲(天)','前置作業','檢核完成','未結問題','問題總數','預算','實際成本','備註'];
   const q=v=>{v=String(v??'');return/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=filtered().map(t=>[t.category,t.name,t.owner,t.priority,t.weight,t.milestone?'是':'',t.planStart,t.planEnd,D.diff(t.planStart,t.planEnd)+1,t.actualStart,t.actualEnd,t.progress,expectedPct(t,T),t.progress-expectedPct(t,T),STATUS[statusOf(t,T)].label,delayDays(t,T)||'',t.deps.map(d=>getTask(d)?.name).filter(Boolean).join('、'),t.checklist.length?`${t.checklist.filter(c=>c.done).length}/${t.checklist.length}`:'',t.budget||'',t.cost||'',t.note]);
+  const rows=filtered().map(t=>[t.category,t.name,t.owner,t.priority,t.weight,t.milestone?'是':'',t.planStart,t.planEnd,D.diff(t.planStart,t.planEnd)+1,t.actualStart,t.actualEnd,t.progress,expectedPct(t,T),t.progress-expectedPct(t,T),STATUS[statusOf(t,T)].label,delayDays(t,T)||'',t.deps.map(d=>getTask(d)?.name).filter(Boolean).join('、'),t.checklist.length?`${t.checklist.filter(c=>c.done).length}/${t.checklist.length}`:'',openIssues(t).length||'',t.issues.length||'',t.budget||'',t.cost||'',t.note]);
   download(fname('csv'),'﻿'+[head,...rows].map(r=>r.map(q).join(',')).join('\r\n'),'text/csv;charset=utf-8');
   toast('已匯出 CSV（可直接用 Excel 開啟）');
 }
@@ -1149,6 +1355,15 @@ function loadSample(){
     ['驗收','出貨與 SAT 現場驗收','PM',61,68,0,null,null,[15],0,0,0],
   ];
   const ids=S.map(()=>uid());
+  const ISS={
+    0:[{date:a(-31),type:'客戶因素',severity:'低',desc:'節拍需求反覆調整',cause:'客戶產能預估未定，口頭變更未留紀錄',action:'首版簽核後仍變更 → 改為變更需走 ECN 並評估工期/費用',owner:'PM',due:a(-26),status:'doing',effect:'no',affectDays:1}],
+    1:[{date:a(-20),type:'規格變更',severity:'中',desc:'客戶追加第二機種治具共用',cause:'需求確認階段未納入未來機種規劃',action:'Layout 預留治具快換空間；規格書增列擴充條款',owner:'王工',due:a(-17),status:'closed',closedDate:a(-16),effect:'yes',affectDays:2}],
+    3:[{date:a(-5),type:'設計問題',severity:'高',desc:'取放模組與送料軌道干涉',cause:'3D 組裝僅做靜態檢查，未做全行程動態干涉',action:'修改取放 Z 軸行程；全行程干涉模擬納入設計檢查表',owner:'王工',due:a(2),status:'doing',effect:'',affectDays:3},
+       {date:a(-2),type:'設計問題',severity:'低',desc:'定位銷規格與標準件不一致',cause:'沿用舊專案圖面',action:'統一改用 MISUMI 標準定位銷',owner:'李工',due:a(1),status:'open',effect:'',affectDays:0}],
+    5:[{date:a(-10),type:'客戶因素',severity:'高',desc:'客戶 MES 通訊規格未定，I/O 表無法定版',cause:'客戶端 IT 窗口未確認',action:'先以 OPC UA 預留介面；發函請客戶限期回覆',owner:'陳工',due:a(-2),status:'open',effect:'',affectDays:6}],
+    7:[{date:a(-3),type:'採購交期',severity:'高',desc:'線軌交期 4 週，晚於組立需求',cause:'原廠缺貨',action:'改用同規格替代品牌，或先借庫存品組立',owner:'林專員',due:a(4),status:'doing',effect:'',affectDays:0},
+       {date:a(-12),type:'採購交期',severity:'低',desc:'氣缸報價延遲',cause:'單一供應商依賴',action:'建立第二供應商比價',owner:'林專員',due:a(-9),status:'closed',closedDate:a(-9),effect:'yes',affectDays:0}],
+  };
   state={project:{name:'自動化組裝設備專案（範例）'},catColor:{},collapsed:{},tasks:[]};
   S.forEach((r,i)=>{
     const[cat,name,owner,ps,pe,p,as,ae,deps,budget,cost,ms,ck]=r;
@@ -1157,7 +1372,7 @@ function loadSample(){
     catColor(cat);
     state.tasks.push(normTask({id:ids[i],category:cat,name,owner,planStart:a(ps),planEnd:a(pe),progress:p,actualStart:a(as),actualEnd:a(ae),
       deps:deps.map(d=>ids[d]),budget,cost,milestone:!!ms,priority:i===3||i===6?'高':'中',weight:ms?0.5:Math.max(1,(pe-ps+1)/5),
-      checklist:(ck||[]).map((x,k)=>({text:x,done:p>=100||k<Math.floor((ck.length)*p/100)})),logs,note:i===7?'線軌交期 4 週，需追蹤':''}));
+      issues:ISS[i]||[],checklist:(ck||[]).map((x,k)=>({text:x,done:p>=100||k<Math.floor((ck.length)*p/100)})),logs,note:i===7?'線軌交期 4 週，需追蹤':''}));
   });
   didInitialScroll=false;commit();toast('已載入自動化設備範例專案');
 }
@@ -1190,7 +1405,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('#depSearch').addEventListener('input',renderDeps);
   $('#ckNew').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCheck()}});
   $('#qaName').addEventListener('keydown',e=>{if(e.key==='Enter')quickAdd()});
-  $('#viewAnalysis').addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o)openModal(o.dataset.open)});
+  ['#viewAnalysis','#viewIssues'].forEach(s=>$(s).addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o)openModal(o.dataset.open,{focusIssue:!!o.dataset.issue})}));
+  initIssueEditorEvents();
   document.addEventListener('keydown',e=>{
     const inModal=!$('#modal').classList.contains('hidden');
     if(e.key==='Escape'&&inModal)closeModal();
