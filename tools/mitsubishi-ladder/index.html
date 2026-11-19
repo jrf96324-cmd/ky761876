@@ -7,18 +7,18 @@
 :root {
   --bg: #eef1ef; --panel: #ffffff; --ink: #18211d; --muted: #5b6a63; --line: #cdd6d1;
   --rail: #24312b; --accent: #0b7a57; --accent-ink: #ffffff; --warn: #a15c00; --warn-bg: #fff3df;
-  --err: #b42318; --err-bg: #fdecea; --soft: #e3ebe7; --wire: #1d2a24; --cmt: #3d6b8f;
+  --err: #b42318; --err-bg: #fdecea; --soft: #e3ebe7; --wire: #1d2a24; --cmt: #3d6b8f; --live: #0a63b8; --live-bg: #d3e6fa;
   --sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
   --mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #121815; --panel: #1a221e; --ink: #e3ebe6; --muted: #92a39a; --line: #2f3c35;
   --rail: #c9d6cf; --accent: #3fc596; --accent-ink: #08130e; --warn: #f0b45c; --warn-bg: #33270f;
-  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; color-scheme: dark; } }
+  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; --live: #5ab8ff; --live-bg: #123553; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #121815; --panel: #1a221e; --ink: #e3ebe6; --muted: #92a39a; --line: #2f3c35;
   --rail: #c9d6cf; --accent: #3fc596; --accent-ink: #08130e; --warn: #f0b45c; --warn-bg: #33270f;
-  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; color-scheme: dark; }
+  --err: #ff8a7a; --err-bg: #3a1a16; --soft: #222d27; --wire: #d5e1da; --cmt: #8cc3ec; --live: #5ab8ff; --live-bg: #123553; color-scheme: dark; }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
@@ -77,6 +77,31 @@ details.guide ol { padding-left: 20px; margin: 6px 0; display: grid; gap: 4px; }
 code { font-family: var(--mono); font-size: 12.5px; background: var(--soft); padding: 0 4px; border-radius: 3px; }
 #toast { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); background: var(--rail); color: var(--bg); padding: 8px 14px; border-radius: 4px; font-size: 13px; }
 svg text { font-family: var(--mono); }
+.ct.on .b, .co.on .b { stroke: var(--live); stroke-width: 3; }
+.ct.on .hl, .co.on .hl { fill: var(--live-bg); }
+.sim { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 4px; padding: 10px; }
+.sim h4 { margin: 0 0 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.simgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; }
+@media (max-width: 700px) { .simgrid { grid-template-columns: minmax(0, 1fr); } }
+.pads { display: flex; flex-wrap: wrap; gap: 4px; }
+.pad { display: grid; grid-template-columns: 10px auto; column-gap: 5px; align-items: center; padding: 3px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); font-size: 12px; text-align: left; user-select: none; touch-action: none; }
+.pad i { grid-row: span 2; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--muted); }
+.pad b { font-family: var(--mono); font-weight: 600; }
+.pad small { grid-column: 2; color: var(--muted); font-size: 10.5px; line-height: 1.2; }
+.pad.on { border-color: var(--live); background: var(--live-bg); }
+.pad.on i { background: var(--live); border-color: var(--live); }
+.pad.mom { border-style: dashed; }
+.pad.auto { opacity: .75; cursor: default; }
+.pad.out { cursor: default; }
+.simstate { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; }
+.chip { font-size: 11.5px; padding: 1px 8px; border-radius: 10px; background: var(--soft); color: var(--muted); }
+.chip.run { background: var(--live-bg); color: var(--live); font-weight: 600; }
+.chip.alm { background: var(--err-bg); color: var(--err); font-weight: 600; }
+details.mech summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+#shared .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#shList { flex: 1 1 260px; min-width: 0; }
+#shName { flex: 1 1 160px; }
+.banner { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 4px; background: var(--live-bg); color: var(--live); font-size: 13px; }
 svg .cm { font-family: var(--sans); }
 </style>
 
@@ -129,6 +154,12 @@ svg .cm { font-family: var(--sans); }
   </div>
 
   <div class="col">
+    <section class="card" id="shared" hidden>
+      <div class="head"><h2>共用專案（雙方可編輯）</h2><span class="hint" id="shStat"></span></div>
+      <div class="banner" id="shBanner" hidden><span id="shBannerText"></span><button id="shReload" type="button">載入最新</button></div>
+      <div class="row"><select id="shList" aria-label="共用專案"></select><button id="shLoad" type="button">載入</button><button id="shDel" type="button">刪除</button></div>
+      <div class="row"><input id="shName" placeholder="專案名稱，例：261596-AFF8 啟動盤鎖付" aria-label="專案名稱"><button id="shSave" class="primary" type="button">儲存到共用</button></div>
+    </section>
     <section class="card">
       <div class="tabs" role="tablist">
         <button type="button" role="tab" id="tab-ladder" aria-selected="true">階梯圖</button>
@@ -138,7 +169,24 @@ svg .cm { font-family: var(--sans); }
       <div class="stats" id="stats"></div>
       <div class="msgs" id="msgs"></div>
 
-      <div id="pane-ladder"><div class="ladder-wrap" id="ladder"></div></div>
+      <div id="pane-ladder" style="display:grid;gap:10px">
+        <div class="sim">
+          <div class="head">
+            <div class="ctl"><button id="simRun" class="primary" type="button">▶ 模擬運轉</button><button id="simReset" type="button">重置</button>
+              <label class="inline" for="simSpeed">速度<select id="simSpeed"><option value="1">×1</option><option value="5">×5</option><option value="10">×10</option></select></label></div>
+            <div class="simstate" id="simState"></div>
+          </div>
+          <div class="simgrid">
+            <div><h4>輸入 X：點擊切換；虛線框為按鈕（按住 ON）；淡色由虛擬機構驅動</h4><div id="simIn" class="pads"></div></div>
+            <div><h4>輸出 Y</h4><div id="simOut" class="pads"></div></div>
+          </div>
+          <details class="mech"><summary>虛擬機構：輸出 ON 後經過動作時間，動作端感測 ON、原位端感測 OFF</summary>
+            <div class="tw"><table class="grid"><thead><tr><th>輸出 Y</th><th>動作端 X</th><th>原位端 X</th><th>時間 s</th><th></th></tr></thead><tbody id="mechBody"></tbody></table></div>
+            <div class="ctl"><button id="addMech" type="button">＋ 新增機構</button></div>
+          </details>
+        </div>
+        <div class="ladder-wrap" id="ladder"></div>
+      </div>
 
       <div id="pane-il" hidden>
         <p class="hint">可直接貼上或修改三菱指令表（LD/LDI/LDP/AND/ANI/OR/ORI/ANB/ORB/MPS/MRD/MPP/OUT/SET/RST/PLS/PLF/比較接點/應用指令…），修改後按「重繪階梯圖」。<code>;</code> 之後為註解。</p>
@@ -179,6 +227,14 @@ svg .cm { font-family: var(--sans); }
             <div class="ctl"><button data-exp="json" data-act="save" type="button">下載</button><label class="inline" for="loadJson"><span>載入</span><input id="loadJson" type="file" accept=".json,application/json"></label></div>
           </article>
         </div>
+        <section class="fmt">
+          <h3>從 GX Works 讀回（雙向編輯）</h3>
+          <p class="hint">在 GX Works2 / GX Developer 修改後，把程式匯出成 CSV（或貼成指令表文字檔）讀回這裡，就能看階梯圖、模擬、再匯出。讀回的 CSV 也會自動當作匯出格式範本。</p>
+          <div class="ctl">
+            <label class="inline" for="impProg">讀回程式（CSV / 指令表 TXT）<input id="impProg" type="file" accept=".csv,.txt"></label>
+            <label class="inline" for="impCmt">讀回裝置註解 CSV<input id="impCmt" type="file" accept=".csv,.txt"></label>
+          </div>
+        </section>
         <section class="fmt">
           <h3>匯入檔案格式（程式 CSV / 裝置註解 CSV）</h3>
           <div class="cfg">
@@ -247,7 +303,8 @@ const SAMPLE = {
     ["夾爪放開", "Y1,-Y2", "!X14", "0.3", "2"],
     ["放料上升", "", "X12", "", "3"],
     ["橫移後退", "-Y0", "X10", "", "3"]
-  ]
+  ],
+  sim: [["Y0", "X11", "X10", "0.8"], ["Y1", "X13", "X12", "0.5"], ["Y2", "X14", "", "0.2"]]
 };
 
 /* ---------- 小工具 ---------- */
@@ -293,7 +350,9 @@ function readProject() {
   const io = [...$("#ioBody").children].map((tr) => [tr.querySelector(".io-d").value.trim(), tr.querySelector(".io-c").value.trim()]).filter((r) => r[0]);
   const cfg = {}; for (const [k, id] of Object.entries(CFG_IDS)) cfg[k] = $("#" + id).value.trim();
   const steps = [...$("#stepBody").children].map((tr) => [".s-n", ".s-o", ".s-t", ".s-d", ".s-to"].map((c) => tr.querySelector(c).value.trim()));
-  return { series: $("#series").value, io, cfg, steps };
+  const il = st.ilSource === "manual" ? $("#il").value : "";
+  const sim = $("#mechBody") ? [...$("#mechBody").children].map((tr) => [".m-y", ".m-a", ".m-h", ".m-t"].map((c) => tr.querySelector(c).value.trim())).filter((r) => r[0]) : [];
+  return { series: $("#series").value, io, cfg, steps, il, extraCm: Object.fromEntries(st.extraCm), sim };
 }
 
 /* ---------- 時序 → 指令表 產生器 ---------- */
@@ -492,6 +551,9 @@ function layNode(n, col, row, P, coils) {
   if (last > row) P.push({ t: "v", c: bx, r1: row, r2: last });
 }
 function contactSVG(x, y, el, cm) {
+  return `<g class="ct" data-d="${esc(el.dev)}" data-k="${el.kind}"${el.op ? ` data-op="${esc(el.op)}"` : ""}>${contactInner(x, y, el, cm)}</g>`;
+}
+function contactInner(x, y, el, cm) {
   const cx = x + CW / 2; let s = "";
   const lbl = el.kind === "CMP" ? `[${el.op} ${el.dev}]` : el.dev;
   if (el.kind === "CMP") {
@@ -505,7 +567,7 @@ function contactSVG(x, y, el, cm) {
     else s += `<line x1="${cx}" y1="${y + 9}" x2="${cx}" y2="${y - 9}" class="w"/><path d="M${cx - 4} ${el.kind === "MEP" ? y - 4 : y + 4} L${cx} ${el.kind === "MEP" ? y - 9 : y + 9} L${cx + 4} ${el.kind === "MEP" ? y - 4 : y + 4}" class="w f0"/>`;
     s += `<text x="${cx}" y="${y - 16}" text-anchor="middle" class="t">${el.kind}</text>`; return s;
   }
-  s += `<line x1="${x}" y1="${y}" x2="${cx - 7}" y2="${y}" class="w"/><line x1="${cx + 7}" y1="${y}" x2="${x + CW}" y2="${y}" class="w"/>`;
+  s += `<rect x="${cx - 12}" y="${y - 13}" width="24" height="26" class="hl"/><line x1="${x}" y1="${y}" x2="${cx - 7}" y2="${y}" class="w"/><line x1="${cx + 7}" y1="${y}" x2="${x + CW}" y2="${y}" class="w"/>`;
   s += `<line x1="${cx - 7}" y1="${y - 11}" x2="${cx - 7}" y2="${y + 11}" class="w b"/><line x1="${cx + 7}" y1="${y - 11}" x2="${cx + 7}" y2="${y + 11}" class="w b"/>`;
   if (el.kind === "NC") s += `<line x1="${cx - 11}" y1="${y + 11}" x2="${cx + 11}" y2="${y - 11}" class="w"/>`;
   if (el.kind === "P" || el.kind === "F") { const up = el.kind === "P"; s += `<line x1="${cx}" y1="${y + 8}" x2="${cx}" y2="${y - 8}" class="w"/><path d="M${cx - 3.5} ${up ? y - 3 : y + 3} L${cx} ${up ? y - 8 : y + 8} L${cx + 3.5} ${up ? y - 3 : y + 3}" class="w f0"/>`; }
@@ -515,16 +577,21 @@ function contactSVG(x, y, el, cm) {
 }
 function trunc(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 function coilSVG(x, y, el, cm) {
+  return `<g class="co" data-i="${esc(el.ins)}" data-d="${esc(el.ops[0] || "")}">${coilInner(x, y, el, cm)}</g>`;
+}
+function coilInner(x, y, el, cm) {
   const ops = el.ops; let s = "";
   if (el.ins === "OUT" && !/^[TC]/.test(ops[0] || "")) {
     const cx = x + COILW / 2;
-    s += `<line x1="${x}" y1="${y}" x2="${cx - 13}" y2="${y}" class="w"/><line x1="${cx + 13}" y1="${y}" x2="${x + COILW}" y2="${y}" class="w"/>`;
+    s += `<rect x="${cx - 16}" y="${y - 13}" width="32" height="26" class="hl"/><line x1="${x}" y1="${y}" x2="${cx - 13}" y2="${y}" class="w"/><line x1="${cx + 13}" y1="${y}" x2="${x + COILW}" y2="${y}" class="w"/>`;
     s += `<path d="M${cx - 6} ${y - 12} Q${cx - 16} ${y} ${cx - 6} ${y + 12}" class="w f0 b"/><path d="M${cx + 6} ${y - 12} Q${cx + 16} ${y} ${cx + 6} ${y + 12}" class="w f0 b"/>`;
     s += `<text x="${cx}" y="${y - 16}" text-anchor="middle" class="t">${esc(ops[0] || "")}</text>`;
     const c = cm.get(ops[0]); if (c) s += `<text x="${cx}" y="${y + 26}" text-anchor="middle" class="cm">${esc(trunc(c, 14))}</text>`;
     return s;
   }
   const txt = [el.ins, ...ops].join(" ");
+  s += `<rect x="${x + 10}" y="${y - 13}" width="${COILW - 20}" height="26" class="hl"/>`;
+  if (el.ins === "OUT" && /^[TC]/.test(ops[0] || "")) s += `<text x="${x + COILW / 2}" y="${y - 17}" text-anchor="middle" class="t sm tv"></text>`;
   s += `<line x1="${x}" y1="${y}" x2="${x + 10}" y2="${y}" class="w"/><line x1="${x + COILW - 10}" y1="${y}" x2="${x + COILW}" y2="${y}" class="w"/>`;
   s += `<path d="M${x + 16} ${y - 13} H${x + 10} V${y + 13} H${x + 16} M${x + COILW - 16} ${y - 13} H${x + COILW - 10} V${y + 13} H${x + COILW - 16}" class="w f0 b"/>`;
   s += `<text x="${x + COILW / 2}" y="${y + 4}" text-anchor="middle" class="t">${esc(trunc(txt, 22))}</text>`;
@@ -552,13 +619,13 @@ function renderLadder(parsed, cm, remarks, forExport = false) {
   });
   const H = y + 10;
   const css = forExport
-    ? `.w{stroke:#1d2a24;stroke-width:1.6;fill:none}.b{stroke-width:2.2}.f0{fill:none}.box{fill:#fff;stroke:#1d2a24;stroke-width:1.4}.t{font:12px Consolas,monospace;fill:#18211d}.sm{font-size:11px}.cm{font:11px "Microsoft JhengHei",sans-serif;fill:#3d6b8f}.rem{fill:#0b7a57;font-weight:600}.step{fill:#5b6a63;font-size:11px}.rail{stroke:#24312b;stroke-width:3}.sep{stroke:#cdd6d1;stroke-dasharray:3 4}`
-    : `.w{stroke:var(--wire);stroke-width:1.6;fill:none}.b{stroke-width:2.2}.f0{fill:none}.box{fill:var(--panel);stroke:var(--wire);stroke-width:1.4}.t{font-size:12px;fill:var(--ink)}.sm{font-size:11px}.cm{font-size:11px;fill:var(--cmt)}.rem{fill:var(--accent);font-weight:600}.step{fill:var(--muted);font-size:11px}.rail{stroke:var(--rail);stroke-width:3}.sep{stroke:var(--line);stroke-dasharray:3 4}`;
+    ? `.w{stroke:#1d2a24;stroke-width:1.6;fill:none}.b{stroke-width:2.2}.f0{fill:none}.box{fill:#fff;stroke:#1d2a24;stroke-width:1.4}.t{font:12px Consolas,monospace;fill:#18211d}.sm{font-size:11px}.cm{font:11px "Microsoft JhengHei",sans-serif;fill:#3d6b8f}.rem{fill:#0b7a57;font-weight:600}.step{fill:#5b6a63;font-size:11px}.rail{stroke:#24312b;stroke-width:3}.sep{stroke:#cdd6d1;stroke-dasharray:3 4}.hl{fill:none}.tv{display:none}`
+    : `.w{stroke:var(--wire);stroke-width:1.6;fill:none}.b{stroke-width:2.2}.f0{fill:none}.box{fill:var(--panel);stroke:var(--wire);stroke-width:1.4}.t{font-size:12px;fill:var(--ink)}.sm{font-size:11px}.cm{font-size:11px;fill:var(--cmt)}.rem{fill:var(--accent);font-weight:600}.step{fill:var(--muted);font-size:11px}.rail{stroke:var(--rail);stroke-width:3}.sep{stroke:var(--line);stroke-dasharray:3 4}.hl{fill:transparent}.tv{fill:var(--live)}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${css}</style>${forExport ? `<rect width="${W}" height="${H}" fill="#fff"/>` : ""}<line x1="${X0}" y1="6" x2="${X0}" y2="${H - 6}" class="rail"/><line x1="${coilX + COILW}" y1="6" x2="${coilX + COILW}" y2="${H - 6}" class="rail"/>${body}</svg>`;
 }
 
 /* ---------- 狀態與輸出 ---------- */
-const st = { il: "", cm: new Map(), parsed: null, genWarn: [] };
+const st = { il: "", cm: new Map(), extraCm: new Map(), parsed: null, genWarn: [], ilSource: "gen", genConfirm: false };
 function remarksOf(text) {
   // 把「; ── 說明」對應到下一行指令的行號
   const m = new Map(); let pending = null;
@@ -584,13 +651,16 @@ function analyze() {
   if (!msgs.length) msgs.push(["ok", `檢查通過：${S.sw} 可用的指令表已就緒`]);
   $("#msgs").innerHTML = msgs.map(([k, t]) => `<div class="msg ${k}">${esc(t)}</div>`).join("");
   $("#stats").innerHTML = `<span>迴路 <b>${st.parsed.rungs.length}</b></span><span>指令 <b>${st.parsed.count}</b></span><span>步數(FX 估算) <b>${st.parsed.steps}</b></span><span>機種 <b>${p.series}</b></span>`;
-  $("#ladder").innerHTML = renderLadder(st.parsed, st.cm, remarksOf(text));
+  $("#ladder").innerHTML = renderLadder(st.parsed, cmAll(), remarksOf(text));
+  sim.nodes = [...$("#ladder").querySelectorAll("g.ct, g.co")];
+  if (sim.on) simCompile();
+  simPaint();
 }
 function runGenerate() {
   const p = readProject(); const g = generate(p);
-  st.genWarn = g.warn; st.cm = g.cm; $("#il").value = g.il; analyze(); saveLocal();
+  st.genWarn = g.warn; st.cm = g.cm; st.ilSource = "gen"; $("#il").value = g.il; analyze(); if (typeof renderPads === "function" && $("#simIn")) renderPads(); saveLocal();
 }
-function commentMapFromIO() { const p = readProject(); const m = new Map(st.cm); p.io.forEach(([d, c]) => m.set(normDev(d), c)); return m; }
+function commentMapFromIO() { return cmAll(); }
 
 /* ---------- 匯出格式 / 編碼 ---------- */
 const PRESETS = {
@@ -781,7 +851,7 @@ function exportFile(kind) {
   if (kind === "prog") return { name: `${base}_Program.csv`, ...buildProgCsv() };
   if (kind === "cmt") return { name: `${base}_DeviceComment.csv`, ...buildCmtCsv() };
   if (kind === "ahk") return { name: `${base}_AutoInput.ahk`, text: buildAhk(), enc: "utf8bom" };
-  if (kind === "svg") return { name: `${base}_Ladder.svg`, text: renderLadder(st.parsed, st.cm, remarksOf(st.il), true), enc: "utf8" };
+  if (kind === "svg") return { name: `${base}_Ladder.svg`, text: renderLadder(st.parsed, cmAll(), remarksOf(st.il), true), enc: "utf8" };
   if (kind === "json") return { name: `${base}_Project.json`, text: JSON.stringify(p, null, 2), enc: "utf8" };
 }
 let downloadsNs;
@@ -809,6 +879,282 @@ async function copyText(kind) {
   catch { selectTab("il"); $("#il").select(); toast("無法存取剪貼簿，已選取指令表文字，請按 Ctrl+C"); }
 }
 
+/* ---------- 專案套用（含手動指令表、讀回註解、虛擬機構） ---------- */
+function cmAll() { const m = new Map([...st.cm, ...st.extraCm]); readProject().io.forEach(([d, c]) => c && m.set(normDev(d), c)); return m; }
+function mechRow(v = ["", "", "", "0.5"]) {
+  const tr = document.createElement("tr"); const i = ++uid;
+  tr.innerHTML = `<td class="w-dev"><input id="m-y-${i}" class="mono m-y" value="${esc(v[0])}" aria-label="輸出"></td><td class="w-dev"><input id="m-a-${i}" class="mono m-a" value="${esc(v[1])}" aria-label="動作端感測"></td><td class="w-dev"><input id="m-h-${i}" class="mono m-h" value="${esc(v[2])}" aria-label="原位端感測"></td><td class="w-num"><input id="m-t-${i}" class="mono m-t" value="${esc(v[3])}" inputmode="decimal" aria-label="動作時間"></td><td><button class="x" type="button" title="刪除">×</button></td>`;
+  tr.querySelector("button").onclick = () => { tr.remove(); renderPads(); };
+  $("#mechBody").append(tr);
+}
+function readMech() { return [...$("#mechBody").children].map((tr) => [".m-y", ".m-a", ".m-h", ".m-t"].map((c) => tr.querySelector(c).value.trim())).filter((r) => r[0]); }
+function applyProject(p) {
+  st.extraCm = new Map(Object.entries(p.extraCm || {}));
+  $("#mechBody").innerHTML = ""; (p.sim || []).forEach((r) => mechRow(r));
+  loadProject(p); runGenerate();
+  if (p.il) { $("#il").value = p.il; st.ilSource = "manual"; analyze(); }
+  simReset(); saveLocal();
+}
+
+/* ---------- 從 GX Works 讀回 ---------- */
+function looksLikeIL(text) {
+  const ls = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^(;|\/\/)/.test(l));
+  return ls.length > 0 && ls.every((l) => !/[",]/.test(l) && /^[A-Z][A-Z0-9<>=]*(\s+\S+){0,4}$/i.test(l));
+}
+function importProgram(buf) {
+  const { text } = decodeBytes(buf);
+  if (looksLikeIL(text)) return { il: text.replace(/\r\n/g, "\n"), csv: false };
+  const tpl = calibrate(buf, "prog");
+  const rows = text.split(/\r?\n/).map((l) => splitCsv(l, tpl.delim));
+  const out = [];
+  for (let r = tpl.pre.length + (tpl.header != null ? 1 : 0); r < rows.length; r++) {
+    const c = rows[r]; const raw = (c[tpl.idx.ins] || "").trim(); const ins = raw.toUpperCase(); const dev = (c[tpl.idx.dev] || "").trim().toUpperCase();
+    const stmt = tpl.idx.stmt >= 0 ? (c[tpl.idx.stmt] || "").trim() : "";
+    if (stmt) out.push("; ── " + stmt.replace(/^[;*]+\s*/, ""));
+    if (raw.startsWith(";")) { out.push(raw); continue; }
+    if (ins && /^[A-Z][A-Z0-9<>=]*$/.test(ins)) out.push(ins + (dev ? "\t" + dev : ""));
+    else if (!ins && dev && out.length) out[out.length - 1] += " " + dev;
+  }
+  if (tpl.header != null) { fmt.tpl = tpl; saveFmt(); showFmt(); }
+  return { il: out.join("\n"), csv: true };
+}
+function importComments(buf) {
+  const { text } = decodeBytes(buf); const tpl = calibrate(buf, "cmt");
+  const rows = text.split(/\r?\n/).map((l) => splitCsv(l, tpl.delim)); let n = 0;
+  for (let r = tpl.pre.length + (tpl.header != null ? 1 : 0); r < rows.length; r++) {
+    const d = normDev(rows[r][0] || ""), c = (rows[r][1] || "").trim(); if (!d || !c) continue; n++;
+    if (/^[XY][0-9A-F]+$/.test(d)) {
+      const tr = [...$("#ioBody").children].find((t) => normDev(t.querySelector(".io-d").value) === d);
+      if (tr) tr.querySelector(".io-c").value = c; else ioRow(d, c);
+    } else st.extraCm.set(d, c);
+  }
+  if (tpl.header != null) { fmt.ctpl = tpl; saveFmt(); showFmt(); }
+  return n;
+}
+$("#impProg").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const r = importProgram(await f.arrayBuffer()); simStop(); $("#il").value = r.il; st.ilSource = "manual"; st.genWarn = []; analyze(); saveLocal(); selectTab("ladder"); toast(`已讀回 ${st.parsed.count} 條指令${r.csv ? "，並以此檔校準匯出格式" : ""}`); }
+  catch (err) { toast(`無法讀取：${err.message}`); }
+  e.target.value = "";
+};
+$("#impCmt").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const n = importComments(await f.arrayBuffer()); analyze(); renderPads(); saveLocal(); toast(`已讀回 ${n} 筆裝置註解`); }
+  catch (err) { toast(`無法讀取：${err.message}`); }
+  e.target.value = "";
+};
+
+/* ---------- 模擬運轉 ---------- */
+const sim = { on: false, prog: [], bits: new Map(), cur: new Map(), words: new Map(), prev: [], first: true, clock: 0, last: 0, timer: 0, warned: new Set(), mech: new Map(), nodes: [] };
+const SIM_KNOWN = new Set(["ZRST", "MOV", "INC", "DEC", "ADD", "SUB", "MUL", "DIV", "FEND"]);
+function sbit(d) {
+  switch (d) {
+    case "M8000": case "SM400": return true;
+    case "M8001": case "SM401": return false;
+    case "M8002": case "SM402": return sim.first;
+    case "M8003": case "SM403": return !sim.first;
+    case "M8012": case "SM410": return sim.clock % 100 >= 50;
+    case "M8013": case "SM412": return sim.clock % 1000 >= 500;
+    case "M8014": return sim.clock % 60000 >= 30000;
+  }
+  return !!sim.bits.get(d);
+}
+function sval(o) {
+  o = String(o || "K0").toUpperCase();
+  if (/^K-?\d+$/.test(o)) return parseInt(o.slice(1), 10);
+  if (/^H[0-9A-F]+$/.test(o)) return parseInt(o.slice(1), 16);
+  const d = normDev(o); return /^[TC]\d/.test(d) ? sim.cur.get(d) || 0 : sim.words.get(d) || 0;
+}
+function tUnit(d) { const n = +d.slice(1); return $("#series").value === "FX3U" && n >= 200 && n <= 245 ? 10 : 100; }
+function cmpOk(op, a, b) { op = String(op).replace(/^D/, ""); return op === "=" ? a === b : op === "<>" ? a !== b : op === ">" ? a > b : op === "<" ? a < b : op === ">=" ? a >= b : a <= b; }
+function devRange(a, b) { const A = devNum(normDev(a)), B = devNum(normDev(b)); const out = []; if (!A || !B || A.p !== B.p) return out; for (let n = A.n; n <= B.n && out.length < 4096; n++) out.push(A.p + n); return out; }
+function resetDev(x) { if (/^[TC]\d/.test(x)) { sim.cur.set(x, 0); sim.words.set("#" + x, 0); sim.bits.set(x, false); } else if (/^(D|W|R)\d/.test(x)) sim.words.set(x, 0); else sim.bits.set(x, false); }
+function simWarn(op) { if (!sim.warned.has(op)) { sim.warned.add(op); paintState(); } }
+function simCompile() { sim.prog = []; (st.parsed?.rungs || []).forEach((g) => g.ins.forEach((it) => sim.prog.push({ op: it.op, ops: it.ops, c: classify(it.op) }))); sim.prev = new Array(sim.prog.length).fill(false); }
+function mechStep(dt) {
+  readMech().forEach((r) => {
+    const y = normDev(r[0]); const t = Math.max(0.01, Number(r[3]) || 0.5) * 1000;
+    let p = sim.mech.get(y) ?? 0; p = Math.max(0, Math.min(1, p + (sbit(y) ? 1 : -1) * dt / t)); sim.mech.set(y, p);
+    if (r[1]) sim.bits.set(normDev(r[1]), p >= 1); if (r[2]) sim.bits.set(normDev(r[2]), p <= 0);
+  });
+}
+function simOut(i, op, ops, d, acc, dt) {
+  const P = sim.prev; const edge = acc && !P[i], fall = !acc && P[i]; P[i] = acc;
+  if (op === "OUT") {
+    if (/^T\d/.test(d)) {
+      const u = tUnit(d), k = sval(ops[1]);
+      if (acc) { const ms = (sim.words.get("#" + d) || 0) + dt; sim.words.set("#" + d, ms); sim.cur.set(d, Math.min(32767, Math.floor(ms / u))); sim.bits.set(d, ms >= k * u); }
+      else resetDev(d);
+      return;
+    }
+    if (/^C\d/.test(d)) { const k = sval(ops[1]); if (edge && !sim.bits.get(d)) sim.cur.set(d, (sim.cur.get(d) || 0) + 1); sim.bits.set(d, (sim.cur.get(d) || 0) >= k); return; }
+    sim.bits.set(d, acc); return;
+  }
+  if (op === "SET") { if (acc) sim.bits.set(d, true); return; }
+  if (op === "RST") { if (acc) resetDev(d); return; }
+  if (op === "PLS") { sim.bits.set(d, edge); return; }
+  if (op === "PLF") { sim.bits.set(d, fall); return; }
+  const pulse = /P$/.test(op) && SIM_KNOWN.has(op.slice(0, -1)); const base = pulse ? op.slice(0, -1) : op;
+  if (!SIM_KNOWN.has(base)) { simWarn(op); return; }
+  if (!(pulse ? edge : acc)) return;
+  const W = (o, v) => sim.words.set(normDev(o), Math.trunc(v));
+  switch (base) {
+    case "ZRST": devRange(ops[0], ops[1]).forEach(resetDev); break;
+    case "MOV": W(ops[1], sval(ops[0])); break;
+    case "INC": W(ops[0], sval(ops[0]) + 1); break;
+    case "DEC": W(ops[0], sval(ops[0]) - 1); break;
+    case "ADD": W(ops[2] || ops[1], sval(ops[0]) + sval(ops[1])); break;
+    case "SUB": W(ops[2] || ops[1], ops[2] ? sval(ops[0]) - sval(ops[1]) : sval(ops[1]) - sval(ops[0])); break;
+    case "MUL": W(ops[2], sval(ops[0]) * sval(ops[1])); break;
+    case "DIV": if (sval(ops[1])) W(ops[2], sval(ops[0]) / sval(ops[1])); break;
+  }
+}
+function simScan(dt) {
+  sim.clock += dt; mechStep(dt);
+  let acc = false; const bs = [], ms = [], P = sim.prev;
+  for (let i = 0; i < sim.prog.length; i++) {
+    const { op, ops, c } = sim.prog[i]; const d = ops[0] ? normDev(ops[0]) : "";
+    if (c.cls === "load" || c.cls === "and" || c.cls === "or") {
+      let v;
+      if (c.kind === "INV") { acc = !acc; continue; }
+      if (c.kind === "MEP" || c.kind === "MEF") { const e = c.kind === "MEP" ? acc && !P[i] : !acc && P[i]; P[i] = acc; acc = e; continue; }
+      if (c.kind === "CMP") v = cmpOk(c.op, sval(ops[0]), sval(ops[1]));
+      else { const b = sbit(d); if (c.kind === "NO") v = b; else if (c.kind === "NC") v = !b; else { v = c.kind === "P" ? b && !P[i] : !b && P[i]; P[i] = b; } }
+      if (c.cls === "load") { bs.push(acc); acc = v; } else if (c.cls === "and") acc = acc && v; else acc = acc || v;
+      continue;
+    }
+    if (c.cls === "anb") acc = !!bs.pop() && acc;
+    else if (c.cls === "orb") acc = !!bs.pop() || acc;
+    else if (c.cls === "mps") ms.push(acc);
+    else if (c.cls === "mrd") acc = !!ms[ms.length - 1];
+    else if (c.cls === "mpp") acc = !!ms.pop();
+    else if (c.cls === "end") break;
+    else if (c.cls !== "nop") simOut(i, op, ops, d, acc, dt);
+  }
+  sim.first = false;
+}
+function simTick() {
+  const now = performance.now(); const dt = (now - sim.last) * Number($("#simSpeed").value || 1); sim.last = now;
+  const n = Math.min(60, Math.max(1, Math.ceil(dt / 20))); for (let k = 0; k < n; k++) simScan(dt / n);
+  simPaint();
+}
+function simStart() {
+  if (!st.parsed || !st.parsed.count) { toast("沒有可模擬的程式"); return; }
+  simCompile(); sim.on = true; sim.last = performance.now(); clearInterval(sim.timer); sim.timer = setInterval(simTick, 25);
+  $("#simRun").textContent = "■ 停止模擬"; paintState();
+}
+function simStop() { clearInterval(sim.timer); sim.on = false; if ($("#simRun")) $("#simRun").textContent = "▶ 模擬運轉"; paintState(); }
+function simReset() {
+  simStop(); sim.bits = new Map(); sim.cur = new Map(); sim.words = new Map(); sim.mech = new Map(); sim.warned = new Set(); sim.first = true; sim.clock = 0;
+  const emg = normDev(readProject().cfg.emg); if (emg) sim.bits.set(emg, true);
+  readMech().forEach((r) => { if (r[2]) sim.bits.set(normDev(r[2]), true); });
+  renderPads(); simPaint();
+}
+function momentarySet() { const c = readProject().cfg; return new Set([c.start, c.stop, c.reset].map(normDev).filter(Boolean)); }
+function mechDriven() { const s = new Set(); readMech().forEach((r) => { if (r[1]) s.add(normDev(r[1])); if (r[2]) s.add(normDev(r[2])); }); return s; }
+function renderPads() {
+  const p = readProject(); const cm = cmAll(); const base = SERIES[p.series].base;
+  const xs = new Set(), ys = new Set();
+  p.io.forEach(([d]) => { d = normDev(d); if (/^X/.test(d)) xs.add(d); if (/^Y/.test(d)) ys.add(d); });
+  (st.parsed?.rungs || []).forEach((g) => g.ins.forEach((it) => it.ops.forEach((o) => { const d = normDev(o); if (/^X[0-9A-F]+$/.test(d)) xs.add(d); if (/^Y[0-9A-F]+$/.test(d)) ys.add(d); })));
+  const ord = (a, b) => parseInt(a.slice(1), base) - parseInt(b.slice(1), base);
+  const mom = momentarySet(), auto = mechDriven(), emg = normDev(p.cfg.emg);
+  $("#simIn").innerHTML = [...xs].sort(ord).map((d) => `<button type="button" class="pad${mom.has(d) ? " mom" : ""}${auto.has(d) ? " auto" : ""}" data-d="${d}" title="${auto.has(d) ? "由虛擬機構自動驅動" : mom.has(d) ? "按住為 ON（按鈕）" : "點擊切換 ON/OFF"}${d === emg ? "；B 接點：平時 ON，按下緊急停止時 OFF" : ""}"><i></i><b>${d}</b><small>${esc(trunc(cm.get(d) || "", 9))}</small></button>`).join("") || `<p class="hint">I/O 表沒有 X 點位</p>`;
+  $("#simOut").innerHTML = [...ys].sort(ord).map((d) => `<span class="pad out" data-d="${d}"><i></i><b>${d}</b><small>${esc(trunc(cm.get(d) || "", 9))}</small></span>`).join("") || `<p class="hint">I/O 表沒有 Y 點位</p>`;
+  simPaint();
+}
+function paintState() {
+  const el = $("#simState"); if (!el) return;
+  const cm = cmAll(); const steps = [...sim.bits].filter(([d, v]) => v && /^M\d/.test(d) && /^STEP/.test(cm.get(d) || "")).map(([d]) => `${d} ${cm.get(d)}`);
+  const alarm = [...sim.bits].some(([d, v]) => v && /異常/.test(cm.get(d) || "") && /^M/.test(d));
+  el.innerHTML = `<span class="chip ${sim.on ? "run" : ""}">${sim.on ? "模擬中" : "停止"}</span>` + (steps.length ? `<span>目前：<b>${esc(steps.join("、"))}</b></span>` : "") + (alarm ? `<span class="chip alm">異常</span>` : "") + (sim.warned.size ? `<span class="hint">不模擬：${esc([...sim.warned].join("、"))}</span>` : "");
+}
+let lastState = "";
+function simPaint() {
+  document.querySelectorAll("#simIn .pad, #simOut .pad").forEach((b) => b.classList.toggle("on", sbit(b.dataset.d)));
+  sim.nodes.forEach((g) => {
+    const d = g.dataset.d, k = g.dataset.k; let on = false;
+    if (k) { if (k === "NO" || k === "P" || k === "F") on = sbit(d); else if (k === "NC") on = !sbit(d); else if (k === "CMP") { const [a, b] = d.split(" "); on = cmpOk(g.dataset.op, sval(a), sval(b)); } }
+    else { const i = g.dataset.i; if (i === "OUT" || i === "SET") on = sbit(d); const tv = g.querySelector(".tv"); if (tv) tv.textContent = sim.clock || sim.on ? `現在值 ${sim.cur.get(d) || 0}` : ""; }
+    g.classList.toggle("on", on && (sim.on || sim.clock > 0));
+  });
+  const sig = [...sim.bits].filter(([, v]) => v).map(([d]) => d).join() + sim.on + sim.warned.size;
+  if (sig !== lastState) { lastState = sig; paintState(); }
+}
+$("#simRun").onclick = () => (sim.on ? simStop() : simStart());
+$("#simReset").onclick = () => simReset();
+$("#addMech").onclick = () => mechRow();
+$("#mechBody").addEventListener("change", () => { renderPads(); saveLocal(); });
+const simIn = $("#simIn");
+simIn.addEventListener("pointerdown", (e) => {
+  const b = e.target.closest(".pad"); if (!b || b.classList.contains("auto")) return;
+  const d = b.dataset.d; if (b.classList.contains("mom")) { sim.bits.set(d, true); b.setPointerCapture?.(e.pointerId); } else sim.bits.set(d, !sim.bits.get(d));
+  simPaint();
+});
+const release = (e) => { const b = e.target.closest?.(".pad"); if (b && b.classList.contains("mom")) { sim.bits.set(b.dataset.d, false); simPaint(); } };
+simIn.addEventListener("pointerup", release); simIn.addEventListener("pointercancel", release);
+simIn.addEventListener("keydown", (e) => { const b = e.target.closest(".pad"); if (b && (e.key === " " || e.key === "Enter") && !e.repeat && !b.classList.contains("auto")) { e.preventDefault(); const d = b.dataset.d; sim.bits.set(d, b.classList.contains("mom") ? true : !sim.bits.get(d)); simPaint(); } });
+simIn.addEventListener("keyup", (e) => { const b = e.target.closest(".pad"); if (b && b.classList.contains("mom") && (e.key === " " || e.key === "Enter")) { sim.bits.set(b.dataset.d, false); simPaint(); } });
+
+/* ---------- 共用專案（線上版：雙方可編輯） ---------- */
+const shared = { db: null, user: null, me: null, docs: [], names: {}, cur: null, curAt: 0, confirm: null };
+const fmtTime = (t) => new Date(t).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+const who = (id) => (id && id === shared.me ? "我" : shared.names[id]?.name || "同事");
+function shStat(t) { $("#shStat").textContent = t; }
+async function initShared() {
+  if (!window.claude?.use) return;
+  const db = await window.claude.use("db"); if (!db) return;
+  shared.db = db; $("#shared").hidden = false; shStat("讀取共用專案中…");
+  shared.user = await window.claude.use("user"); shared.me = shared.user ? await shared.user.id() : null;
+  let got = false; const t = setTimeout(() => { if (!got) shStat("共用專案讀取逾時，請稍後重新開啟頁面"); }, 10000);
+  db.collection("projects").orderBy("updatedAt", "desc").limit(200).onSnapshot(async (snap) => {
+    got = true; clearTimeout(t);
+    shared.docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const ids = [...new Set(shared.docs.map((d) => d.by).filter(Boolean))];
+    if (shared.user && ids.length) { try { shared.names = await shared.user.profiles(ids); } catch {} }
+    renderShared();
+  }, (e) => { got = true; clearTimeout(t); shStat(`無法讀取共用專案：${e.message || e.code}`); });
+}
+function renderShared() {
+  const sel = $("#shList"); const keep = sel.value || shared.cur || "";
+  sel.innerHTML = `<option value="">— 選擇共用專案（${shared.docs.length}）—</option>` + shared.docs.map((d) => `<option value="${esc(d.id)}">${esc(d.name)}｜${esc(d.series || "")}｜${esc(who(d.by))} ${esc(fmtTime(d.updatedAt))}</option>`).join("");
+  if (shared.docs.some((d) => d.id === keep)) sel.value = keep;
+  const cur = shared.docs.find((d) => d.id === shared.cur);
+  const newer = cur && cur.updatedAt > shared.curAt && cur.by !== shared.me;
+  $("#shBanner").hidden = !newer;
+  if (newer) $("#shBannerText").textContent = `${who(cur.by)} 於 ${fmtTime(cur.updatedAt)} 更新了「${cur.name}」`;
+  if (!$("#shStat").dataset.keep) shStat(cur ? `目前專案：${cur.name}（最後由 ${who(cur.by)} 於 ${fmtTime(cur.updatedAt)} 儲存）` : "可把目前的 I/O、步序、指令表存成共用專案，同事開啟同一頁即可讀取與修改。");
+}
+function sharedLoad(id) {
+  const d = shared.docs.find((x) => x.id === id); if (!d) { toast("請先選擇專案"); return; }
+  try { applyProject(JSON.parse(d.json)); shared.cur = d.id; shared.curAt = d.updatedAt; $("#shName").value = d.name; renderShared(); toast(`已載入「${d.name}」`); }
+  catch { toast("此共用專案資料損壞，無法載入"); }
+}
+async function sharedSave() {
+  const name = $("#shName").value.trim(); if (!name) { toast("請先輸入專案名稱"); $("#shName").focus(); return; }
+  const ex = shared.docs.find((d) => d.name === name);
+  if (ex && ex.by !== shared.me && ex.updatedAt > shared.curAt && shared.confirm !== ex.id) {
+    shared.confirm = ex.id; toast(`「${name}」已被 ${who(ex.by)} 於 ${fmtTime(ex.updatedAt)} 更新，再按一次「儲存」會覆蓋；或先「載入最新」`); return;
+  }
+  const data = { name, series: $("#series").value, json: JSON.stringify(readProject()), updatedAt: Date.now(), by: shared.me || "" };
+  try {
+    if (ex) { await shared.db.collection("projects").doc(ex.id).set(data); shared.cur = ex.id; }
+    else { const ref = await shared.db.collection("projects").add(data); shared.cur = ref.id; }
+    shared.curAt = data.updatedAt; shared.confirm = null; renderShared(); toast(`已儲存「${name}」到共用專案`);
+  } catch (e) { toast(e?.code === "not_granted" ? "您只有檢視權限，無法儲存；請專案擁有者給您編輯權限" : `儲存失敗：${e?.message || e?.code}`); }
+}
+async function sharedDelete() {
+  const id = $("#shList").value; const d = shared.docs.find((x) => x.id === id); if (!d) { toast("請先選擇專案"); return; }
+  if (shared.confirm !== "del:" + id) { shared.confirm = "del:" + id; toast(`再按一次「刪除」將永久刪除「${d.name}」`); return; }
+  try { await shared.db.collection("projects").doc(id).delete(); if (shared.cur === id) shared.cur = null; shared.confirm = null; toast("已刪除"); }
+  catch (e) { toast(`刪除失敗：${e?.message || e?.code}`); }
+}
+$("#shLoad").onclick = () => sharedLoad($("#shList").value);
+$("#shSave").onclick = () => sharedSave();
+$("#shDel").onclick = () => sharedDelete();
+$("#shReload").onclick = () => sharedLoad(shared.cur);
+$("#shList").onchange = () => { const d = shared.docs.find((x) => x.id === $("#shList").value); if (d) $("#shName").value = d.name; };
+
 /* ---------- 分頁 / 事件 ---------- */
 function selectTab(name) {
   ["ladder", "il", "export"].forEach((t) => { $("#tab-" + t).setAttribute("aria-selected", String(t === name)); $("#pane-" + t).hidden = t !== name; });
@@ -817,21 +1163,26 @@ function selectTab(name) {
 ["ladder", "il", "export"].forEach((t) => ($("#tab-" + t).onclick = () => selectTab(t)));
 $("#addIo").onclick = () => ioRow();
 $("#addStep").onclick = () => stepRow();
-$("#gen").onclick = () => { runGenerate(); selectTab("ladder"); toast("已產生階梯圖"); };
-$("#redraw").onclick = () => { analyze(); selectTab("ladder"); };
-$("#loadSample").onclick = () => { loadProject(SAMPLE); runGenerate(); toast("已載入範例"); };
-$("#series").onchange = () => { runGenerate(); showFmt(); };
+$("#gen").onclick = () => {
+  if (st.ilSource === "manual" && !st.genConfirm) { st.genConfirm = true; setTimeout(() => (st.genConfirm = false), 6000); toast("指令表是手動編輯或從 GX Works 讀回的，再按一次「產生」會以步序表重新產生並覆蓋"); return; }
+  st.genConfirm = false; simStop(); runGenerate(); selectTab("ladder"); toast("已產生階梯圖");
+};
+$("#il").addEventListener("input", () => (st.ilSource = "manual"));
+$("#redraw").onclick = () => { analyze(); renderPads(); saveLocal(); selectTab("ladder"); };
+$("#loadSample").onclick = () => { applyProject(SAMPLE); toast("已載入範例"); };
+$("#series").onchange = () => { if (st.ilSource === "manual") analyze(); else runGenerate(); showFmt(); renderPads(); };
 document.querySelectorAll("[data-exp]").forEach((b) => (b.onclick = () => (b.dataset.act === "save" ? saveFile(b.dataset.exp) : copyText(b.dataset.exp))));
 $("#loadJson").onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  try { loadProject(JSON.parse(await f.text())); runGenerate(); toast("已載入專案"); } catch { toast("檔案格式不正確，請選擇本工具匯出的 JSON"); }
+  try { applyProject(JSON.parse(await f.text())); toast("已載入專案"); } catch { toast("檔案格式不正確，請選擇本工具匯出的 JSON"); }
   e.target.value = "";
 };
 function saveLocal() { try { localStorage.setItem("mlg-project", JSON.stringify(readProject())); } catch {} }
-document.addEventListener("change", (e) => { if (e.target.closest("main") && e.target.id !== "loadJson" && e.target.id !== "il") saveLocal(); });
+document.addEventListener("change", (e) => { if (e.target.closest("main") && !["loadJson", "impProg", "impCmt", "calProg", "calCmt"].includes(e.target.id)) saveLocal(); });
+$("#il").addEventListener("change", saveLocal);
 
 let initial = SAMPLE;
 try { const s = localStorage.getItem("mlg-project"); if (s) initial = JSON.parse(s); } catch {}
-loadFmt(); loadProject(initial); runGenerate(); showFmt();
+loadFmt(); applyProject(initial); showFmt(); initShared();
 try { const t = localStorage.getItem("mlg-tab"); if (t) selectTab(t); } catch {}
 </script>
