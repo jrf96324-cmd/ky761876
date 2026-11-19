@@ -72,7 +72,7 @@ function defaultPrices() {
 function blankState() {
   return {
     room: { W: 5000, D: 4200, H: 2800, T: 120, floor: 'oak', wall: '#e9e5dd', ceiling: 'flat', type: 'living', west: false, top: false, lm: 1100 },
-    items: [], openings: [], prices: defaultPrices(), set: { snap: 50, minPath: 600, cut: true }
+    items: [], openings: [], prices: defaultPrices(), set: { snap: 50, minPath: 600, cut: true }, meta: { name: '室內設計案', designer: '' }
   };
 }
 function mkItem(type, x, y, rot = 0, over = {}) {
@@ -102,7 +102,7 @@ const TPL = {
 };
 function applyTpl(key) {
   const t = TPL[key], st = blankState();
-  if (S) { st.prices = S.prices; st.set = S.set; st.room.wall = S.room.wall; st.room.T = S.room.T; }
+  if (S) { st.prices = S.prices; st.set = S.set; st.meta = S.meta; st.room.wall = S.room.wall; st.room.T = S.room.T; }
   Object.assign(st.room, t.room);
   st.openings = t.ops.map(o => mkOp(...o));
   st.items = t.items.map(([ty, x, y, r]) => mkItem(ty, x, y, r));
@@ -124,6 +124,7 @@ function normalize(s) {
   b.room = Object.assign(b.room, s.room || {});
   b.prices = Object.assign(b.prices, s.prices || {}); b.prices.floor = Object.assign(defaultPrices().floor, (s.prices || {}).floor || {});
   b.set = Object.assign(b.set, s.set || {});
+  b.meta = Object.assign(b.meta, s.meta || {});
   b.items = (s.items || []).filter(i => LIB[i.type]).map(i => Object.assign(mkItem(i.type, 0, 0), i));
   b.openings = (s.openings || []).filter(o => OPK[o.kind] && WALLN[o.wall]).map(o => Object.assign(mkOp('door', 'S', 0, 900, 2100, 0), o));
   return b;
@@ -500,7 +501,7 @@ function buildRoom() {
   const { t, meters } = floorTexture(FLOORS[r.floor] || FLOORS.oak); floorTex = t; t.repeat.set(W / meters, D / meters);
   const fm = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: t, roughness: .7 }));
   fm.rotation.x = -Math.PI / 2; fm.receiveShadow = true; roomG.add(fm);
-  B(roomG, W + 2 * T, .02, D + 2 * T, 0, -.021, 0, '#2a3442');
+  B(roomG, W + 2 * T, .02, D + 2 * T, 0, -.021, 0, '#2a3442').userData.stepColor = (FLOORS[r.floor] || FLOORS.oak).c1;
   const wc = r.wall;
   const defs = [{ k: 'N', ax: 'x', s0: -T, s1: W + T, n: [0, -1] }, { k: 'S', ax: 'x', s0: -T, s1: W + T, n: [0, 1] }, { k: 'W', ax: 'y', s0: 0, s1: D, n: [-1, 0] }, { k: 'E', ax: 'y', s0: 0, s1: D, n: [1, 0] }];
   for (const df of defs) {
@@ -719,9 +720,10 @@ function dim(x1, y1, x2, y2, label, cls = '') {
   return `<g class="dim ${cls}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><line x1="${x1 - nx}" y1="${y1 - ny}" x2="${x1 + nx}" y2="${y1 + ny}"/><line x1="${x2 - nx}" y1="${y2 - ny}" x2="${x2 + nx}" y2="${y2 + ny}"/>` +
     `<rect x="${mx - tw / 2}" y="${my - fs * .72}" width="${tw}" height="${fs * 1.44}" rx="${fs * .3}"/><text x="${mx}" y="${my + fs * .36}" font-size="${fs}" text-anchor="middle">${label}</text></g>`;
 }
-function renderPlan() {
-  if (view !== 'plan') return;
-  const { W, D, T } = S.room, fs = Math.max(W, D) / 48, M = T + fs * 5.5;
+let PRINT = false;
+function renderPlan(force) {
+  if (view !== 'plan' && !force) return;
+  const { W, D, T } = S.room, fs = Math.max(W, D) / 48, M = T + fs * (PRINT ? 8.5 : 5.5);
   svg.setAttribute('viewBox', `${-M} ${-M} ${W + 2 * M} ${D + 2 * M}`);
   let h = `<rect class="floor" x="0" y="0" width="${W}" height="${D}"/>`;
   for (let x = 500; x < W; x += 500) h += `<line class="gridl" x1="${x}" y1="0" x2="${x}" y2="${D}"/>`;
@@ -743,13 +745,24 @@ function renderPlan() {
       for (const [f, a, bb] of [[-.3, 0, .55], [-.7, .45, 1]]) ops += `<line class="op" x1="${hg[0] + dv[0] * w * a + n[0] * T * f}" y1="${hg[1] + dv[1] * w * a + n[1] * T * f}" x2="${hg[0] + dv[0] * w * bb + n[0] * T * f}" y2="${hg[1] + dv[1] * w * bb + n[1] * T * f}"/>`;
     }
     ops += `<rect class="op-hit ${isS ? 'sel' : ''}" data-op="${o.id}" x="${box.x - (sp.along === 'y' ? 60 : 0)}" y="${box.y - (sp.along === 'x' ? 60 : 0)}" width="${box.w + (sp.along === 'y' ? 120 : 0)}" height="${box.h + (sp.along === 'x' ? 120 : 0)}"/>`;
-    if (isS) {
+    if (isS && !PRINT) {
       const L = wallLen(o.wall), g = fs * 2.4;
       if (sp.along === 'x') { const y = o.wall === 'N' ? -T - g : D + T + g; h += dim(0, y, o.offset, y, fmt(o.offset), 'o') + dim(o.offset, y, o.offset + o.width, y, OPK[o.kind] + ' ' + fmt(o.width), 'o') + dim(o.offset + o.width, y, L, y, fmt(L - o.offset - o.width), 'o'); }
       else { const x = o.wall === 'W' ? -T - g : W + T + g; h += dim(x, 0, x, o.offset, fmt(o.offset), 'o') + dim(x, o.offset, x, o.offset + o.width, fmt(o.width), 'o') + dim(x, o.offset + o.width, x, L, fmt(L - o.offset - o.width), 'o'); }
     }
   }
   h += ops;
+  if (PRINT) for (const wk of ['N', 'S', 'W', 'E']) {
+    const os = S.openings.filter(o => o.wall === wk).sort((a, b) => a.offset - b.offset); if (!os.length) continue;
+    const L = wallLen(wk), g = fs * 2.4, cuts = [0]; os.forEach(o => cuts.push(o.offset, o.offset + o.width)); cuts.push(L);
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const a = cuts[i], b = cuts[i + 1]; if (b - a < 1) continue; const lab = i % 2 ? OPK[os[(i - 1) / 2].kind] + ' ' + fmt(b - a) : fmt(b - a);
+      if (wk === 'N') h += dim(a, -T - g * 2.2, b, -T - g * 2.2, lab, i % 2 ? 'o' : '');
+      else if (wk === 'S') h += dim(a, D + T + g * 2.2, b, D + T + g * 2.2, lab, i % 2 ? 'o' : '');
+      else if (wk === 'W') h += dim(-T - g * 2.2, a, -T - g * 2.2, b, lab, i % 2 ? 'o' : '');
+      else h += dim(W + T + g * 2.2, a, W + T + g * 2.2, b, lab, i % 2 ? 'o' : '');
+    }
+  }
   const items = [...S.items].sort((a, b) => (LIB[b.type].flat ? 1 : 0) - (LIB[a.type].flat ? 1 : 0));
   const sIt = sel && sel.kind === 'item' ? itemById(sel.id) : null;
   if (sIt && LIB[sIt.type].front) { const L = LIB[sIt.type], z = itemPoly(sIt, { x0: -sIt.w / 2, x1: sIt.w / 2, y0: sIt.d / 2, y1: sIt.d / 2 + L.front }); h += `<path class="zone" d="M${z.map(p => p.join(' ')).join('L')}Z"/>`; }
@@ -759,6 +772,7 @@ function renderPlan() {
     h += `<g class="it sym ${cls}" data-item="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.rot})">${symbol(it)}</g>`;
     const tf = Math.min(fs * .82, Math.max(fs * .5, Math.min(it.w, it.d) / 4.2));
     if (Math.min(it.w, it.d) >= 300 && !LIB[it.type].flat) txt += `<text x="${it.x}" y="${it.y + tf * .35}" font-size="${tf}" text-anchor="middle" pointer-events="none">${esc(it.name)}</text>`;
+    if (PRINT && Math.min(it.w, it.d) >= 300 && !LIB[it.type].flat) txt += `<text x="${it.x}" y="${it.y + tf * 1.45}" font-size="${tf * .8}" text-anchor="middle" pointer-events="none">${it.w}×${it.d}×${it.h}</text>`;
   }
   h += txt;
   const g1 = T + fs * 2.4;
@@ -944,7 +958,7 @@ function renderBottom() {
 }
 function syncParams() {
   const r = S.room;
-  $('#rW').value = r.W; $('#rD').value = r.D; $('#rH').value = r.H; $('#rT').value = r.T;
+  $('#mName').value = S.meta.name; $('#rW').value = r.W; $('#rD').value = r.D; $('#rH').value = r.H; $('#rT').value = r.T;
   $('#rType').value = r.type; $('#rFloor').value = r.floor; $('#rCeil').value = r.ceiling;
   $('#sSnap').value = S.set.snap; $('#sPath').value = S.set.minPath; $('#sCut').checked = S.set.cut;
   $('#wallSw').innerHTML = WALL_COLORS.map(c => `<button type="button" class="sw ${c === r.wall ? 'on' : ''}" style="background:${c}" data-wall="${c}" aria-label="牆色 ${c}"></button>`).join('');
@@ -1040,6 +1054,9 @@ function bindUI() {
   $('#undoBtn').addEventListener('click', undo);
   $('#csvBtn').addEventListener('click', () => { const t = csvText(); openDlg('匯出清單（CSV）', `<textarea readonly spellcheck="false">${esc(t)}</textarea>`, '複製後貼到 Excel 或存成 .csv 檔。', t); });
   $('#imgBtn').addEventListener('click', exportImg);
+  $('#stepBtn').addEventListener('click', () => exportSTEP());
+  $('#pdfBtn').addEventListener('click', () => exportPDF());
+  $('#mName').addEventListener('change', e => { S.meta.name = e.target.value.trim() || '室內設計案'; save(); });
   $('#projBtn').addEventListener('click', projDlg);
   $('#dlgClose').addEventListener('click', () => $('#dlg').close());
   $('#dlgCopy').addEventListener('click', e => {

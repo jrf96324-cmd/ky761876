@@ -112,6 +112,7 @@ dialog textarea{width:100%;height:300px;background:#0d1724;border:1px solid var(
 dialog img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
 .dlg-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:10px;align-items:center}
 .dlg-actions .note{margin-right:auto}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#16304f;border:1px solid var(--accent);color:#fff;padding:9px 16px;border-radius:9px;z-index:50;max-width:calc(100vw - 32px);font-size:13px}
 /* plan svg */
 #plan text{font-family:var(--font);fill:#dbe6f2;paint-order:stroke;stroke:#0d1622;stroke-width:3px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .sym *,#plan *{vector-effect:non-scaling-stroke}
@@ -163,11 +164,14 @@ dialog img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
       <button class="btn" id="undoBtn" type="button" title="復原 (Ctrl+Z)">復原</button>
       <button class="btn" id="projBtn" type="button">專案存取</button>
       <button class="btn" id="csvBtn" type="button">匯出清單 (CSV)</button>
-      <button class="btn primary" id="imgBtn" type="button">匯出圖片</button>
+      <button class="btn" id="imgBtn" type="button">匯出圖片</button>
+      <button class="btn primary" id="stepBtn" type="button">匯出 3D STEP</button>
+      <button class="btn primary" id="pdfBtn" type="button">匯出 2D PDF</button>
     </div>
   </header>
 
   <section class="params" aria-label="空間參數">
+    <label class="f"><span>專案名稱</span><input id="mName" type="text" style="width:150px"></label>
     <label class="f"><span>房間寬 W (mm)</span><input id="rW" type="number" step="10" min="1000"></label>
     <label class="f"><span>房間深 D (mm)</span><input id="rD" type="number" step="10" min="1000"></label>
     <label class="f"><span>樓高 H (mm)</span><input id="rH" type="number" step="10" min="2000"></label>
@@ -247,8 +251,10 @@ dialog img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
     <button class="btn primary" type="button" id="dlgClose">關閉</button>
   </div>
 </dialog>
+<div id="toast" class="toast" hidden></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="vendor/three.min.js"></script>
 <script src="app.js"></script>
+<script src="export.js"></script>
 </body>
 </html>
