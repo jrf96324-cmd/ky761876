@@ -25,16 +25,17 @@
       ["交期需求", project.dueDate || "", "報價截止日", project.quoteDeadline || ""],
       [],
       [H("項目"), H("金額 NT$"), H("說明"), H("")],
-      ["最低估價 (薄利)", { v: R0(summary.totalLow), s: "n" }, `利潤 ${db.markup.profitLow * 100}%`],
-      ["合理估價", { v: R0(summary.total), s: "nb" }, `利潤 ${db.markup.profitFair * 100}% (建議採購底價)`],
-      ["急件/少量上限", { v: R0(summary.totalRush), s: "n" }, `利潤 ${db.markup.profitRush * 100}%`],
+      ["估價合計（成本價）", { v: R0(summary.total), s: "nb" }, `${db.region || ""}，管銷 ${R0((db.markup.overhead || 0) * 100)}%、利潤 ${R0(db.markup.profitFair * 100)}%`],
+      ["議價下限", { v: R0(summary.totalLow), s: "n" }, `估價 ${db.markup.profitLow >= 0 ? "+" : ""}${R0(db.markup.profitLow * 100)}%`],
+      ["急件參考", { v: R0(summary.totalRush), s: "n" }, `估價 +${R0(db.markup.profitRush * 100)}%`],
+      ["估價比例", `整體 ${R0((db.ratio?.overall ?? 1) * 100)}%`, `材料 ${R0((db.ratio?.material ?? 1) * 100)}%／加工 ${R0((db.ratio?.machining ?? 1) * 100)}%／委外 ${R0((db.ratio?.outsource ?? 1) * 100)}%`],
       ["降本潛力 (首要建議)", { v: R0(summary.potential), s: "n" }, { v: summary.total ? summary.potential / summary.total : 0, s: "p" }],
       [],
       [H("風險等級"), H("件數"), H(""), H("")],
       ["高", { v: summary.riskCount["高"], s: "hi" }], ["中", { v: summary.riskCount["中"], s: "mid" }], ["低", { v: summary.riskCount["低"], s: "lo" }],
       [],
-      ["說明", "價格為台灣本地加工廠參考行情估算（材料+機時+委外+管銷利潤），供發包前初判與議價基準，正式價格以供應商報價為準。"],
-    ], merges: ["A1:D1", "B17:D17"] });
+      ["說明", "價格為台灣南部加工成本價估算（材料+各加工步驟機時+委外，不加價），可用估價比例調整；供發包前初判與議價基準，正式價格以供應商報價為準。"],
+    ], merges: ["A1:D1", "B18:D18"] });
 
     // 01 圖面辨識總表
     sheets.push({ name: "01_圖面辨識總表", freeze: 1, colWidths: [16, 12, 16, 10, 8, 16, 22, 10, 10, 12, 12, 12, 10, 14, 30],
@@ -47,6 +48,22 @@
       rows: [["圖號", "零件名稱", "建議製程", "加工順序", "風險", "風險說明"].map(H),
         ...results.map((r) => [r.part.drawingNo, r.part.name, r.best.name, seq(r.best),
           { v: r.risk.level, s: { 高: "hi", 中: "mid", 低: "lo" }[r.risk.level] }, { v: r.risk.items.join("\n") || "—", s: "wrap" }])] });
+
+    // 02B 各圖加工步驟明細（推薦路線）
+    const cat = { material: "材料", machining: "加工", outsource: "委外" };
+    const sp = [["圖號", "零件名稱", "步驟", "工序", "類別", "計算依據", "單件工時 min", "費率 NT$/hr", "架模 min", "單件執行費", "架模/批費分攤", "成本小計/件", "估價比例", "估價/件", "數量", "估價小計"].map(H)];
+    results.forEach((r) => {
+      const pr = r.best.price, q = r.part.qty;
+      pr.lines.forEach((l) => sp.push([r.part.drawingNo, r.part.name, { v: l.step, s: "n0" }, l.process, cat[l.cat],
+        { v: l.runMin != null ? `${l.runMin.toFixed(1)} min × ${l.rate}/hr${l.setupMin ? `，架模 ${l.setupMin} min ÷ ${q} 件` : ""}` : (l.detail || "") + (l.note ? `（${l.note}）` : ""), s: "wrap" },
+        l.runMin != null ? +l.runMin.toFixed(1) : "", l.rate || "", l.setupMin != null ? l.setupMin : "",
+        { v: +l.runPer.toFixed(1), s: "n" }, { v: +l.setupPer.toFixed(1), s: "n" }, { v: +l.cost.toFixed(1), s: "n" }, { v: l.factor, s: "p" },
+        { v: +l.unitCost.toFixed(1), s: "n" }, { v: q, s: "n0" }, { v: R0(l.unitCost * q), s: "n" }]));
+      if (pr.overhead) sp.push([r.part.drawingNo, r.part.name, "", "管銷", "", "", "", "", "", "", "", "", "", { v: +pr.overhead.toFixed(1), s: "n" }, { v: q, s: "n0" }, { v: R0(pr.overhead * q), s: "n" }]);
+      sp.push([{ v: r.part.drawingNo, s: "b" }, { v: r.part.name, s: "b" }, "", { v: `合計（${r.best.name}）`, s: "b" }, "", "", "", "", "", "", "", { v: R0(pr.rawDirect), s: "nb" }, "", { v: R0(pr.fair), s: "nb" }, { v: q, s: "n0" }, { v: R0(r.lineTotal), s: "nb" }]);
+      sp.push([]);
+    });
+    sheets.push({ name: "02B_加工步驟明細", freeze: 1, colWidths: [16, 14, 6, 26, 7, 40, 10, 10, 8, 11, 11, 11, 9, 11, 7, 12], rows: sp });
 
     // 03 多元製程比較
     const cmp = [["圖號", "零件名稱", "路線", "製程路線", "材料/件", "加工/件", "委外表處/件", "架模總額", "合理單價", "與推薦差異", "適用性", "說明"].map(H)];
@@ -62,7 +79,7 @@
     sheets.push({ name: "04_降本建議表", freeze: 1, colWidths: [16, 14, 24, 50, 11, 11, 10, 10, 11, 20], rows: cd });
 
     // 05 加工估價表
-    const qh = ["圖號", "零件名稱", "數量", "推薦製程", "材料", "加工", "委外", "管銷", "單件最低", "合理估價", "急件上限", "小計(合理)", ...tiers.map((q) => `${q}件 單價`), "批量最佳路線"].map(H);
+    const qh = ["圖號", "零件名稱", "數量", "推薦製程", "材料", "加工", "委外", "管銷", "議價下限", "估價/件", "急件參考", "小計", ...tiers.map((q) => `${q}件 單價`), "批量最佳路線"].map(H);
     const qr = results.map((r) => { const pr = r.best.price; return [r.part.drawingNo, r.part.name, { v: r.part.qty, s: "n0" }, r.best.name,
       { v: R0(pr.material), s: "n" }, { v: R0(pr.machining), s: "n" }, { v: R0(pr.outsource), s: "n" }, { v: R0(pr.overhead), s: "n" },
       { v: R0(pr.low), s: "n" }, { v: R0(pr.fair), s: "nb" }, { v: R0(pr.rush), s: "n" }, { v: R0(r.lineTotal), s: "nb" },
@@ -110,12 +127,13 @@
     pd.push([], ["熱處理", "名稱", "計價單位", "單價", "每批最低"].map(H));
     Object.entries(db.heatTreats).forEach(([k, s]) => pd.push([k, s.name, s.unit, s.price, s.lotMin]));
     pd.push([], ["其他", "參數", "值"].map(H),
-      ["雷射切割", "每公尺 = (基本 + 每mm × 板厚) × 材質係數", `${db.laser.basePerM} + ${db.laser.perMmPerM}×t`],
+      ["雷射切割", "每公尺 = max(最低, 基本 + 每mm × 板厚) × 材質係數", `max(${db.laser.minPerM || 0}, ${db.laser.basePerM} + ${db.laser.perMmPerM}×t)`],
       ["快走絲", "NT$/mm²", db.wireEdm.fast.perMm2], ["慢走絲", "NT$/mm²", db.wireEdm.slow.perMm2],
       ["折彎", "每折 / 每折架模", `${db.bending.perBend} / ${db.bending.setupPerBend}`],
       ["焊接 鐵/不鏽鋼/鋁", "NT$/m", `${db.welding.steel} / ${db.welding.sus} / ${db.welding.al}`],
       ["管銷", "比例", db.markup.overhead], ["利潤 最低/合理/急件", "比例", `${db.markup.profitLow} / ${db.markup.profitFair} / ${db.markup.profitRush}`]);
-    sheets.push({ name: "08_單價資料庫", colWidths: [16, 30, 22, 12, 10, 10], rows: pd });
+    pd.push([], ["資料來源", "內容", "網址"].map(H), ...(db.sources || []).map((s) => [s.item, { v: s.text, s: "wrap" }, s.url]));
+    sheets.push({ name: "08_單價資料庫", colWidths: [16, 60, 50, 12, 10, 10], rows: pd });
     return sheets;
   }
 

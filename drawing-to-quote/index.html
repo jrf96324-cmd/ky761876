@@ -118,6 +118,14 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
 .note { font-size: 12px; color: var(--muted); border-left: 3px solid var(--line-strong); padding-left: 10px; }
 .flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
 .flow b { color: var(--ink); font-weight: 500; background: var(--bg); border: 1px solid var(--line); padding: 1px 7px; border-radius: 3px; }
+.ratios { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; border: 1px solid var(--line); background: var(--panel); padding: 10px 14px; font-size: 13px; }
+.ratios .rt { font-weight: 700; }
+.ratios label { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+.ratios input { width: 64px; font-family: var(--f-mono); font-size: 13px; padding: 4px 6px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); border-radius: 3px; text-align: right; }
+.ratios input.changed { border-color: var(--pick); background: var(--pick-soft); }
+table.steps td, table.steps th { font-size: 12.5px; }
+table.steps tfoot td { font-weight: 700; border-top: 2px solid var(--ink); }
+.cat { font-size: 11px; padding: 0 6px; border-radius: 3px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 /* recognition */
 .drop { border: 2px dashed var(--line-strong); background: var(--bg); padding: 22px 16px; text-align: center; display: grid; gap: 8px; justify-items: center; cursor: pointer; border-radius: 4px; }
 .drop.over { border-color: var(--accent); background: var(--accent-soft); }
@@ -149,7 +157,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
 
 <div class="wrap">
   <header class="titleblock" aria-label="專案資料">
-    <div><span class="tb-label">Drawing-to-Quote · 台灣本地加工行情</span><h1>製作圖製程審查與多元估價</h1></div>
+    <div><span class="tb-label">Drawing-to-Quote · 台灣南部加工成本價</span><h1>製作圖製程審查與多元估價</h1></div>
     <div><label class="tb-label" for="pjName">專案名稱</label><input id="pjName" value="範例專案 S067 送料機構"></div>
     <div><label class="tb-label" for="pjDue">交期需求</label><input id="pjDue" value="下單後 15 工作天"></div>
     <div><label class="tb-label" for="pjDeadline">報價截止日</label><input id="pjDeadline" value="2026-11-30"></div>
@@ -166,11 +174,23 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   </div>
 
   <section class="summary" aria-label="估價摘要">
-    <div class="fair"><div class="k">合理估價合計</div><div class="v" id="sFair">–</div></div>
-    <div><div class="k">最低 (薄利)</div><div class="v" id="sLow">–</div></div>
-    <div><div class="k">急件上限</div><div class="v" id="sRush">–</div></div>
+    <div class="fair"><div class="k">估價合計（南部成本價，不加價）</div><div class="v" id="sFair">–</div></div>
+    <div><div class="k">議價下限</div><div class="v" id="sLow">–</div></div>
+    <div><div class="k">急件參考</div><div class="v" id="sRush">–</div></div>
     <div><div class="k">降本潛力</div><div class="v" id="sSave">–</div></div>
     <div><div class="k">風險分布</div><div class="v" id="sRisk" style="font-size:15px;padding-top:4px">–</div></div>
+  </section>
+
+  <section class="ratios" aria-label="估價比例">
+    <span class="rt">估價比例</span>
+    <label for="rtOverall">整體 <input id="rtOverall" data-rt="ratio.overall" type="number" step="5" min="0"> %</label>
+    <label for="rtMaterial">材料 <input id="rtMaterial" data-rt="ratio.material" type="number" step="5" min="0"> %</label>
+    <label for="rtMachining">加工 <input id="rtMachining" data-rt="ratio.machining" type="number" step="5" min="0"> %</label>
+    <label for="rtOutsource">委外 <input id="rtOutsource" data-rt="ratio.outsource" type="number" step="5" min="0"> %</label>
+    <label for="rtOverhead">管銷 + <input id="rtOverhead" data-rt="markup.overhead" type="number" step="1"> %</label>
+    <label for="rtProfit">利潤 + <input id="rtProfit" data-rt="markup.profitFair" type="number" step="1"> %</label>
+    <button type="button" id="btnRtReset">恢復 100%、不加價</button>
+    <small class="muted">每張圖另可在「零件輸入」設定自己的估價比例%</small>
   </section>
 
   <nav class="tabs" role="tablist" id="tabs">
@@ -231,11 +251,11 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   </section>
 
   <section class="panel" data-pane="db" hidden>
-    <div class="toolbar"><h2>單價設定（台灣本地行情）</h2><span class="spacer"></span>
+    <div class="toolbar"><h2>單價設定（南部成本價）</h2><span class="spacer"></span>
       <button id="btnDbExport" type="button">匯出單價 JSON</button>
       <label class="btn" for="fileDb">匯入單價 JSON<input id="fileDb" type="file" accept=".json,application/json" hidden></label>
       <button id="btnDbReset" type="button">還原預設值</button></div>
-    <p class="note">預設值為 2026 Q4 台灣中小型加工廠參考行情（未稅）。拿到實際報價後請回填，存在這個瀏覽器中；匯出 JSON 可給 CLI 使用（node cli.js parts.csv --db 單價.json）。</p>
+    <p class="note">預設值為 2026 Q4 台灣南部（高雄／台南）加工成本價（未稅、不加價），依下方公開資料換算；未找到公開資料的項目為業界經驗值。拿到實際報價後請回填，存在這個瀏覽器中；匯出 JSON 可給 CLI 使用（node cli.js parts.csv --db 單價.json）。</p>
     <div class="db-grid" id="dbBox"></div>
   </section>
 </div>
@@ -253,7 +273,8 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   const E = window.Estimator, $ = (s) => document.querySelector(s);
   const DEFAULT_DB = JSON.parse(JSON.stringify(window.PRICE_DB));
   const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
-  let db = deepMerge(JSON.parse(JSON.stringify(DEFAULT_DB)), store.get("d2q.db") || {});
+  const savedDb = store.get("d2q.db");
+  let db = deepMerge(JSON.parse(JSON.stringify(DEFAULT_DB)), savedDb && String(savedDb.version || "").startsWith(DEFAULT_DB.version) ? savedDb : {});
   let est = null;
 
   const SAMPLE = [
@@ -274,7 +295,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   const opt = (arr) => ["", ...arr];
   const COLS = [
     { h: "圖號", g: "基本", w: "w-l", sticky: true }, { h: "CAD NO", g: "基本", w: "w-m" }, { h: "零件名稱", g: "基本", w: "w-m" },
-    { h: "材料", g: "基本", sel: () => opt(Object.keys(db.materials)), w: "w-m", free: true }, { h: "數量", g: "基本" },
+    { h: "材料", g: "基本", sel: () => opt(Object.keys(db.materials)), w: "w-m", free: true }, { h: "數量", g: "基本" }, { h: "估價比例%", g: "基本" },
     { h: "外形", g: "基本", sel: () => opt(Object.keys(E.SHAPES)), label: (k) => k ? E.SHAPES[k] : "自動判斷", w: "w-l" },
     { h: "長L", g: "尺寸 mm" }, { h: "寬W", g: "尺寸 mm" }, { h: "高H", g: "尺寸 mm" }, { h: "外徑OD", g: "尺寸 mm" }, { h: "內徑ID", g: "尺寸 mm" }, { h: "板厚T", g: "尺寸 mm" },
     { h: "實體率%", g: "尺寸 mm" }, { h: "淨重kg", g: "尺寸 mm" },
@@ -347,26 +368,53 @@ dialog form { display: flex; justify-content: space-between; align-items: center
         <td class="n">${rt.recommended ? "—" : (rt.deltaPct > 0 ? "+" : "") + pct(rt.deltaPct)}</td>
         <td style="min-width:110px"><div style="width:${(rt.price.fair / maxFair * 100).toFixed(0)}%">${stack(rt.price)}</div></td></tr>`).join("");
       const b = r.best.price;
-      const lines = b.lines.map((l) => `<tr><td>${esc(l.process)}</td><td class="muted">${l.runMin != null ? `${l.runMin.toFixed(1)} min × ${l.rate}/hr，架模 ${l.setupMin} min` : esc(l.detail || "")}${l.note ? ` <span class="pill 中">${l.note}</span>` : ""}</td><td class="n">${n0(l.unitCost)}</td></tr>`).join("");
       const tiers = r.tierBest.map((t) => `<td class="n">${n0(t.fair)}</td>`).join("");
+      const alt = r.routes.filter((rt) => !rt.recommended).map((rt) => `<details><summary>${rt.id} ${esc(rt.name)} 的加工步驟（估價 ${n0(rt.price.fair)}/件）</summary>${stepsTable(rt.price, p.qty)}</details>`).join("");
       return `<article class="card">
         <div class="card-h"><span class="dno">${esc(p.drawingNo)}</span><span class="name">${esc(p.name)}</span>
-          <span class="muted">${esc(p.material)} × ${p.qty} 件 · ${esc(r.shapeLabel)} · ${esc(r.geometry.outline)} · 胚料 ${r.geometry.stockKg.toFixed(2)} kg</span>
-          <span class="spacer"></span><span class="pill ${r.risk.level}">風險 ${r.risk.level}</span></div>
+          <span class="muted">${esc(p.material)} × ${p.qty} 件 · ${esc(r.shapeLabel)} · ${esc(r.geometry.outline)} · 胚料 ${r.geometry.stockKg.toFixed(2)} kg${p.ratio !== 1 ? ` · 本圖估價比例 ${Math.round(p.ratio * 100)}%` : ""}</span>
+          <span class="spacer"></span><span class="mono"><b>${nt(r.lineTotal)}</b></span><span class="pill ${r.risk.level}">風險 ${r.risk.level}</span></div>
         <div class="card-b">
-          <div class="scroll"><table><thead><tr><th>路線</th><th>製程</th><th class="n">材料</th><th class="n">加工</th><th class="n">委外</th><th class="n">最低</th><th class="n">合理單價</th><th class="n">急件</th><th class="n">差異</th><th>結構</th></tr></thead><tbody>${rows}</tbody></table></div>
-          <div class="flow">推薦加工順序：${b.lines.filter((l) => l.type !== "material").map((l) => `<b>${esc(l.process)}</b>`).join("→")}</div>
-          <details><summary>推薦路線成本明細與批量價</summary>
-            <div class="scroll"><table><thead><tr><th>項目</th><th>計算依據</th><th class="n">單件 NT$</th></tr></thead><tbody>${lines}
-              <tr><td>管銷 ${pct(db.markup.overhead)}</td><td></td><td class="n">${n0(b.overhead)}</td></tr></tbody></table></div>
+          <h3 style="margin:0;font-size:14px">加工步驟與金額 · ${esc(r.best.name)}</h3>
+          ${stepsTable(b, p.qty)}
+          <details><summary>其他製程路線比較（${r.routes.length} 條）</summary>
+            <div class="scroll"><table><thead><tr><th>路線</th><th>製程</th><th class="n">材料</th><th class="n">加工</th><th class="n">委外</th><th class="n">議價下限</th><th class="n">估價/件</th><th class="n">急件</th><th class="n">差異</th><th>結構</th></tr></thead><tbody>${rows}</tbody></table></div>
+            ${alt}
+          </details>
+          <details><summary>批量單價</summary>
             <div class="scroll"><table><thead><tr><th>數量</th>${r.tierBest.map((t) => `<th class="n">${t.qty} 件</th>`).join("")}</tr></thead>
-              <tbody><tr><td>合理單價</td>${tiers}</tr><tr><td class="muted">最佳路線</td>${r.tierBest.map((t) => `<td class="n"><small>${esc(t.route.split(/[ (]/)[0])}</small></td>`).join("")}</tr></tbody></table></div>
+              <tbody><tr><td>估價/件</td>${tiers}</tr><tr><td class="muted">最佳路線</td>${r.tierBest.map((t) => `<td class="n"><small>${esc(t.route.split(/[ (]/)[0])}</small></td>`).join("")}</tr></tbody></table></div>
           </details>
           ${r.risk.items.length ? `<ul class="risk-list">${r.risk.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
           ${p.warnings.length ? `<p class="note">${p.warnings.map(esc).join("；")}</p>` : ""}
         </div></article>`;
     }).join("") || `<p class="muted">尚無零件。到「零件輸入」新增或匯入 CSV。</p>`;
   }
+
+  const CAT = { material: "材料", machining: "加工", outsource: "委外" };
+  function stepsTable(pr, qty) {
+    const rows = pr.lines.map((l) => `<tr><td class="n">${l.step}</td><td>${esc(l.process)} <span class="cat">${CAT[l.cat]}</span></td>
+      <td class="muted">${l.runMin != null ? `${l.runMin.toFixed(1)} min × ${l.rate}/hr${l.setupMin ? `＋架模 ${l.setupMin} min ÷ ${qty} 件` : ""}` : esc(l.detail || "")}${l.note ? ` <span class="pill 中">${esc(l.note)}</span>` : ""}</td>
+      <td class="n">${n0(l.runPer)}</td><td class="n">${n0(l.setupPer)}</td><td class="n">${n0(l.cost)}</td><td class="n">${Math.abs(l.factor - 1) < 1e-9 ? "100%" : `<b>${Math.round(l.factor * 100)}%</b>`}</td><td class="n"><b>${n0(l.unitCost)}</b></td><td class="n">${n0(l.unitCost * qty)}</td></tr>`).join("");
+    const profit = pr.fair - pr.direct - pr.overhead;
+    const addRow = (label, v) => `<tr><td></td><td>${label}</td><td></td><td></td><td></td><td></td><td></td><td class="n">${n0(v)}</td><td class="n">${n0(v * qty)}</td></tr>`;
+    return `<div class="scroll"><table class="steps"><thead><tr><th class="n">#</th><th>加工步驟</th><th>計算依據</th><th class="n">執行費/件</th><th class="n">架模分攤/件</th><th class="n">成本/件</th><th class="n">比例</th><th class="n">估價/件</th><th class="n">小計 ×${qty}</th></tr></thead>
+      <tbody>${rows}${pr.overhead ? addRow(`管銷 ${pct(db.markup.overhead)}`, pr.overhead) : ""}${Math.abs(profit) > 0.5 ? addRow(profit > 0 ? `利潤 ${pct(db.markup.profitFair)}` : "最低出貨補差", profit) : ""}</tbody>
+      <tfoot><tr><td></td><td>合計</td><td></td><td></td><td></td><td class="n">${n0(pr.rawDirect)}</td><td></td><td class="n">${n0(pr.fair)}</td><td class="n">${n0(pr.fair * qty)}</td></tr></tfoot></table></div>`;
+  }
+
+  // ── 估價比例 ──
+  const getPath = (path) => path.split(".").reduce((o, k) => (o ? o[k] : undefined), db);
+  function setPath(path, v) { const ks = path.split("."); let o = db; ks.slice(0, -1).forEach((k) => (o = o[k] = o[k] || {})); o[ks[ks.length - 1]] = v; }
+  function renderRatios() {
+    document.querySelectorAll("[data-rt]").forEach((i) => { const isR = i.dataset.rt.startsWith("ratio"); const v = getPath(i.dataset.rt) ?? (isR ? 1 : 0); i.value = Math.round(v * 1000) / 10; i.classList.toggle("changed", isR ? Math.abs(v - 1) > 1e-9 : Math.abs(v) > 1e-9); });
+  }
+  document.querySelector(".ratios").addEventListener("input", (e) => {
+    const t = e.target; if (!t.dataset.rt) return; const v = parseFloat(t.value); if (!Number.isFinite(v)) return;
+    setPath(t.dataset.rt, v / 100); t.classList.toggle("changed", t.dataset.rt.startsWith("ratio") ? v !== 100 : v !== 0);
+    store.set("d2q.db", db); clearTimeout(timer); timer = setTimeout(compute, 250);
+  });
+  $("#btnRtReset").onclick = () => { db.ratio = { overall: 1, material: 1, machining: 1, outsource: 1 }; db.markup.overhead = 0; db.markup.profitFair = 0; store.set("d2q.db", db); renderRatios(); renderDb(); compute(); toast("已恢復 100%、不加價"); };
 
   function renderCostDown() {
     const rows = [];
@@ -403,17 +451,19 @@ dialog form { display: flex; justify-content: space-between; align-items: center
       tbl("表面處理（委外）", ["項目", "單價", "每批最低"], Object.entries(db.surfaces).filter(([, s]) => s.unit !== "none").map(([k, s]) => `<tr><td>${esc(s.name)} <small class="muted">/${s.unit === "dm2" ? "dm²" : "kg"}</small></td><td class="n">${field(`surfaces.${k}.price`, s.price)}</td><td class="n">${field(`surfaces.${k}.lotMin`, s.lotMin, 50)}</td></tr>`)) +
       tbl("熱處理（委外）", ["項目", "NT$/kg", "每批最低"], Object.entries(db.heatTreats).filter(([, s]) => s.unit !== "none").map(([k, s]) => `<tr><td>${esc(s.name)}</td><td class="n">${field(`heatTreats.${k}.price`, s.price)}</td><td class="n">${field(`heatTreats.${k}.lotMin`, s.lotMin, 50)}</td></tr>`)) +
       tbl("計長/計件加工", ["項目", "值"], [
-        ["雷切 基本 NT$/m", "laser.basePerM", 1], ["雷切 每mm板厚 NT$/m", "laser.perMmPerM", 0.5], ["雷切 穿孔 NT$/孔", "laser.pierce", 0.5],
+        ["雷切 基本 NT$/m", "laser.basePerM", 1], ["雷切 最低 NT$/m", "laser.minPerM", 1], ["雷切 每mm板厚 NT$/m", "laser.perMmPerM", 0.5], ["雷切 穿孔 NT$/孔", "laser.pierce", 0.5],
         ["快走絲 NT$/mm²", "wireEdm.fast.perMm2", 0.005], ["慢走絲 NT$/mm²", "wireEdm.slow.perMm2", 0.01], ["折彎 NT$/折", "bending.perBend", 1],
         ["焊接 鐵 NT$/m", "welding.steel", 10], ["焊接 不鏽鋼 NT$/m", "welding.sus", 10], ["焊接 鋁 NT$/m", "welding.al", 10]]
         .map(([l, path, st]) => `<tr><td>${l}</td><td class="n">${field(path, path.split(".").reduce((o, k) => o[k], db), st)}</td></tr>`)) +
-      tbl("管銷與利潤", ["項目", "比例/金額"], [["管銷比例", "markup.overhead", 0.01], ["最低利潤", "markup.profitLow", 0.01], ["合理利潤", "markup.profitFair", 0.01], ["急件利潤", "markup.profitRush", 0.01], ["單項最低出貨 NT$", "markup.minOrder", 50]]
-        .map(([l, path, st]) => `<tr><td>${l}</td><td class="n">${field(path, path.split(".").reduce((o, k) => o[k], db), st)}</td></tr>`));
+      tbl("管銷與利潤（不加價 = 0）", ["項目", "比例/金額"], [["管銷比例", "markup.overhead", 0.01], ["估價利潤", "markup.profitFair", 0.01], ["議價下限（相對估價）", "markup.profitLow", 0.01], ["急件參考（相對估價）", "markup.profitRush", 0.01], ["單項最低出貨 NT$", "markup.minOrder", 50]]
+        .map(([l, path, st]) => `<tr><td>${l}</td><td class="n">${field(path, path.split(".").reduce((o, k) => o[k], db), st)}</td></tr>`)) +
+      `<div style="grid-column:1/-1"><h2 style="font-size:14px;margin-bottom:6px">單價依據（${esc(db.region || "")}）</h2><div class="scroll"><table><thead><tr><th>項目</th><th>公開資料</th><th>出處</th></tr></thead><tbody>${(DEFAULT_DB.sources || []).map((x) => `<tr><td>${esc(x.item)}</td><td>${esc(x.text)}</td><td>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(new URL(x.url).hostname)}</a>` : "—"}</td></tr>`).join("")}</tbody></table></div></div>`;
+    renderRatios();
   }
   $("#dbBox").addEventListener("input", (e) => {
     const t = e.target; if (!t.dataset.path) return; const v = parseFloat(t.value); if (!Number.isFinite(v)) return;
     const ks = t.dataset.path.split("."); let o = db; ks.slice(0, -1).forEach((k) => (o = o[k])); o[ks[ks.length - 1]] = v;
-    db.version = DEFAULT_DB.version + "-自訂"; $("#dbVer").textContent = `單價版本 ${db.version}`;
+    db.version = DEFAULT_DB.version + "-自訂"; $("#dbVer").textContent = `單價版本 ${db.version}`; renderRatios();
     store.set("d2q.db", db); clearTimeout(timer); timer = setTimeout(compute, 250);
   });
   $("#btnDbReset").onclick = () => { db = JSON.parse(JSON.stringify(DEFAULT_DB)); store.set("d2q.db", null); renderDb(); compute(); toast("已還原預設單價"); };

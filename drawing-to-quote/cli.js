@@ -34,12 +34,12 @@ for (const r of est.results) {
   if (r.suggestions[0]) console.log(`   ↓ 降本：${r.suggestions[0].suggest}（-${(r.suggestions[0].savingPct * 100).toFixed(0)}%）`);
 }
 const s = est.summary;
-console.log(`\n合計：最低 ${nt(s.totalLow)}｜合理 ${nt(s.total)}｜急件 ${nt(s.totalRush)}｜降本潛力 ${nt(s.potential)}`);
+console.log(`\n合計（成本價，不加價）：估價 ${nt(s.total)}｜議價下限 ${nt(s.totalLow)}｜急件參考 ${nt(s.totalRush)}｜降本潛力 ${nt(s.potential)}`);
 console.log(`風險：高 ${s.riskCount["高"]}／中 ${s.riskCount["中"]}／低 ${s.riskCount["低"]}\n`);
 
 if (out) {
   fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
   fs.writeFileSync(out, buildXlsx(buildSheets(est, project, db)));
   fs.writeFileSync(out.replace(/\.xlsx$/i, "") + "_詢價單.txt", rfqText(est, project));
-  console.log(`已輸出：${out}（9 個工作表）與詢價單文字檔`);
+  console.log(`已輸出：${out}（10 個工作表，含各圖加工步驟明細）與詢價單文字檔`);
 }

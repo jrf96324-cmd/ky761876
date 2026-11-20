@@ -76,6 +76,7 @@
       heatInput: String(raw.heat ?? raw["熱處理"] ?? "").trim(),
       notes: String(raw.notes ?? raw["備註"] ?? "").trim(),
       source: String(raw.source ?? raw["辨識來源"] ?? "").trim(),
+      ratio: (num(raw.ratio ?? raw["估價比例%"], 100) || 100) / 100,
       warnings: [],
     };
     p.qty = parseQty(p.qtyInput);
@@ -156,6 +157,7 @@
   }
 
   // ───────────────────────── 成本元件 ─────────────────────────
+  const laserPerM = (db, t) => Math.max(db.laser.minPerM || 0, db.laser.basePerM + db.laser.perMmPerM * t);
   function hr(db, machineKey, runMin, setupMin, label) {
     const m = db.machines[machineKey];
     const setup = setupMin ?? m.setupMin;
@@ -260,7 +262,7 @@
       const flat = p.shape === "plate" || H <= 0.3 * Math.min(p.L, p.W); // 板狀件才適合切割下料
       if (flat && H <= (db.laser.maxT[grp] || 0)) {
         const cutM = (g.cutMm + p.pockets * 200) / 1000;
-        const laserRun = cutM * (db.laser.basePerM + db.laser.perMmPerM * H) * db.laser.matFactor[grp] + (1 + p.holes + p.pockets) * db.laser.pierce;
+        const laserRun = cutM * laserPerM(db, H) * db.laser.matFactor[grp] + (1 + p.holes + p.pockets) * db.laser.pierce;
         const plateKg = p.L * p.W * H / 1e6 * mat.density / 0.85;
         const mill = (p.faces > 1 || tol > 1 ? (2 * p.L * p.W / 100) / db.mrr.finishMillCm2PerMin * tol * ra / Math.sqrt(mat.machinability) : 0)
           + (p.taps + p.ptTaps + p.slots) * 1.5 * Math.sqrt(mc) + p.deepHoles * 6 + p.crossHoles * 5 + p.faces * 4;
@@ -288,7 +290,7 @@
         const weldM = (p.weldMm || 2 * (p.L + p.W + H)) / 1000;
         const wp = db.welding[mat.group] || db.welding.steel;
         add("M5", "改板件焊接/鎖附組合 + 後加工", "移除量大（實體率低），改以板材雷切組焊或螺絲組合，再後加工基準面。需確認剛性與變形。",
-          [materialCost(p, g, db, { kg: plateKg, cuts: 4 }), lot("雷射下料", weldM * 2 * (db.laser.basePerM + db.laser.perMmPerM * 10) * (db.laser.matFactor[mat.group] || 1), db.laser.setup, "板件下料"),
+          [materialCost(p, g, db, { kg: plateKg, cuts: 4 }), lot("雷射下料", weldM * 2 * laserPerM(db, 10) * (db.laser.matFactor[mat.group] || 1), db.laser.setup, "板件下料"),
             lot("焊接/組裝", weldM * wp, 600, `${round(weldM, 2)} m 焊道`), hr(db, "vmc3", 25 + holeMin, 60, "焊後基準面加工"), deburr]);
       }
     }
@@ -296,7 +298,7 @@
     if (p.shape === "sheet") {
       const t = p.T, grp = mat.group;
       const cutM = g.cutMm / 1000;
-      const laserRun = cutM * (db.laser.basePerM + db.laser.perMmPerM * t) * (db.laser.matFactor[grp] || 1) + (1 + p.holes + p.slots) * db.laser.pierce;
+      const laserRun = cutM * laserPerM(db, t) * (db.laser.matFactor[grp] || 1) + (1 + p.holes + p.slots) * db.laser.pierce;
       const bf = 1 + Math.max(0, t - 3) * db.bending.heavyFactorPerMm;
       const bendOps = p.bends ? [lot(`折彎 ×${p.bends}`, p.bends * db.bending.perBend * bf, p.bends * db.bending.setupPerBend, `每折 ${db.bending.perBend}`)] : [];
       const tapOps = (p.taps + p.ptTaps) ? [hr(db, "drill_tap", (p.taps * 0.6 + p.ptTaps * 1.2), 15, "攻牙/壓鉚")] : [];
@@ -334,7 +336,7 @@
           [lot("鋁擠型材料+連接件", members * 280 + (p.L + p.W + p.H) * 4 / 1000 * 450, 0, `約 ${members} 支型材`),
             lot("鋸切/攻牙/組裝", members * 60, 300, ""), deburr], { designChange: true });
       add("F3", "雷切板件 + 榫接焊接", "以雷切板件榫卯定位後焊接，減少治具與焊道，尺寸重現性佳。",
-        [materialCost(p, g, db, { kg: g.stockKg * 1.1, cuts: 0 }), lot("雷射切割", members * 1.2 * (db.laser.basePerM + db.laser.perMmPerM * 6) * (db.laser.matFactor[grp] || 1), db.laser.setup, ""),
+        [materialCost(p, g, db, { kg: g.stockKg * 1.1, cuts: 0 }), lot("雷射切割", members * 1.2 * laserPerM(db, 6) * (db.laser.matFactor[grp] || 1), db.laser.setup, ""),
           lot("焊接+修磨", weldMm * 0.7 / 1000 * wp, 900, "焊道減 30%"), lot("消除應力退火", g.partKg * 20, db.welding.stressRelief, ""), post2, deburr],
         { designChange: true });
     }
@@ -342,29 +344,37 @@
   }
 
   // ───────────────────────── 單價計算 ─────────────────────────
-  function priceRoute(route, qty, db) {
-    let material = 0, machining = 0, outsource = 0, setupTotal = 0;
-    const lines = route.ops.map((o) => {
-      let setupShare;
+  /**
+   * 單價計算（成本價，不加價）
+   * 每個步驟：成本 = 單件工時費/材料費 + 架模費 ÷ 數量（委外則 max(單件×數量, 每批最低) ÷ 數量）
+   * 估價 = 成本 × 類別比例(材料/加工/委外) × 整體比例 × 該圖比例；再加管銷/利潤（預設 0）
+   */
+  function priceRoute(route, qty, db, partRatio = 1) {
+    const R = { overall: 1, material: 1, machining: 1, outsource: 1, ...(db.ratio || {}) };
+    let material = 0, machining = 0, outsource = 0, setupTotal = 0, rawDirect = 0;
+    const lines = route.ops.map((o, i) => {
+      let cost, cat, note = "", runPer, setupPer;
       if (o.lotMin != null) { // 委外：每批最低收費
         const lotCost = Math.max(o.runCost * qty, o.lotMin);
-        const per = lotCost / qty;
-        outsource += per;
-        return { ...o, unitCost: per, note: o.runCost * qty < o.lotMin ? "未達最低收費" : "" };
+        cost = lotCost / qty; cat = "outsource"; runPer = o.runCost; setupPer = cost - o.runCost;
+        if (o.runCost * qty < o.lotMin) note = `未達每批最低 ${o.lotMin}`;
+      } else {
+        runPer = o.runCost; setupPer = o.setupCost / qty; cost = runPer + setupPer;
+        setupTotal += o.setupCost; cat = o.type === "material" ? "material" : "machining";
       }
-      setupShare = o.setupCost / qty;
-      const per = o.runCost + setupShare;
-      setupTotal += o.setupCost;
-      if (o.type === "material") material += per; else machining += per;
-      return { ...o, unitCost: per };
+      const factor = R[cat] * R.overall * partRatio;
+      const unitCost = cost * factor;
+      rawDirect += cost;
+      if (cat === "material") material += unitCost; else if (cat === "outsource") outsource += unitCost; else machining += unitCost;
+      return { ...o, step: i + 1, cat, runPer, setupPer, cost, factor, unitCost, note };
     });
     const direct = material + machining + outsource;
     const m = db.markup;
-    const overhead = direct * m.overhead;
-    const minPer = m.minOrder / qty;
+    const overhead = direct * (m.overhead || 0);
+    const minPer = (m.minOrder || 0) / qty;
     const at = (pr) => Math.max(direct + overhead + (direct + overhead) * pr, minPer);
     return {
-      qty, material, machining, outsource, setupTotal, direct, overhead, lines,
+      qty, material, machining, outsource, setupTotal, rawDirect, direct, overhead, lines,
       low: at(m.profitLow), fair: at(m.profitFair), rush: at(m.profitRush),
     };
   }
@@ -398,7 +408,7 @@
     let best = null;
     for (const r of routes) {
       if (r.designChange) continue;
-      const pr = priceRoute(r, p.qty, db);
+      const pr = priceRoute(r, p.qty, db, p.ratio);
       if (!best || pr.fair < best.fair) best = pr;
     }
     return best ? best.fair : 0;
@@ -438,12 +448,12 @@
     const p = raw.__normalized ? raw : normalizePart(raw, db);
     const { g, routes } = routesFor(p, db);
     const priced = routes.map((r) => {
-      const pr = priceRoute(r, p.qty, db);
+      const pr = priceRoute(r, p.qty, db, p.ratio);
       let fit = true, fitNote = "";
       if (r.minQty && p.qty < r.minQty) { fit = false; fitNote = `建議數量 ≥ ${r.minQty}`; }
       if (r.maxQty && p.qty > r.maxQty) { fit = false; fitNote = `適用數量 ≤ ${r.maxQty}`; }
       if (r.designChange) fitNote = fitNote || "需修改設計";
-      const tiers = (opts.tiers || db.qtyTiers).map((q) => { const t = priceRoute(r, q, db); return { qty: q, low: t.low, fair: t.fair, rush: t.rush }; });
+      const tiers = (opts.tiers || db.qtyTiers).map((q) => { const t = priceRoute(r, q, db, p.ratio); return { qty: q, low: t.low, fair: t.fair, rush: t.rush }; });
       return { id: r.id, name: r.name, desc: r.desc, designChange: !!r.designChange, fit, fitNote, price: pr, tiers };
     });
     const eligible = priced.filter((r) => r.fit && !r.designChange);
@@ -486,7 +496,7 @@
   // ───────────────────────── CSV ─────────────────────────
   const CSV_HEADERS = ["圖號", "CAD NO", "零件名稱", "材料", "數量", "外形", "長L", "寬W", "高H", "外徑OD", "內徑ID", "板厚T",
     "實體率%", "淨重kg", "孔數", "攻牙數", "PT牙數", "槽數", "口袋數", "深孔數", "交叉孔數", "內直角數", "外螺紋數", "退刀槽數",
-    "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註", "辨識來源"];
+    "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註", "估價比例%", "辨識來源"];
 
   function parseCSV(text) {
     const rows = []; let row = [], cell = "", q = false;
