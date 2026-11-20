@@ -74,3 +74,10 @@ assert.strictEqual(DP.fromDXF(inch, "x.dxf").dims[0].value, 101.6);
 const noT = E.estimatePart({ 圖號: "T1", 材料: "A6061", 數量: 1, 外形: "plate", 長L: 200, 寬W: 100 });
 assert.ok(noT.part.warnings.some((w) => /板厚未填/.test(w)) && noT.best.price.fair > 0);
 console.log("計算檢核測試通過 ✔");
+
+// ── CAD 匯出 PDF：Ø 字元變體（ø/Φ/未對應符號）、直書逐字、疊式公差、「圖號 DWG No.」「個/台」──
+const q603 = DP.recognize(JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "cad_q603_pdftext.json"), "utf8"))).fields;
+assert.deepStrictEqual([q603["圖號"], q603["材料"], q603["數量"], q603["外形"], q603["外徑OD"], q603["內徑ID"], q603["孔數"], q603["公差"], q603["表面處理"]],
+  ["2002224-25", "S50C", "1", "round", 130, 40, 6, "中等", "染黑"]);
+assert.strictEqual(DP.norm("\u0000100"), "Ø100");
+console.log("CAD 匯出 PDF 直徑／疊式公差測試通過 ✔");

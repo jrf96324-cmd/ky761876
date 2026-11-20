@@ -391,6 +391,33 @@ return of(u,o);};})();\n`;
     return { preview: c.toDataURL("image/jpeg", 0.85), previewSize: { w: c.width, h: c.height }, previewMap: { sx: map.sx * f, ox: map.ox * f, sy: map.sy * f, oy: map.oy * f } };
   }
 
+  /**
+   * PDF 文字層整理：CAD 匯出的 PDF 常把直書尺寸「Ø」「1」「0」「0」逐字輸出，
+   * 依文字方向與間距把連續的字合併成一段，並標記直書（90°）／斜向文字。
+   */
+  function mergePdfText(raw, pageH) {
+    const out = [];
+    for (const i of raw) {
+      if (!i.str || !i.str.trim()) { continue; }
+      const t = i.transform, ang = Math.atan2(t[1], t[0]) * 180 / Math.PI, h = Math.hypot(t[2], t[3]) || 8;
+      const cos = Math.cos(ang * Math.PI / 180), sin = Math.sin(ang * Math.PI / 180);
+      const w = i.width || i.str.length * h * 0.6;
+      const prev = out[out.length - 1];
+      if (prev && Math.abs(prev.ang - ang) < 2 && h / prev.h > 0.75 && h / prev.h < 1.33) {
+        const dx = t[4] - prev.ex, dy = t[5] - prev.ey;          // 與上一段結尾的距離（PDF 座標）
+        const along = dx * cos + dy * sin, perp = -dx * sin + dy * cos;
+        if (along > -0.4 * h && along < 0.9 * h && Math.abs(perp) < 0.35 * h) {
+          prev.s += (along > 0.3 * h ? " " : "") + i.str; prev.ex = t[4] + w * cos; prev.ey = t[5] + w * sin; continue;
+        }
+      }
+      out.push({ s: i.str, ox: t[4], oy: t[5], ex: t[4] + w * cos, ey: t[5] + w * sin, h, ang });
+    }
+    return out.map((o) => {
+      const a = ((o.ang % 360) + 360) % 360, vertical = Math.abs(a - 90) < 3 || Math.abs(a - 270) < 3, flat = a < 3 || a > 357 || Math.abs(a - 180) < 3;
+      return { s: o.s, x: o.ox, y: pageH - o.oy, h: o.h, ...(vertical ? { vertical: true } : {}), ...(!vertical && !flat ? { slanted: -o.ang } : {}) };
+    });
+  }
+
   /** 讀一個檔案 → 一或多張圖面（PDF 每頁一張） */
   async function readFile(file, opts = {}, onStep = () => {}) {
     const name = file.name, ext = (name.split(".").pop() || "").toLowerCase();
@@ -414,7 +441,7 @@ return of(u,o);};})();\n`;
         const page = await pdf.getPage(n);
         const vp = page.getViewport({ scale: 1 });
         const tc = await page.getTextContent();
-        let items = tc.items.filter((i) => i.str && i.str.trim()).map((i) => ({ s: i.str, x: i.transform[4], y: vp.height - i.transform[5], h: Math.hypot(i.transform[2], i.transform[3]) || 8 }));
+        let items = mergePdfText(tc.items, vp.height);
         const scale = Math.min(4.2, 4600 / Math.max(vp.width, vp.height)); // 約 300 dpi
         const c = document.createElement("canvas"); const v2 = page.getViewport({ scale }); c.width = v2.width; c.height = v2.height;
         const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);

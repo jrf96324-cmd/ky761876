@@ -16,7 +16,7 @@
     cadNo: /^(CAD\s*NO\.?|CAD\s*編號|檔\s*名|FILE\s*NAME)\s*[:：]?/i,
     name: /^(品\s*名|圖\s*名|零件名稱|名\s*稱|PART\s*NAME|DESCRIPTION|TITLE|NAME)\s*[:：]?/i,
     material: /^(材\s*料|材\s*質|MATERIAL|MAT'?L\.?)\s*[:：]?/i,
-    qty: /^(數\s*量|QTY\.?|Q'TY|QUANTITY|件\s*數)\s*[:：]?/i,
+    qty: /^(數\s*量|QTY\.?|Q'TY|QUANTITY|件\s*數|個\s*\/\s*台|台\s*數|PIECES|PCS)(\s*(PIECES|PCS|QTY))?\s*[:：]?/i,
     surface: /^(表\s*面(\s*處)?(\s*理)?|表\s*處|FINISH|SURFACE(\s*TREATMENT)?|處\s*理)\s*[:：]?/i,
     heat: /^(熱\s*處(\s*理)?|HEAT\s*TREAT(MENT)?|硬\s*度|HARDNESS)\s*[:：]?/i,
     scale: /^(比\s*例|SCALE)\s*[:：]?/i,
@@ -24,7 +24,8 @@
   };
 
   const norm = (s) => String(s ?? "")
-    .replace(/[⌀∅φΦ]/g, "Ø").replace(/%%[cC]/g, "Ø").replace(/%%[pP]/g, "±").replace(/%%[dD]/g, "°")
+    .replace(/[⌀∅φΦøФфϕ]/g, "Ø").replace(/%%[cC]/g, "Ø")
+    .replace(/[\u0000-\u001f\uE000-\uF8FF\uFFFD](?=\s*\d)/g, "Ø")   // CAD 符號字型未對應 Unicode 時，數字前的亂碼多為 Ø.replace(/%%[pP]/g, "±").replace(/%%[dD]/g, "°")
     .replace(/[＋]/g, "+").replace(/[－—–]/g, "-").replace(/[：]/g, ":").replace(/[（]/g, "(").replace(/[）]/g, ")")
     .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
     .replace(/\s+/g, " ").trim();
@@ -59,7 +60,7 @@
     for (const it of doc.items) {
       const m = it.s.match(labelRe);
       if (!m) continue;
-      const rest = it.s.slice(m[0].length).trim();
+      const rest = it.s.slice(m[0].length).replace(/^(DWG\.?\s*No\.?|Drawing\s*No\.?|Material|Mat'?l\.?|Pieces|PCS|Q'?ty|Scale|Title|Part\s*Name|Name|Unit|Surface(\s*Treatment)?|Finish|Heat\s*Treatment)\s*[:：]?/i, "").trim();
       if (rest && accept(rest)) return { v: rest, ev: it.s };
       const h = it.h || 3, labelEnd = it.x + Math.max(m[0].length, 1) * h * 0.6;
       const right = doc.items.filter((o) => o !== it && Math.abs(o.y - it.y) < h * 0.9 && o.x > labelEnd - h && o.x - labelEnd < h * 25 && !Object.values(LABELS).some((re) => re.test(o.s)) && accept(o.s))
@@ -196,7 +197,21 @@
     if (tm) set("板厚T", +tm[1], "mid", tm[0]);
 
     // 3) 公差與粗糙度
-    let tolBand = Infinity; const tolEv = [];
+    let tolBand = Infinity; const tolEv = []; const holeTolVals = new Set();
+    // 疊式公差：尺寸右側上下兩個小字（+0.025 / 0、-0.01 / -0.03）
+    const DEV = /^[+\-±]?\s*0?\.\d+$|^0$/;
+    for (const num of doc.items) {
+      if (!/\d/.test(num.s) || DEV.test(num.s)) continue;
+      const nx1 = num.x + estW(num);
+      const devs = doc.items.filter((d) => d !== num && DEV.test(d.s) && d.h < num.h * 0.85 && d.x >= nx1 - num.h * 0.6 && d.x <= nx1 + num.h * 2.5 && Math.abs(d.y - num.y) <= num.h * 1.2);
+      if (!devs.length) continue;
+      const vals = devs.map((d) => +d.s.replace(/[±\s]/g, "")).filter(Number.isFinite);
+      const band = devs.some((d) => /^±/.test(d.s)) ? 2 * Math.max(...vals.map(Math.abs)) : vals.length >= 2 ? Math.max(...vals) - Math.min(...vals) : Math.abs(vals[0]);
+      if (band > 0) {
+        tolBand = Math.min(tolBand, band); tolEv.push(`${num.s} ${devs.sort((a, b) => a.y - b.y).map((d) => d.s).join("/")}`);
+        const nv = num.s.match(/Ø\s*(\d+(?:\.\d+)?)/); if (nv && Math.min(...vals) >= 0) holeTolVals.add(+nv[1]); // +x/0 → 孔公差（內徑）
+      }
+    }
     for (const m of allWithDims.matchAll(/±\s*(0\.\d+)/g)) { tolBand = Math.min(tolBand, 2 * +m[1]); tolEv.push(m[0]); }
     for (const m of allWithDims.matchAll(/\+\s*(0\.\d+)\s*\/?\s*-\s*(0\.\d+)/g)) { tolBand = Math.min(tolBand, +m[1] + +m[2]); tolEv.push(m[0]); }
     for (const m of allWithDims.matchAll(/\b([A-HJ-NP-Z]|[a-hj-np-z]|js)([5-9])\b/g)) { if (!/[HhGgFfKkMmNnPpJj]|js/.test(m[1])) continue; const it = +m[2]; tolBand = Math.min(tolBand, it <= 6 ? 0.01 : it === 7 ? 0.025 : 0.05); tolEv.push(m[0]); }
@@ -311,9 +326,9 @@
     if (shape === "round") {
       set("外徑OD", maxD, dimConf, "最大直徑 Ø" + maxD);
       set("長L", overall[0] || "", dimConf, "最大長度 " + (overall[0] || "?"));
-      const bore = dims.find((d) => d.kind === "diameter" && d.v < maxD * 0.9 && /H\d|內|孔|ID/i.test(d.text));
+      const bore = dims.find((d) => d.kind === "diameter" && d.v < maxD * 0.9 && (/H\d|內|孔|ID/i.test(d.text) || holeTolVals.has(d.v)));
       const holeDias = new Set(holeEv.map((h) => +(h.match(/Ø\s*(\d+(?:\.\d+)?)/) || [])[1]));
-      const inner = bore ? bore.v : dia.find((v) => v < maxD * 0.9 && v > maxD * 0.2 && !holeDias.has(v));
+      const inner = bore ? bore.v : [...dia].reverse().find((v) => v < maxD * 0.9 && v > maxD * 0.15 && !holeDias.has(v)); // 無公差線索時取最小的非孔直徑
       if (inner) set("內徑ID", inner, "low", bore ? bore.text : "次大直徑（請確認是否為內孔）");
       const extM = tapEv.find((t) => { const m = t.match(/M\s*(\d+)/); return m && +m[1] >= maxD * 0.85; });
       if (extM) { set("外螺紋數", 1, "mid", extM); fields["攻牙數"] = Math.max(0, (fields["攻牙數"] || 1) - 1); }
