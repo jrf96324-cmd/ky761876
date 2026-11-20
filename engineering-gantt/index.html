@@ -233,6 +233,32 @@ td.wrap{white-space:normal;min-width:150px;max-width:280px;font-size:12px}
 .grp-h{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--panel-2);font-weight:700}
 .sec h4 .spacer{flex:1}
 
+/* Daily load */
+.ld-grid{display:grid;grid-template-columns:340px 1fr;gap:12px;margin-bottom:12px}
+@media (max-width:1000px){.ld-grid{grid-template-columns:1fr}}
+.lchip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:12px;margin:2px 4px 2px 0;border:1px solid var(--border);background:var(--panel);white-space:nowrap}
+.lchip.proj{border-color:color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent);cursor:pointer}
+.lchip.rout{background:var(--panel-3)}
+.lchip.ins{border-color:#f59e0b;background:rgba(245,158,11,.13)}
+.lchip.off{opacity:.45;text-decoration:line-through}
+.lchip button{border:0;background:none;cursor:pointer;padding:0 2px;color:var(--text-2);font-size:11px}
+.lchip b{font-variant-numeric:tabular-nums}
+.loadbar{position:relative;height:14px;background:var(--panel-3);border-radius:7px;overflow:hidden;min-width:150px}
+.loadbar i{position:absolute;top:0;bottom:0}
+.loadbar .capl{position:absolute;top:0;bottom:0;width:2px;background:var(--text)}
+.hm{border-collapse:separate;border-spacing:3px;width:auto}
+.hm td,.hm th{padding:0;border:0;text-align:center;white-space:nowrap}
+.hm th{font-size:11px;color:var(--text-2);position:static;background:none;cursor:default;padding:0 0 2px}
+.hm th.td{color:var(--today);font-weight:800}
+.hm th.we{opacity:.55}
+.hm .nm{text-align:left;padding-right:10px;font-weight:600;font-size:12px}
+.hm .cell{width:56px;height:36px;border-radius:6px;font-size:11px;display:flex;flex-direction:column;justify-content:center;align-items:center;cursor:pointer;font-variant-numeric:tabular-nums;line-height:1.15;border:2px solid transparent}
+.hm .cell.sel{border-color:var(--primary)}
+.hm .cell small{font-size:10px;color:var(--text-2)}
+.wd-pick{display:flex;gap:2px;flex-wrap:wrap}
+.wd-pick label{display:inline-flex;align-items:center;gap:2px;font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:5px;cursor:pointer}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle;margin-right:3px}
+
 /* Tooltip & Toast */
 .tip{position:fixed;z-index:2000;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow-lg);padding:9px 11px;font-size:12px;max-width:320px;line-height:1.55}
 .tip .t{font-weight:700;font-size:13px;margin-bottom:3px}
@@ -295,6 +321,7 @@ td.wrap{white-space:normal;min-width:150px;max-width:280px;font-size:12px}
       <button data-v="table">明細表</button>
       <button data-v="analysis">追蹤分析</button>
       <button data-v="issues">問題管理</button>
+      <button data-v="load">每日負荷</button>
     </div>
     <input type="search" id="fSearch" placeholder="搜尋名稱/負責人/備註">
     <select id="fCat" title="類別"></select>
@@ -328,6 +355,7 @@ td.wrap{white-space:normal;min-width:150px;max-width:280px;font-size:12px}
   <div class="card hidden" id="viewTable"><div class="tbl-wrap" id="tableWrap"></div></div>
   <div class="hidden" id="viewAnalysis"></div>
   <div class="hidden" id="viewIssues"></div>
+  <div class="hidden" id="viewLoad"></div>
 </div>
 
 <datalist id="catList"></datalist>
@@ -370,6 +398,7 @@ td.wrap{white-space:normal;min-width:150px;max-width:280px;font-size:12px}
           <div class="fld"><label>實際完成 <a href="#" class="hint" onclick="setToday('eAE');return false">今天</a></label><input type="date" id="eAE"></div>
         </div>
         <div class="hint" style="margin-top:6px" id="eVar"></div>
+        <div class="fld" style="margin-top:8px"><label>每日投入工時 (h)　<span class="hint" id="eDayHint"></span></label><input type="number" id="eDayHours" min="0" step="0.5" placeholder="空白＝使用預設值"></div>
       </div>
 
       <div class="sec">
@@ -479,7 +508,7 @@ const minD=(...a)=>a.filter(Boolean).reduce((x,y)=>(!x||y<x)?y:x,'');
 function isoWeek(dt){const d=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));const n=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-n);const y0=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil(((d-y0)/864e5+1)/7)}
 
 /* ============ 狀態 ============ */
-let state={project:{name:'自動化設備專案'},tasks:[],catColor:{},collapsed:{}};
+let state={project:{name:'自動化設備專案'},tasks:[],catColor:{},collapsed:{},settings:{cap:8,capMap:{},defTaskHours:4,skipWeekend:true},routines:[],daily:[],routineSkip:{}};
 let ui={view:'gantt',zoom:'day',search:'',cat:'ALL',status:'ALL',owner:'ALL',showDeps:true,cascade:true,sortKey:'',sortDir:1};
 let undoStack=[];
 let G=null;            // 甘特圖目前座標資訊
@@ -487,7 +516,8 @@ let didInitialScroll=false;
 
 function normTask(t){
   const n=Object.assign({id:uid(),category:'未分類',name:'',owner:'',priority:'中',weight:1,milestone:false,hold:false,
-    planStart:D.today(),planEnd:D.today(),actualStart:'',actualEnd:'',progress:0,deps:[],checklist:[],logs:[],issues:[],budget:0,cost:0,note:''},t||{});
+    planStart:D.today(),planEnd:D.today(),actualStart:'',actualEnd:'',progress:0,deps:[],checklist:[],logs:[],issues:[],budget:0,cost:0,dayHours:0,note:''},t||{});
+  n.dayHours=Math.max(0,+n.dayHours||0);
   n.issues=Array.isArray(n.issues)?n.issues.map(normIssue):[];
   n.id=String(n.id);
   n.progress=clamp(parseInt(n.progress)||0,0,100);
@@ -524,8 +554,14 @@ function applyData(data){
   state.tasks=(data.tasks||[]).map(normTask);
   const ids=new Set(state.tasks.map(t=>t.id));
   state.tasks.forEach(t=>{t.deps=t.deps.filter(d=>ids.has(d)&&d!==t.id);catColor(t.category)});
+  const s=data.settings||{};
+  state.settings={cap:+s.cap>0?+s.cap:8,capMap:Object.assign({},s.capMap||{}),defTaskHours:+s.defTaskHours>=0&&s.defTaskHours!==undefined&&s.defTaskHours!==''?+s.defTaskHours:4,skipWeekend:s.skipWeekend!==false};
+  state.routines=(data.routines||[]).map(r=>({id:String(r.id||uid()),owner:String(r.owner||''),name:String(r.name||''),hours:Math.max(0,+r.hours||0),days:Array.isArray(r.days)?r.days.map(Number):[1,2,3,4,5],from:r.from||''}));
+  state.daily=(data.daily||[]).map(x=>({id:String(x.id||uid()),date:x.date||D.today(),owner:String(x.owner||''),kind:x.kind==='routine'?'routine':'insert',name:String(x.name||''),hours:Math.max(0,+x.hours||0),note:String(x.note||''),done:!!x.done}));
+  state.routineSkip=Object.assign({},data.routineSkip||{});
 }
-function serialize(){return{app:'eng-gantt',version:2,savedAt:new Date().toISOString(),project:state.project,catColor:state.catColor,collapsed:state.collapsed,tasks:state.tasks}}
+function serialize(){return{app:'eng-gantt',version:3,savedAt:new Date().toISOString(),project:state.project,catColor:state.catColor,collapsed:state.collapsed,tasks:state.tasks,
+  settings:state.settings,routines:state.routines,daily:state.daily,routineSkip:state.routineSkip}}
 function persist(){LS.set(LS_KEY,JSON.stringify(serialize()))}
 function persistUI(){LS.set(LS_UI,JSON.stringify(ui))}
 function commit(){persist();renderAll()}
@@ -622,7 +658,7 @@ function renderAll(){
   renderFilters();
   const list=filtered();
   renderKPIs(list);
-  ['gantt','table','analysis','issues'].forEach(v=>{
+  ['gantt','table','analysis','issues','load'].forEach(v=>{
     $('#view'+v[0].toUpperCase()+v.slice(1)).classList.toggle('hidden',ui.view!==v);
   });
   document.querySelectorAll('#viewTabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===ui.view));
@@ -630,12 +666,13 @@ function renderAll(){
   if(ui.view==='gantt')renderGantt(list);
   else if(ui.view==='table')renderTable(list);
   else if(ui.view==='issues')renderIssuesView(list);
+  else if(ui.view==='load')renderLoadView();
   else renderAnalysis(list);
 }
 
 function renderFilters(){
   const cats=[...new Set([...Object.keys(state.catColor).filter(c=>state.tasks.some(t=>t.category===c))])];
-  const owners=[...new Set(state.tasks.map(t=>t.owner||'(未指派)'))].sort();
+  const owners=[...new Set([...state.tasks.map(t=>t.owner||'(未指派)'),...state.routines.map(r=>r.owner),...state.daily.map(x=>x.owner)].filter(Boolean))].sort();
   $('#catList').innerHTML=[...new Set([...cats,...DEFAULT_CATS])].map(c=>`<option value="${esc(c)}">`).join('');
   $('#ownerList').innerHTML=owners.filter(o=>o!=='(未指派)').map(o=>`<option value="${esc(o)}">`).join('');
   if(ui.cat!=='ALL'&&!cats.includes(ui.cat))ui.cat='ALL';
@@ -683,7 +720,7 @@ function renderKPIs(list){
       <div class="sub">逾期 ${cnt('overdue')}　落後 ${cnt('behind')}　逾期完成 ${cnt('doneLate')}</div></div>
     <div class="card kpi" style="cursor:pointer" onclick="quickFilter('week')" title="點擊篩選本週"><div class="lbl">今日（${T}）</div>
       <div class="val">${activeToday}<small>項進行中</small></div>
-      <div class="sub">${ms?`下個里程碑：${esc(ms.name)} ${D.short(ms.planEnd)}`:'無待達成里程碑'}</div></div>
+      <div class="sub">${(()=>{const ov=loadOwners().filter(o=>{const l=loadOf(o,T);return l.total>l.cap}).length;return ov?`<b class="late-t" style="cursor:pointer" onclick="event.stopPropagation();ui.view='load';ui.loadDate='';persistUI();renderAll()">今日負荷超載 ${ov} 人 ›</b><br>`:''})()}${ms?`下個里程碑：${esc(ms.name)} ${D.short(ms.planEnd)}`:'無待達成里程碑'}</div></div>
     <div class="card kpi" style="cursor:pointer" onclick="ui.view='issues';persistUI();renderAll()" title="點擊進入問題管理"><div class="lbl">⚑ 問題管理</div>
       <div class="val" style="color:${io.length?'var(--bad)':'var(--ok)'}">${io.length}<small>未結 / 共 ${iss.length}</small></div>
       <div class="sub">高嚴重 ${ihi}　對策逾期 <b style="color:${iod?'var(--bad)':'inherit'}">${iod}</b>　改善有效 ${iy+inn?Math.round(iy/(iy+inn)*100)+'%':'—'}</div></div>
@@ -1028,6 +1065,185 @@ function ownerSummary(list,T){
       <td class="num ${late?'late-t':''}">${late}</td><td class="num">${weighted(ts,t=>t.progress).toFixed(0)}%</td></tr>`}).join('')+`</tbody></table><div class="hint" style="margin-top:6px">點擊列可在甘特圖篩選該負責人</div>`;
 }
 
+/* ============ 每日負荷 ============ */
+const LC={proj:'#2563eb',rout:'#64748b',ins:'#f59e0b'};
+function isWorkday(d){const w=D.parse(d).getDay();return!(state.settings.skipWeekend&&(w===0||w===6))}
+function taskHoursOn(t,d){
+  if(t.milestone||t.hold||!isWorkday(d))return 0;
+  const T=D.today();let s,e;
+  if(t.progress>=100){s=t.actualStart||t.planStart;e=t.actualEnd||t.planEnd}
+  else{s=minD(t.planStart,t.actualStart);e=t.planEnd;if(T>e)e=T}   // 逾期未完成：負荷延續到今天
+  return d>=s&&d<=e?(t.dayHours>0?t.dayHours:state.settings.defTaskHours):0;
+}
+function loadOwners(){
+  const s=new Set();
+  state.tasks.forEach(t=>{if(!t.milestone)s.add(t.owner||'(未指派)')});
+  state.routines.forEach(r=>r.owner&&s.add(r.owner));state.daily.forEach(x=>x.owner&&s.add(x.owner));
+  return[...s].sort((a,b)=>(a==='(未指派)')-(b==='(未指派)')||a.localeCompare(b,'zh-Hant'));
+}
+function capOf(o){const v=+state.settings.capMap[o];return v>0?v:state.settings.cap}
+function loadOf(o,d){
+  const proj=state.tasks.filter(t=>(t.owner||'(未指派)')===o).map(t=>({t,h:taskHoursOn(t,d)})).filter(x=>x.h>0);
+  const wd=D.parse(d).getDay();
+  const rout=state.routines.filter(r=>r.owner===o&&r.days.includes(wd)&&(!r.from||r.from<=d)).map(r=>({r,skip:!!state.routineSkip[d+'|'+r.id]}));
+  const once=state.daily.filter(x=>x.owner===o&&x.date===d);
+  const ph=proj.reduce((s,x)=>s+x.h,0);
+  const rh=rout.reduce((s,x)=>s+(x.skip?0:x.r.hours),0)+once.filter(x=>x.kind==='routine').reduce((s,x)=>s+x.hours,0);
+  const ih=once.filter(x=>x.kind==='insert').reduce((s,x)=>s+x.hours,0);
+  return{proj,rout,once,ph,rh,ih,total:ph+rh+ih,cap:capOf(o)};
+}
+function loadColor(total,cap){
+  if(!total)return'transparent';
+  const r=total/cap;
+  if(r>1)return`rgba(220,38,38,${Math.min(.85,.35+(r-1)*.8)})`;
+  if(r>=.85)return'rgba(217,119,6,.45)';
+  return`rgba(22,163,74,${.15+r*.35})`;
+}
+const fh=h=>(Math.round(h*10)/10).toString();
+function renderLoadView(){
+  const box=$('#viewLoad'), T=D.today(), d=ui.loadDate||T, S=state.settings;
+  let os=loadOwners();if(ui.owner!=='ALL')os=os.filter(o=>o===ui.owner);
+  const L=os.map(o=>({o,...loadOf(o,d)}));
+  const wdN=WD[D.parse(d).getDay()], off=!isWorkday(d);
+  const tot=k=>L.reduce((s,x)=>s+x[k],0), capSum=L.reduce((s,x)=>s+x.cap,0);
+  const over=L.filter(x=>x.total>x.cap);
+
+  const idle=L.filter(x=>!x.total&&!x.once.length&&!x.rout.length).map(x=>x.o);
+  const rows=L.filter(x=>!idle.includes(x.o)).map(x=>{
+    const sc=Math.max(x.total,x.cap)||1, diff=x.cap-x.total;
+    const chips=[
+      ...x.proj.map(p=>`<span class="lchip proj" style="--c:${catColor(p.t.category)}" data-open="${p.t.id}" title="${esc(p.t.category)}｜${p.t.planStart}~${p.t.planEnd}　點擊編輯（可改每日工時）">📐 ${esc(p.t.name)} <b>${fh(p.h)}h</b>${statusOf(p.t)==='overdue'?' <span class="late-t">逾期</span>':''}</span>`),
+      ...x.rout.map(r=>`<span class="lchip rout ${r.skip?'off':''}" title="常態平常工作">🔁 ${esc(r.r.name)} <b>${fh(r.r.hours)}h</b><button onclick="toggleSkip('${d}','${r.r.id}')" title="${r.skip?'恢復':'今日不做（請假/取消）'}">${r.skip?'↺':'略過'}</button></span>`),
+      ...x.once.map(e=>`<span class="lchip ${e.kind==='insert'?'ins':'rout'} ${e.done?'off':''}" title="${esc(e.note)}">${e.kind==='insert'?'⚡':'📝'} ${esc(e.name)} <b>${fh(e.hours)}h</b><button onclick="toggleDailyDone('${e.id}')" title="標記完成">${e.done?'↺':'✓'}</button><button onclick="delDaily('${e.id}')" title="刪除">✕</button></span>`)
+    ].join('')||'<span class="faint">（無工作）</span>';
+    return `<tr>
+      <td><b>${esc(x.o)}</b></td>
+      <td class="num">${fh(x.ph)}</td><td class="num">${fh(x.rh)}</td><td class="num" style="${x.ih?'color:#d97706;font-weight:700':''}">${fh(x.ih)}</td>
+      <td class="num"><b>${fh(x.total)}</b></td>
+      <td class="num"><input type="number" min="0" step="0.5" value="${x.cap}" data-cap="${esc(x.o)}" style="width:58px" title="此人每日可用工時"></td>
+      <td><div class="loadbar" title="專案 ${fh(x.ph)}h / 平常 ${fh(x.rh)}h / 插件 ${fh(x.ih)}h">
+        <i style="left:0;width:${x.ph/sc*100}%;background:${LC.proj}"></i>
+        <i style="left:${x.ph/sc*100}%;width:${x.rh/sc*100}%;background:${LC.rout}"></i>
+        <i style="left:${(x.ph+x.rh)/sc*100}%;width:${x.ih/sc*100}%;background:${LC.ins}"></i>
+        <span class="capl" style="left:calc(${x.cap/sc*100}% - 2px)"></span></div></td>
+      <td class="num" style="font-weight:800;color:${x.total>x.cap?'var(--bad)':x.total/x.cap>=.85?'var(--warn)':'var(--ok)'}">${x.cap?Math.round(x.total/x.cap*100):0}%</td>
+      <td style="white-space:nowrap">${diff<0?`<span class="late-t">超載 ${fh(-diff)}h</span>`:`<span class="muted">尚可 ${fh(diff)}h</span>`}</td>
+    </tr><tr><td></td><td colspan="8" style="white-space:normal;padding-top:0">${chips}</td></tr>`;
+  }).join('');
+
+  // 熱圖：選定日前 3 天 ~ 後 10 天
+  const days=[];for(let i=-3;i<=10;i++)days.push(D.add(d,i));
+  const hm=`<table class="hm"><thead><tr><th></th>${days.map(x=>{const dt=D.parse(x);return`<th class="${x===T?'td':''} ${isWorkday(x)?'':'we'}">${dt.getMonth()+1}/${dt.getDate()}<br>${WD[dt.getDay()]}</th>`}).join('')}</tr></thead>
+    <tbody>${os.map(o=>`<tr><td class="nm">${esc(o)}</td>${days.map(x=>{const l=loadOf(o,x);
+      return`<td><div class="cell ${x===d?'sel':''}" style="background:${loadColor(l.total,l.cap)}" onclick="setLoadDate('${x}')" title="${esc(o)} ${x}\n專案 ${fh(l.ph)}h／平常 ${fh(l.rh)}h／插件 ${fh(l.ih)}h\n合計 ${fh(l.total)}h／可用 ${l.cap}h">${l.total?`<b>${fh(l.total)}h</b><small>${l.ih?'⚡'+fh(l.ih):Math.round(l.total/l.cap*100)+'%'}</small>`:'<small>—</small>'}</div></td>`}).join('')}</tr>`).join('')}</tbody></table>`;
+
+  // 一週插件統計
+  const wk=[];for(let i=-6;i<=0;i++)wk.push(D.add(d,i));
+  const wkStat=os.map(o=>{let t=0,ins=0;wk.forEach(x=>{const l=loadOf(o,x);t+=l.total;ins+=l.ih});return{o,t,ins}}).filter(x=>x.t);
+
+  const wdBoxes=[1,2,3,4,5,6,0].map(w=>`<label><input type="checkbox" value="${w}" ${w>=1&&w<=5?'checked':''}>${WD[w]}</label>`).join('');
+  box.innerHTML=`
+    <div class="card iss-bar">
+      <b>日期</b>
+      <button class="btn sm" onclick="setLoadDate('${D.add(d,-1)}')">◀</button>
+      <input type="date" id="ldDay" value="${d}">
+      <button class="btn sm" onclick="setLoadDate('${D.add(d,1)}')">▶</button>
+      <button class="btn sm" onclick="setLoadDate('')">今天</button>
+      <span class="muted">（${wdN}）${off?'<span class="late-t">非工作日</span>':''}</span>
+      <span class="spacer"></span>
+      <label class="chk">預設可用工時 <input type="number" id="ldCap" min="1" step="0.5" value="${S.cap}" style="width:58px">h/人</label>
+      <label class="chk" title="專案項目未填「每日投入工時」時使用">專案項目預設 <input type="number" id="ldDef" min="0" step="0.5" value="${S.defTaskHours}" style="width:58px">h/天</label>
+      <label class="chk"><input type="checkbox" id="ldWe" ${S.skipWeekend?'checked':''}>週末不計</label>
+      <button class="btn sm" onclick="exportLoadCSV()">⇩ 負荷 CSV</button>
+    </div>
+    <div class="ld-grid">
+      <div class="card an-card">
+        <h3>＋ 填入當日工作</h3>
+        <div class="fld"><label>日期</label><input type="date" id="ldDate" value="${d}"></div>
+        <div class="g2" style="margin-top:8px">
+          <div class="fld"><label>人員 *</label><input list="ownerList" id="ldOwner" value="${ui.owner!=='ALL'&&ui.owner!=='(未指派)'?esc(ui.owner):''}"></div>
+          <div class="fld"><label>類型</label><select id="ldKind"><option value="insert">⚡ 插件（臨時/急件）</option><option value="routine">📝 平常工作（單次）</option></select></div>
+        </div>
+        <div class="fld" style="margin-top:8px"><label>工作內容 *</label><input id="ldName" placeholder="例：產線設備異常支援"></div>
+        <div class="g2" style="margin-top:8px">
+          <div class="fld"><label>工時 (h) *</label><input type="number" id="ldHours" min="0.5" step="0.5" value="2"></div>
+          <div class="fld"><label>連續天數</label><input type="number" id="ldDays" min="1" max="30" value="1" title="同一工作連續數個工作日"></div>
+        </div>
+        <div class="fld" style="margin-top:8px"><label>來源 / 備註</label><input id="ldNote" placeholder="例：業務臨時要求、產線停機"></div>
+        <button class="btn primary" style="margin-top:10px;width:100%;justify-content:center" onclick="addDaily()">加入</button>
+        <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
+        <h3>🔁 常態平常工作（每週固定）</h3>
+        <div class="g2">
+          <div class="fld"><label>人員</label><input list="ownerList" id="rtOwner"></div>
+          <div class="fld"><label>工時 (h/天)</label><input type="number" id="rtHours" min="0.5" step="0.5" value="1"></div>
+        </div>
+        <div class="fld" style="margin-top:8px"><label>工作內容</label><input id="rtName" placeholder="例：晨會、例行保養、請購跟催"></div>
+        <div class="fld" style="margin-top:8px"><label>星期</label><div class="wd-pick" id="rtDays">${wdBoxes}</div></div>
+        <button class="btn" style="margin-top:10px;width:100%;justify-content:center" onclick="addRoutine()">加入常態工作</button>
+        <div style="margin-top:10px">${state.routines.filter(r=>ui.owner==='ALL'||r.owner===ui.owner).map(r=>`<div class="list-item" style="cursor:default"><span class="nm"><b>${esc(r.owner)}</b>　${esc(r.name)}　<span class="faint">${[1,2,3,4,5,6,0].filter(w=>r.days.includes(w)).map(w=>WD[w]).join('')}</span></span><b>${fh(r.hours)}h</b><button class="btn ghost sm" onclick="delRoutine('${r.id}')">✕</button></div>`).join('')||'<div class="hint">尚未設定常態工作</div>'}</div>
+      </div>
+      <div class="card an-card" style="overflow-x:auto">
+        <h3>${d} 負荷比對 <span class="hint" style="font-weight:400">${os.length} 人　合計 ${fh(tot('total'))}h / 可用 ${fh(capSum)}h（${capSum?Math.round(tot('total')/capSum*100):0}%）　${over.length?`<span class="late-t">超載 ${over.length} 人：${over.map(x=>esc(x.o)).join('、')}</span>`:'<span style="color:var(--ok)">無超載</span>'}</span></h3>
+        <div class="row hint" style="margin-bottom:6px"><span><i class="sw" style="background:${LC.proj}"></i>專案項目（依甘特圖時程自動帶入）</span><span><i class="sw" style="background:${LC.rout}"></i>平常工作</span><span><i class="sw" style="background:${LC.ins}"></i>插件工作</span><span>│ 黑線＝可用工時</span></div>
+        ${L.length?`<table><thead><tr><th>人員</th><th class="num">專案</th><th class="num">平常</th><th class="num">插件</th><th class="num">合計</th><th class="num">可用</th><th>負荷分布</th><th class="num">負荷率</th><th>餘裕</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>合計</td><td class="num">${fh(tot('ph'))}</td><td class="num">${fh(tot('rh'))}</td><td class="num">${fh(tot('ih'))}</td><td class="num">${fh(tot('total'))}</td><td class="num">${fh(capSum)}</td>
+        <td colspan="3">插件佔比 <b>${tot('total')?Math.round(tot('ih')/tot('total')*100):0}%</b></td></tr></tfoot></table>${idle.length?`<div class="hint" style="margin-top:8px">當日無排工（尚可 ${fh(L.filter(x=>idle.includes(x.o)).reduce((s,x)=>s+x.cap,0))}h 可調度）：${idle.map(esc).join('、')}</div>`:''}`:'<div class="empty">沒有人員資料 — 在專案項目填負責人，或在左側填入工作</div>'}
+      </div>
+    </div>
+    <div class="card an-card" style="margin-bottom:12px;overflow-x:auto">
+      <h3>人員負荷熱圖（點格子切換日期）</h3>${os.length?hm:'<div class="faint">無資料</div>'}
+      <div class="hint" style="margin-top:6px"><i class="sw" style="background:rgba(22,163,74,.4)"></i>&lt;85%　<i class="sw" style="background:rgba(217,119,6,.45)"></i>85–100%　<i class="sw" style="background:rgba(220,38,38,.6)"></i>超載　⚡＝當日插件工時　逾期未完成的項目會持續計入至今天</div>
+    </div>
+    <div class="card an-card"><h3>近 7 天插件影響（${D.short(wk[0])} ~ ${D.short(d)}）</h3>
+      ${wkStat.length?`<table><thead><tr><th>人員</th><th class="num">總工時</th><th class="num">插件工時</th><th>插件佔比</th></tr></thead><tbody>${wkStat.sort((a,b)=>b.ins-a.ins).map(x=>`<tr><td>${esc(x.o)}</td><td class="num">${fh(x.t)}</td><td class="num">${fh(x.ins)}</td><td><div class="row" style="flex-wrap:nowrap"><div class="mini" style="height:8px;width:160px"><i style="width:${x.t?x.ins/x.t*100:0}%;background:${LC.ins}"></i></div><b>${x.t?Math.round(x.ins/x.t*100):0}%</b></div></td></tr>`).join('')}</tbody></table>
+      <div class="hint" style="margin-top:6px">插件佔比過高代表專案人力被臨時工作稀釋，可據此調整排程或增補人力</div>`:'<div class="faint">無資料</div>'}
+    </div>`;
+  $('#ldDay').onchange=e=>setLoadDate(e.target.value);
+  $('#ldCap').onchange=e=>setSetting('cap',Math.max(1,+e.target.value||8));
+  $('#ldDef').onchange=e=>setSetting('defTaskHours',Math.max(0,+e.target.value||0));
+  $('#ldWe').onchange=e=>setSetting('skipWeekend',e.target.checked);
+  $('#ldName').onkeydown=e=>{if(e.key==='Enter')addDaily()};
+}
+function setLoadDate(d){ui.loadDate=d===D.today()?'':d;persistUI();renderAll()}
+function setSetting(k,v){pushUndo();state.settings[k]=v;commit()}
+function addDaily(){
+  const date=$('#ldDate').value,owner=$('#ldOwner').value.trim(),name=$('#ldName').value.trim(),hours=+$('#ldHours').value,n=clamp(+$('#ldDays').value||1,1,30);
+  if(!date||!owner||!name||!(hours>0)){alert('請填寫日期、人員、工作內容與工時');return}
+  pushUndo();
+  let d=date,c=0,guard=0;
+  while(c<n&&guard<90){guard++;if(n===1||isWorkday(d)){state.daily.push({id:uid(),date:d,owner,kind:$('#ldKind').value,name,hours,note:$('#ldNote').value.trim(),done:false});c++}d=D.add(d,1)}
+  commit();toast(`已加入「${name}」${n>1?` ${c} 天`:''}，${owner} ${date} 起`);
+}
+function delDaily(id){pushUndo();state.daily=state.daily.filter(x=>x.id!==id);commit()}
+function toggleDailyDone(id){const x=state.daily.find(x=>x.id===id);if(!x)return;pushUndo();x.done=!x.done;commit()}
+function toggleSkip(d,rid){pushUndo();const k=d+'|'+rid;if(state.routineSkip[k])delete state.routineSkip[k];else state.routineSkip[k]=true;commit()}
+function addRoutine(){
+  const owner=$('#rtOwner').value.trim(),name=$('#rtName').value.trim(),hours=+$('#rtHours').value;
+  const days=[...document.querySelectorAll('#rtDays input:checked')].map(i=>+i.value);
+  if(!owner||!name||!(hours>0)||!days.length){alert('請填寫人員、工作內容、工時並勾選星期');return}
+  pushUndo();state.routines.push({id:uid(),owner,name,hours,days,from:''});commit();toast(`已加入常態工作「${name}」`);
+}
+function delRoutine(id){const r=state.routines.find(x=>x.id===id);if(!r||!confirm(`刪除常態工作「${r.name}」？`))return;pushUndo();state.routines=state.routines.filter(x=>x.id!==id);commit()}
+function initLoadEvents(){
+  const v=$('#viewLoad');
+  v.addEventListener('change',e=>{const c=e.target.closest('[data-cap]');if(!c)return;pushUndo();const o=c.dataset.cap,val=+c.value;
+    if(val>0&&val!==state.settings.cap)state.settings.capMap[o]=val;else delete state.settings.capMap[o];commit()});
+  v.addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o)openModal(o.dataset.open)});
+}
+function exportLoadCSV(){
+  const d=ui.loadDate||D.today();const days=[];for(let i=-3;i<=10;i++)days.push(D.add(d,i));
+  let os=loadOwners();if(ui.owner!=='ALL')os=os.filter(o=>o===ui.owner);
+  const q=v=>{v=String(v??'');return/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=[['日期','星期','人員','專案工時','平常工時','插件工時','合計','可用工時','負荷率%','專案項目','平常/插件工作']];
+  days.forEach(x=>os.forEach(o=>{const l=loadOf(o,x);if(!l.total)return;
+    rows.push([x,WD[D.parse(x).getDay()],o,fh(l.ph),fh(l.rh),fh(l.ih),fh(l.total),l.cap,Math.round(l.total/l.cap*100),
+      l.proj.map(p=>`${p.t.name}(${fh(p.h)}h)`).join('、'),
+      [...l.rout.filter(r=>!r.skip).map(r=>`${r.r.name}(${fh(r.r.hours)}h)`),...l.once.map(e=>`${e.kind==='insert'?'[插件]':''}${e.name}(${fh(e.hours)}h)`)].join('、')])}));
+  download(fname('csv').replace('.csv','_每日負荷.csv'),'﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n'),'text/csv;charset=utf-8');
+  toast('已匯出每日負荷 CSV');
+}
+
 /* ============ 問題管理 ============ */
 function issueRate(arr){const y=arr.filter(i=>i.effect==='yes').length,n=arr.filter(i=>i.effect==='no').length;return y+n?Math.round(y/(y+n)*100)+'%':'—'}
 function renderIssuesView(list){
@@ -1192,6 +1408,7 @@ function openModal(id,opts={}){
   set('#eCat',draft.category);set('#eName',draft.name);set('#eOwner',draft.owner);set('#ePriority',draft.priority);set('#eWeight',draft.weight);
   $('#eMilestone').checked=draft.milestone;$('#eHold').checked=draft.hold;
   set('#ePS',draft.planStart);set('#ePE',draft.planEnd);set('#eAS',draft.actualStart);set('#eAE',draft.actualEnd);
+  set('#eDayHours',draft.dayHours||'');$('#eDayHint').textContent=`計入「每日負荷」，預設 ${state.settings.defTaskHours}h/天`;
   set('#eProg',draft.progress);set('#eLogNote','');set('#eBudget',draft.budget||'');set('#eCost',draft.cost||'');set('#eNote',draft.note);
   set('#depSearch','');set('#ckNew','');
   renderModalParts();renderIssueEditor();
@@ -1257,7 +1474,7 @@ function saveModal(){
   draft.issues=draft.issues.filter(i=>i.desc.trim()||i.cause.trim()||i.action.trim());
   if(draft.issues.some(i=>!i.desc.trim())){alert('問題紀錄的「問題描述」不可空白');renderIssueEditor();return}
   Object.assign(draft,{category:cat,name,owner:$('#eOwner').value.trim(),priority:$('#ePriority').value,weight:+$('#eWeight').value>0?+$('#eWeight').value:1,
-    milestone:$('#eMilestone').checked,hold:$('#eHold').checked,budget:+$('#eBudget').value||0,cost:+$('#eCost').value||0,note:$('#eNote').value.trim()});
+    milestone:$('#eMilestone').checked,hold:$('#eHold').checked,budget:+$('#eBudget').value||0,cost:+$('#eCost').value||0,dayHours:Math.max(0,+$('#eDayHours').value||0),note:$('#eNote').value.trim()});
   if(draft.milestone)draft.planStart=draft.planEnd;
   draft.progress=origProgress;
   setProgress(draft,$('#eProg').value,$('#eLogNote').value.trim());
@@ -1364,7 +1581,23 @@ function loadSample(){
     7:[{date:a(-3),type:'採購交期',severity:'高',desc:'線軌交期 4 週，晚於組立需求',cause:'原廠缺貨',action:'改用同規格替代品牌，或先借庫存品組立',owner:'林專員',due:a(4),status:'doing',effect:'',affectDays:0},
        {date:a(-12),type:'採購交期',severity:'低',desc:'氣缸報價延遲',cause:'單一供應商依賴',action:'建立第二供應商比價',owner:'林專員',due:a(-9),status:'closed',closedDate:a(-9),effect:'yes',affectDays:0}],
   };
-  state={project:{name:'自動化組裝設備專案（範例）'},catColor:{},collapsed:{},tasks:[]};
+  state={project:{name:'自動化組裝設備專案（範例）'},catColor:{},collapsed:{},tasks:[],
+    settings:{cap:8,capMap:{'PM':6},defTaskHours:4,skipWeekend:true},routineSkip:{},
+    routines:[
+      {id:uid(),owner:'王工',name:'晨會 / 日報',hours:0.5,days:[1,2,3,4,5],from:''},
+      {id:uid(),owner:'陳工',name:'晨會 / 日報',hours:0.5,days:[1,2,3,4,5],from:''},
+      {id:uid(),owner:'陳工',name:'產線設備例行保養支援',hours:2,days:[1,3,5],from:''},
+      {id:uid(),owner:'林專員',name:'日常請購 / 跟催',hours:3,days:[1,2,3,4,5],from:''},
+      {id:uid(),owner:'李工',name:'圖面歸檔 / ECN 處理',hours:1,days:[2,4],from:''},
+      {id:uid(),owner:'PM',name:'客戶週會',hours:2,days:[1],from:''},
+    ],
+    daily:[
+      {id:uid(),date:T,owner:'王工',kind:'insert',name:'客戶舊機台異常，遠端支援',hours:3,note:'業務臨時要求',done:false},
+      {id:uid(),date:T,owner:'陳工',kind:'insert',name:'產線 PLC 緊急修改',hours:4,note:'產線停機',done:false},
+      {id:uid(),date:a(1),owner:'林專員',kind:'insert',name:'急件報價（客戶追加治具）',hours:2,note:'',done:false},
+      {id:uid(),date:a(-1),owner:'王工',kind:'insert',name:'協助業務評估新案',hours:2,note:'',done:true},
+      {id:uid(),date:a(3),owner:'李工',kind:'routine',name:'ISO 文件稽核準備',hours:3,note:'單次',done:false},
+    ]};
   S.forEach((r,i)=>{
     const[cat,name,owner,ps,pe,p,as,ae,deps,budget,cost,ms,ck]=r;
     const logs=[];
@@ -1406,7 +1639,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   $('#ckNew').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addCheck()}});
   $('#qaName').addEventListener('keydown',e=>{if(e.key==='Enter')quickAdd()});
   ['#viewAnalysis','#viewIssues'].forEach(s=>$(s).addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o)openModal(o.dataset.open,{focusIssue:!!o.dataset.issue})}));
-  initIssueEditorEvents();
+  initIssueEditorEvents();initLoadEvents();
   document.addEventListener('keydown',e=>{
     const inModal=!$('#modal').classList.contains('hidden');
     if(e.key==='Escape'&&inModal)closeModal();
