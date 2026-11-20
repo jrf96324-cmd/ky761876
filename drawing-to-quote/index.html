@@ -219,7 +219,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   <section class="panel" data-pane="recog">
     <div class="toolbar"><h2>2D 圖面辨識（多張）</h2><span class="muted" id="recogStat"></span><span class="spacer"></span>
       <button id="btnAddAll" type="button" class="primary" disabled>全部加入估價</button><button id="btnClearRecog" type="button">清除清單</button></div>
-    <div class="banner" id="fileBanner" hidden>目前以檔案直接開啟：DXF 與含文字的 PDF 可辨識；掃描圖、照片的 OCR 需要用資料夾內的 <b>START-Windows.bat</b>（或 start-mac-linux.sh）啟動。</div>
+    <div class="banner" id="fileBanner" hidden>目前以檔案直接開啟（雙擊 index.html），所有功能都可使用。第一次辨識掃描圖會載入約 10 MB 的離線 OCR 字庫，需等待數秒。</div>
     <label class="drop" id="drop" for="fileDraw">
       <strong>拖曳多張製作圖到這裡，或點此選擇檔案</strong>
       <span class="muted">支援 DXF（最準，直接讀尺寸標註）、PDF（多頁＝多張圖）、PNG / JPG 掃描圖（離線 OCR 繁中＋英文）</span>

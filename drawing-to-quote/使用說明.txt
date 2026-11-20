@@ -5,7 +5,7 @@ Drawing-to-Quote 製作圖製程審查與多元估價（離線單機版）
   Windows ：雙擊 START-Windows.bat（免安裝；會開一個黑色視窗，使用期間不要關閉）
   macOS / Linux：執行 ./start-mac-linux.sh（需 Node.js 或 Python 3）
   瀏覽器會自動開啟 http://localhost:8765/index.html
-  ※ 也可以直接雙擊 index.html，但掃描圖 / 照片的 OCR 會停用（DXF、含文字的 PDF 仍可用）
+  ※ 也可以直接雙擊 index.html，所有功能（含掃描圖 / 照片 OCR）都能用；第一次 OCR 需載入約 10 MB 字庫，稍等數秒
 
 【操作流程】
   1. 「圖面辨識」頁：一次拖曳多張製作圖（DXF / PDF / PNG / JPG）

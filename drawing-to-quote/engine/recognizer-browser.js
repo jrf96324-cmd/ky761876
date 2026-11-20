@@ -6,7 +6,7 @@
   const base = (p) => new URL(p, location.href).href;
   const VENDOR = {
     pdf: "vendor/pdfjs/pdf.min.js", pdfWorker: "vendor/pdfjs/pdf.worker.min.js", cmaps: "vendor/pdfjs/cmaps/",
-    tess: "vendor/tesseract/tesseract.min.js", tessWorker: "vendor/tesseract/worker.min.js", tessCore: "vendor/tesseract/", tessLang: "vendor/tessdata",
+    tess: "vendor/tesseract/tesseract.min.js", inline: "vendor/ocr-inline/",
   };
   const loaded = {};
   function loadScript(src) {
@@ -24,15 +24,31 @@
   }
 
   let ocrWorker = null, ocrLangs = null;
+  /**
+   * OCR Worker 由頁面自行組裝成 blob：核心 + Worker 程式 + 字庫（攔截 fetch 從記憶體提供）
+   * 這樣直接雙擊 index.html（file://）也能執行 OCR，不必啟動本機伺服器。
+   */
+  let workerURL = null;
+  async function ocrWorkerURL() {
+    if (workerURL) return workerURL;
+    const simd = typeof WebAssembly === "object" && WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
+    const core = simd ? "core-simd" : "core";
+    await Promise.all([core, "worker", "lang-eng", "lang-chi_tra"].map((n) => loadScript(VENDOR.inline + n + ".js")));
+    const O = root.__D2Q_OCR;
+    const prelude = `self.__LANGS={eng:${JSON.stringify(O["lang-eng"])},chi_tra:${JSON.stringify(O["lang-chi_tra"])}};
+(function(){var of=self.fetch;self.fetch=function(u,o){var m=String(u).match(/([A-Za-z_]+)\.traineddata(\.gz)?$/);
+if(m&&self.__LANGS[m[1]]){var b=atob(self.__LANGS[m[1]]),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return Promise.resolve(new Response(a));}
+return of(u,o);};})();\n`;
+    workerURL = URL.createObjectURL(new Blob([prelude, O[core], "\n;\n", O.worker], { type: "text/javascript" }));
+    return workerURL;
+  }
+  const workerOpts = async (extra = {}) => ({ workerPath: await ocrWorkerURL(), workerBlobURL: false, langPath: "https://d2q.local/tessdata", gzip: true, cacheMethod: "none", ...extra });
+
   async function getOcr(langs, onProgress) {
-    if (isFileProtocol()) throw new Error("影像 OCR 需要用 START 啟動檔開啟（瀏覽器限制 file:// 執行背景辨識）。DXF 與含文字的 PDF 不受影響。");
     await loadScript(VENDOR.tess);
     if (ocrWorker && ocrLangs === langs) return ocrWorker;
     if (ocrWorker) await ocrWorker.terminate();
-    ocrWorker = await root.Tesseract.createWorker(langs.split("+"), 1, {
-      workerPath: base(VENDOR.tessWorker), corePath: base(VENDOR.tessCore), langPath: base(VENDOR.tessLang), workerBlobURL: false, gzip: true,
-      logger: (m) => onProgress && m.status === "recognizing text" && onProgress(m.progress),
-    });
+    ocrWorker = await root.Tesseract.createWorker(langs.split("+"), 1, await workerOpts());
     await ocrWorker.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" }); // 稀疏文字：適合工程圖
     ocrLangs = langs;
     return ocrWorker;
@@ -43,7 +59,7 @@
   async function getLineOcr() { // 尺寸行專用：英文模型 + 字元白名單
     if (lineWorker) return lineWorker;
     await loadScript(VENDOR.tess);
-    lineWorker = await root.Tesseract.createWorker(["eng"], 1, { workerPath: base(VENDOR.tessWorker), corePath: base(VENDOR.tessCore), langPath: base(VENDOR.tessLang), workerBlobURL: false, gzip: true });
+    lineWorker = await root.Tesseract.createWorker(["eng"], 1, await workerOpts());
     await lineWorker.setParameters({ tessedit_pageseg_mode: "7", tessedit_char_whitelist: "0123456789.,+-±RMxXhHgGfFjJkKpPnNsSLT@Ø°/ ", user_defined_dpi: "300" });
     return lineWorker;
   }

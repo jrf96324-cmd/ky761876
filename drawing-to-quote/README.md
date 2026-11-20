@@ -12,6 +12,8 @@
 
 所有函式庫與 OCR 字庫都在 `vendor/`（pdf.js 3.11、tesseract.js 5.1 + 繁中/英文字庫），**完全不連網，圖面不會上傳**。
 
+**直接雙擊 `index.html` 也能用全部功能（含 OCR）**：OCR 核心與字庫包成一般腳本（`vendor/ocr-inline/`，由 `tools/build-inline-ocr.js` 產生），在頁面內組成 Worker，不受瀏覽器 file:// 限制。START 啟動檔改為選用。
+
 ### 2D 圖面辨識流程
 
 ```
