@@ -14,11 +14,11 @@
   const LABELS = {
     drawingNo: /^(圖\s*號|圖\s*面\s*編\s*號|DWG\.?\s*NO\.?|DRAWING\s*NO\.?|PART\s*NO\.?|料\s*號)\s*[:：]?/i,
     cadNo: /^(CAD\s*NO\.?|CAD\s*編號|檔\s*名|FILE\s*NAME)\s*[:：]?/i,
-    name: /^(品\s*名|零件名稱|名\s*稱|PART\s*NAME|DESCRIPTION|TITLE|NAME)\s*[:：]?/i,
+    name: /^(品\s*名|圖\s*名|零件名稱|名\s*稱|PART\s*NAME|DESCRIPTION|TITLE|NAME)\s*[:：]?/i,
     material: /^(材\s*料|材\s*質|MATERIAL|MAT'?L\.?)\s*[:：]?/i,
     qty: /^(數\s*量|QTY\.?|Q'TY|QUANTITY|件\s*數)\s*[:：]?/i,
-    surface: /^(表\s*面\s*處\s*理|表\s*處|FINISH|SURFACE(\s*TREATMENT)?|處\s*理)\s*[:：]?/i,
-    heat: /^(熱\s*處\s*理|HEAT\s*TREAT(MENT)?|硬\s*度|HARDNESS)\s*[:：]?/i,
+    surface: /^(表\s*面(\s*處)?(\s*理)?|表\s*處|FINISH|SURFACE(\s*TREATMENT)?|處\s*理)\s*[:：]?/i,
+    heat: /^(熱\s*處(\s*理)?|HEAT\s*TREAT(MENT)?|硬\s*度|HARDNESS)\s*[:：]?/i,
     scale: /^(比\s*例|SCALE)\s*[:：]?/i,
     unit: /^(單\s*位|UNIT)\s*[:：]?/i,
   };
@@ -37,8 +37,8 @@
     const its = items.filter((i) => i.s && i.s.trim()).map((i) => ({ ...i, s: norm(i.s), h: i.h || 3 })).sort((a, b) => a.y - b.y || a.x - b.x);
     const lines = [];
     for (const it of its) {
-      const ln = lines.find((l) => Math.abs(l.y - it.y) < Math.max(l.h, it.h) * 0.6 && it.x - l.x1 < Math.max(l.h, it.h) * 3 && it.x >= l.x0 - it.h);
-      if (ln) { ln.parts.push(it); ln.x1 = Math.max(ln.x1, it.x + estW(it)); }
+      const ln = lines.find((l) => Math.abs(l.y - it.y) < Math.max(l.h, it.h) * 0.6 && it.x - l.x1 < Math.max(l.h, it.h) * 3 && it.x + estW(it) >= l.x0 - Math.max(l.h, it.h) * 3);
+      if (ln) { ln.parts.push(it); ln.x0 = Math.min(ln.x0, it.x); ln.x1 = Math.max(ln.x1, it.x + estW(it)); }
       else lines.push({ y: it.y, h: it.h, x0: it.x, x1: it.x + estW(it), parts: [it] });
     }
     const segs = [];
@@ -47,8 +47,8 @@
       l.s = l.parts.reduce((acc, p) => (acc ? acc + glue(acc, p.s) : "") + p.s, "");
       let cur = null;
       for (const p of l.parts) {
-        if (cur && p.x - cur.xe <= Math.max(cur.h, p.h) * 0.9) { cur.s += glue(cur.s, p.s) + p.s; cur.xe = Math.max(cur.xe, p.x + estW(p)); }
-        else { cur = { s: p.s, x: p.x, y: p.y, h: p.h, xe: p.x + estW(p), line: l }; segs.push(cur); }
+        if (cur && p.x - cur.xe <= Math.max(cur.h, p.h) * 0.9 && !cur.vertical === !p.vertical) { cur.s += glue(cur.s, p.s) + p.s; cur.xe = Math.max(cur.xe, p.x + estW(p)); cur.conf = Math.min(cur.conf, p.conf ?? 90); cur.titleBlock = cur.titleBlock || p.titleBlock; }
+        else { cur = { s: p.s, x: p.x, y: p.y, h: p.h, xe: p.x + estW(p), line: l, conf: p.conf ?? 90, vertical: p.vertical, titleBlock: p.titleBlock, slanted: p.slanted }; segs.push(cur); }
       }
     });
     return { items: segs, lines };
@@ -85,7 +85,7 @@
   }
   const SURF_WORDS = [["硬陽極", "硬陽極"], ["硬質陽極", "硬陽極"], ["黑色陽極", "黑陽極"], ["黑陽極", "黑陽極"], ["陽極", "陽極"], ["ANODIZ", "陽極"], ["染黑", "染黑"], ["發黑", "染黑"], ["BLACK OXIDE", "染黑"],
     ["鍍鋅", "鍍鋅"], ["ZINC", "鍍鋅"], ["無電解鎳", "無電解鎳"], ["化學鎳", "無電解鎳"], ["ELECTROLESS", "無電解鎳"], ["鍍鎳", "鍍鎳"], ["鍍硬鉻", "鍍硬鉻"], ["硬鉻", "鍍硬鉻"], ["鍍鉻", "鍍硬鉻"],
-    ["粉體", "粉體塗裝"], ["烤漆", "烤漆"], ["噴漆", "烤漆"], ["PAINT", "烤漆"], ["電解拋光", "電解拋光"], ["鈍化", "鈍化"], ["鐵氟龍", "鐵氟龍"], ["TEFLON", "鐵氟龍"], ["噴砂", "噴砂"]];
+    ["粉體", "粉體塗裝"], ["烤漆", "烤漆"], ["噴漆", "烤漆"], ["PAINT", "烤漆"], ["漆", "烤漆"], ["塗裝", "烤漆"], ["電解拋光", "電解拋光"], ["鈍化", "鈍化"], ["鐵氟龍", "鐵氟龍"], ["TEFLON", "鐵氟龍"], ["噴砂", "噴砂"]];
   const HEAT_WORDS = [["真空熱處理", "真空熱處理"], ["真空淬火", "真空熱處理"], ["高周波", "高周波"], ["高頻", "高周波"], ["滲碳", "滲碳"], ["軟氮化", "氮化"], ["氮化", "氮化"], ["調質", "調質"], ["淬火", "淬火回火"], ["QUENCH", "淬火回火"], ["退火", "退火"]];
   const wordHit = (s, list) => { const up = s.toUpperCase(); for (const [w, k] of list) if (up.includes(w.toUpperCase())) return k; return null; };
 
@@ -97,12 +97,29 @@
   /** 主辨識 */
   // OCR 常見誤讀修正：Ø 被讀成 0 / @ / o
   function fixOcr(s) {
+    s = s.replace(/(?<=\d)[oO](?=[\d\-A-Z]|$)|(?<=[A-Z\-])[oO](?=\d)/g, "0")   // SO67→S067、SUS3O4→SUS304、S5OC→S50C
+      .replace(/(?<=\d)[lI|](?=\d)/g, "1").replace(/(?<=[A-Z])[lI](?=\d)/g, "1")  // l/I 夾在數字中 → 1
+      .replace(/(?<=\d)[sS](?=\d)/g, "5").replace(/(?<=\d),(?=\d{1,2}\b)/g, ".");  // 6,6 → 6.6
+    s = s.replace(/[士£]\s*(?=0?[.,]?\d)/g, "±")
+      .replace(/(\d)\s*\+\s*(0\.\d+)(?!\s*\/?\s*-)/g, "$1±$2")                      // 120+0.01（± 被讀成 +）
+      .replace(/(\d+\s*-\s*)9(\d)/g, "$1Ø$2")                                         // 6-96.6 → 6-Ø6.6（Ø 被讀成 9）
+      .replace(/(沉頭|孔|通孔|錐孔|THRU)\s*9(\d)/g, "$1Ø$2");
     return s.replace(/(\d+\s*-\s*)[0oO@](\d)/g, "$1Ø$2").replace(/^[@oO](\d)/, "Ø$1").replace(/(^|\s)0(\d{2,3}(?:\.\d)?)(?=\s|$|[a-zA-Z])/g, "$1Ø$2")
       .replace(/R[aа]\s*[oO](\.\d)/g, "Ra0$1").replace(/\bM(\d+)[xX×]0(\.\d+)/g, "M$1x0$2");
   }
 
   function recognize(input) {
-    if (input.source === "ocr") input = { ...input, items: (input.items || []).map((i) => ({ ...i, s: fixOcr(norm(i.s)) })) };
+    if (input.source === "ocr") {
+      let its = (input.items || []).map((i) => ({ ...i, s: fixOcr(norm(i.s)) }));
+      // 小數點漏讀：「37」「68」緊貼在同一基線 → 37.68
+      its = its.sort((a, b) => a.y - b.y || a.x - b.x);
+      const out = [];
+      for (const it of its) {
+        const prev = !it.vertical && out.find((p) => !p.vertical && /^\d{1,3}$/.test(p.s) && /^\d{2}$/.test(it.s) && Math.abs(p.y - it.y) < it.h * 0.4 && it.x - (p.x + p.s.length * p.h * 0.62) < p.h * 0.9 && it.x > p.x);
+        if (prev) { prev.s = prev.s + "." + it.s; prev.conf = Math.min(prev.conf ?? 90, it.conf ?? 90); } else out.push(it);
+      }
+      input = { ...input, items: out };
+    }
     const doc = buildLines(input.items || []);
     const fields = {}, conf = {}, ev = {};
     const set = (k, v, c, e) => { if (v === undefined || v === null || v === "") return; fields[k] = v; conf[k] = c; ev[k] = e; };
@@ -162,7 +179,7 @@
         const n = +m[1]; holes += n; holeEv.push(m[0]);
         const dep = l.slice(m.index).match(/(?:深|DP|DEPTH|↧)\s*(\d+(?:\.\d+)?)/i); if (dep && +dep[1] >= 5 * +m[2]) deep += n;
       }
-      const ud = l.match(/(UP|DOWN|上折|下折|向上折|向下折|折彎)\s*(\d+)\s*°/gi); if (ud) bends += ud.length;
+      const ud = l.match(/(UP|DOWN|上折|下折|向上折|向下折|折彎)\s*(\d+)\s*°/gi) || l.match(/\b(UP|DOWN)\b|上折|下折/gi); if (ud) bends += ud.length;
     }
     if (!deep) for (const l of textPool) for (const m of l.matchAll(/(?:(\d+)\s*[-xX×]\s*)?(?:PT\s*\d\/\d+\D*?)?Ø\s*(\d+(?:\.\d+)?)[^Ø\n]*?(?:深|DP|DEPTH|↧)\s*(\d+(?:\.\d+)?)/gi)) if (+m[3] >= 5 * +m[2]) deep += +(m[1] || 1);
     const mOnly = tapEv.filter((t) => /M\s*\d/.test(t));
@@ -199,13 +216,38 @@
     for (const d of input.dims || []) if (Number.isFinite(d.value) && d.value > 0) dims.push({ kind: d.kind, v: d.value, text: norm(d.text) });
     if (!dims.length) { // PDF / OCR：從文字推斷尺寸
       const reserved = new Set([fields["圖號"], fields["CAD NO"], fields["數量"]].filter(Boolean).map(String));
+      // 標題欄範圍（由標籤位置推得）內的數字一律不當尺寸
+      const labs = doc.items.filter((it) => Object.values(LABELS).some((re) => re.test(it.s)));
+      let tb = null;
+      if (labs.length >= 2) {
+        const h = Math.max(...labs.map((l) => l.h));
+        tb = { x0: Math.min(...labs.map((l) => l.x)) - h, y0: Math.min(...labs.map((l) => l.y)) - h * 2.5, y1: Math.max(...labs.map((l) => l.y)) + h * 2.5 };
+      }
+      const inTB = (it) => it.titleBlock || (tb && it.x >= tb.x0 && it.y >= tb.y0 && it.y <= tb.y1);
+      // 一般公差表（≤10 ≤100 ≤500 >500 / ±0.1 …）整區排除
+      const tolRows = doc.lines.filter((l) => /Grade|等級|[≤≦<>≥≧]\s*\d|±\s*0?\.\d.*±\s*0?\.\d/i.test(l.s) || (l.s.match(/\b2?(10|100|500)\b/g) || []).length >= 3);
+      // 公差表範圍：由「Grade、≤、>500、±0.x」等指標字推出整個表格框
+      const ind = doc.items.filter((it) => /Grade|等級|[≤≦≥≧]|^[<>]|^±\s*0?\.\d|^2(100|500)$/i.test(it.s));
+      let tz = null;
+      if (ind.length >= 3) { const h = Math.max(...ind.map((i) => i.h)); tz = { x0: Math.min(...ind.map((i) => i.x)) - h * 3, x1: Math.max(...ind.map((i) => i.x + estW(i))) + h * 3, y0: Math.min(...ind.map((i) => i.y)) - h * 3, y1: Math.max(...ind.map((i) => i.y)) + h * 3 }; }
+      const inTolTable = (it) => (tz && it.x >= tz.x0 && it.x <= tz.x1 && it.y >= tz.y0 && it.y <= tz.y1) || tolRows.some((l) => Math.abs(l.y - it.y) < l.h * 1.2 && it.x >= l.x0 - l.h * 2 && it.x <= l.x1 + l.h * 2);
       for (const it of doc.items) {
-        if (reserved.has(it.s) || Object.values(LABELS).some((re) => re.test(it.s))) continue;
+        if (inTB(it) || inTolTable(it) || reserved.has(it.s) || Object.values(LABELS).some((re) => re.test(it.s))) continue;
+        if (/[A-Z]{1,4}\d*-[A-Z0-9]|\d{5,}|^1\s*[\/:]\s*\d+$/i.test(it.s)) continue; // 圖號、料號、比例 1/10
+        if (input.source === "ocr") { // OCR：逐詞檢查，只收乾淨的尺寸字串（如 600、Ø80 g6、120±0.01）
+          for (const tok of it.s.split(/\s+(?![a-hA-H]\d\b|±)/)) {
+            const m = tok.trim().match(/^([ØR]?)\s*(\d{1,4}(?:\.\d{1,3})?)(\s*±.*|\s*[a-hA-H]\d{1,2}.*|\s*[+\-]\s*0?\.\d.*)?$/);
+            if (!m || !(+m[2] >= 1 && +m[2] <= 6000) || (it.conf ?? 90) < 60) continue;
+            dims.push({ kind: m[1] === "Ø" ? "diameter" : m[1] === "R" ? "radius" : "linear", v: +m[2], text: tok, x: it.x, y: it.y, h: it.h, vertical: !!it.vertical, conf: it.conf ?? 90 });
+          }
+          continue;
+        }
+        if (!input.dims?.length && /[\u3400-\u9fff]/.test(it.line ? it.line.s : it.s)) continue; // 中文註記行裡的數字不是尺寸
         if (/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d+\s*:\s*\d+|HRC|Ra|M\d|PT|\b[A-Z]{2,}\d{3}/i.test(it.s) || /通|深|沉頭|孔|DP|THRU|倒角|\bC\d|UP|DOWN|處|M\d|PT/i.test(it.line ? it.line.s : it.s)) continue; // 註記內的數字不是外形尺寸
         for (const m of it.s.matchAll(/(\d+\s*[-xX×]\s*)?(Ø|R)?\s*(\d{1,4}(?:\.\d{1,3})?)(?![\d/°.]|\s*°)/g)) {
           if (m[1]) continue; // 4-Ø6 這類是孔，不當外形
           const v = +m[3]; if (!(v >= 1 && v <= 6000)) continue;
-          dims.push({ kind: m[2] === "Ø" ? "diameter" : m[2] === "R" ? "radius" : "linear", v, text: m[0] });
+          dims.push({ kind: m[2] === "Ø" ? "diameter" : m[2] === "R" ? "radius" : "linear", v, text: m[0] + (/[a-hA-H]\d\b|±/.test(it.s) ? " " + it.s : ""), x: it.x, y: it.y, h: it.h, vertical: !!it.vertical, conf: it.conf ?? 90 });
         }
       }
     }
@@ -214,17 +256,57 @@
     const dimConf = (input.dims || []).length ? "mid" : "low";
     const maxL = lin[0] || 0, maxD = dia[0] || 0;
     // 板厚以外的外形尺寸：取最大的三個不同值（且 ≥ 最大值 8%）
-    const overall = lin.filter((v) => v >= maxL * 0.08).filter((v) => !(fields["板厚T"] && Math.abs(v - fields["板厚T"]) < 1e-6));
+    let overall = lin.filter((v) => v >= maxL * 0.08).filter((v) => !(fields["板厚T"] && Math.abs(v - fields["板厚T"]) < 1e-6));
+    // 掃描/照片：座標式（連鎖）尺寸辨識。同一欄（x 相近）≥4 個數字 = 量測垂直方向位置 → 最大值為寬；
+    // 同一列（y 相近）≥4 個數字 = 量測水平方向位置。連鎖中的中間值（孔位）不當外形尺寸。
+    let chainW = 0, thinCand = 0;
+    const raster = !(input.dims || []).length;
+    if (raster) {
+      const pts = dims.filter((d) => d.kind === "linear" && d.x != null);
+      const clusters = (key, other) => {
+        const cs = [];
+        for (const d of [...pts].sort((a, b) => a[key] - b[key])) {
+          const c = cs.find((c) => Math.abs(c.c - d[key]) < d.h * 0.9); if (c) { c.m.push(d); c.c = (c.c * (c.m.length - 1) + d[key]) / c.m.length; } else cs.push({ c: d[key], m: [d] });
+        }
+        return cs.filter((c) => c.m.length >= 4 && (Math.max(...c.m.map((d) => d[other])) - Math.min(...c.m.map((d) => d[other]))) > c.m[0].h * 4);
+      };
+      const horiz = pts.filter((d) => !d.vertical);
+      // 列：只有「數值隨位置單調變化」才是座標式連鎖（如板件上方 210/130/105/85/80）；
+      // 不單調的一排直書數字是並列尺寸（如架構件 600/560/300），全部保留
+      const monotonic = (c) => { const v = [...c.m].sort((a, b) => a.x - b.x).map((d) => d.v); let up = 0, dn = 0; for (let i = 1; i < v.length; i++) { if (v[i] > v[i - 1]) up++; else if (v[i] < v[i - 1]) dn++; } return Math.min(up, dn) <= 1; };
+      const cols = ((all) => { const save = pts.splice(0, pts.length, ...horiz); const r = clusters("x", "y"); pts.splice(0, pts.length, ...save); return r; })(), rows = clusters("y", "x").filter(monotonic), inChain = new Set();
+      cols.forEach((c) => c.m.forEach((d) => inChain.add(d)));
+      rows.forEach((c) => c.m.forEach((d) => inChain.add(d)));
+      if (cols.length) chainW = Math.max(...cols.map((c) => Math.max(...c.m.map((d) => d.v))));
+      const free = pts.filter((d) => !inChain.has(d)).map((d) => d.v);
+      const keep = [...free, ...rows.map((c) => Math.max(...c.m.map((d) => d.v)))];
+      if (keep.length) {
+        overall = [...new Set(keep.map((v) => +v.toFixed(2)))].sort((a, b) => b - a);
+        if (chainW && chainW < overall[0]) overall = [overall[0], chainW, ...overall.slice(1).filter((v) => v !== chainW && v < chainW)];
+        const big = Math.min(overall[0] || Infinity, overall[1] || Infinity);
+        const isolated = (d) => !pts.some((o) => o !== d && Math.hypot(o.x - d.x, o.y - d.y) < d.h * 6);
+        // 視圖範圍：連鎖尺寸與最大尺寸所在的外框（擴大 25%），範圍外的小數字（標題欄、公差表）不當板厚
+        const core = pts.filter((d) => (inChain.has(d) || d.v >= big * 0.5) && d.conf >= 70);
+        const zx0 = Math.min(...core.map((d) => d.x)), zx1 = Math.max(...core.map((d) => d.x)), zy0 = Math.min(...core.map((d) => d.y)), zy1 = Math.max(...core.map((d) => d.y));
+        const inView = (d) => core.length >= 2 && d.x >= zx0 - (zx1 - zx0) * 0.25 && d.x <= zx1 + (zx1 - zx0) * 0.25 && d.y >= zy0 - (zy1 - zy0) * 0.25 && d.y <= zy1 + (zy1 - zy0) * 0.25;
+        thinCand = pts.filter((d) => !inChain.has(d) && d.conf >= 85 && d.v < big / 4 && d.v >= 1 && isolated(d) && inView(d)).map((d) => d.v).sort((a, b) => a - b)[0] || 0;
+        overall = overall.filter((v) => v >= (overall[0] || 0) * 0.08 || v === thinCand);
+      }
+    }
 
     // 5) 外形判斷
     let shape;
     const tVal = +fields["板厚T"] || 0;
-    if (fields["焊道長mm"] !== undefined && maxL > 300) shape = "frame";
+    const section = /(\d+\s*[xX×]\s*\d+\s*[xX×]\s*\d+(\.\d+)?\s*t)|角鐵|方管|槽鐵|[HC]型鋼|扁鐵|圓管/.test(allWithDims);
+    const big3 = overall.length >= 3 && Math.min(overall[0], overall[1], overall[2]) > 250;
+    if ((fields["焊道長mm"] !== undefined && maxL > 300) || (section && maxL > 300) || (raster && big3 && !fields["板厚T"])) shape = "frame";
     else if (fields["折彎數"] || (tVal && tVal <= 6)) shape = "sheet";
     else if (maxD && maxD >= maxL * 0.25 && lin.length <= 8 + dia.length * 2 && (!overall[1] || maxD >= overall[1] * 0.8)) shape = "round";
     else if (tVal) shape = "plate";
-    else shape = overall[2] && overall[2] < overall[1] * 0.25 ? "plate" : "block";
-    set("外形", shape, "low", { round: "直徑標註為主", sheet: "板厚/折彎註記", frame: "焊接註記 + 大尺寸", plate: "厚度遠小於長寬", block: "三向尺寸相近" }[shape]);
+    else if (raster && thinCand && thinCand <= 6 && !fields["焊道長mm"]) shape = "sheet";
+    else if (raster && chainW && !thinCand) shape = "plate"; // 座標式標註的平面圖，多為板件；板厚請人工補
+    else shape = (overall[2] && overall[2] < overall[1] * 0.25) || (raster && thinCand) ? "plate" : "block";
+    set("外形", shape, "low", { round: "直徑標註為主", sheet: "板厚/折彎註記", frame: section ? "型鋼規格註記（角鐵/方管）" : fields["焊道長mm"] !== undefined ? "焊接註記 + 大尺寸" : "三向尺寸皆 > 250mm，判為架構/焊接件", plate: "厚度遠小於長寬", block: "三向尺寸相近" }[shape]);
 
     if (shape === "round") {
       set("外徑OD", maxD, dimConf, "最大直徑 Ø" + maxD);
@@ -240,7 +322,9 @@
       set("長L", overall[0] || "", dimConf, "最大長度 " + (overall[0] || "?"));
       set("寬W", overall[1] || "", dimConf, "次大長度 " + (overall[1] || "?"));
       if (shape === "block" || shape === "frame") set("高H", overall[2] || "", dimConf, "第三大長度 " + (overall[2] || "?"));
-      if (shape === "plate" && !tVal && overall[2]) set("板厚T", overall[2], "low", "第三大尺寸當板厚");
+      if ((shape === "plate" || shape === "sheet") && !tVal && (thinCand || (!chainW && overall[2]))) set("板厚T", thinCand || overall[2], "low", thinCand ? "側視圖小尺寸當板厚" : "第三大尺寸當板厚");
+      if ((shape === "plate" || shape === "sheet") && !fields["板厚T"]) { fields["板厚T"] = ""; conf["板厚T"] = "low"; ev["板厚T"] = "⚠ 未讀到板厚，請輸入（影響材料與加工估價）"; }
+      if (chainW) { conf["寬W"] = "mid"; ev["寬W"] = `座標尺寸欄最大值 ${chainW}`; }
     }
 
     // 6) 孔數（註記優先；DXF 可用圓輔助）
@@ -261,7 +345,8 @@
     if (notes.length) set("備註", notes.join("；"), "mid", "圖面註記");
 
     // 單位
-    if (input.units && input.units !== "mm" && input.units !== "未指定") ev["單位"] = `⚠ 圖檔單位為 ${input.units}，請換算為 mm`;
+    if (input.unitNote) ev["單位"] = input.unitNote;
+    else if (input.units && input.units !== "mm" && input.units !== "未指定") ev["單位"] = `⚠ 圖檔單位為 ${input.units}，請換算為 mm`;
 
     const weights = { 圖號: 2, 零件名稱: 2, 材料: 3, 數量: 2, 外形: 1, 長L: 2, 寬W: 1, 外徑OD: 2, 表面處理: 1, 公差: 1 };
     let got = 0, tot = 0;
@@ -271,10 +356,13 @@
 
   /** DXF 解析結果 → 辨識器輸入（翻轉 y） */
   function fromDXF(dxf, fileName) {
-    return { source: "dxf", fileName, units: dxf.units, items: dxf.texts.map((t) => ({ s: t.s, x: t.x, y: -t.y, h: t.h })), dims: dxf.dims, circles: dxf.circles };
+    // 圖檔單位換算為 mm（inch ×25.4、cm ×10、m ×1000）；文字仍保留原樣
+    const f = { 1: 25.4, 2: 304.8, 5: 10, 6: 1000 }[dxf.unitCode] || 1;
+    const dims = dxf.dims.map((d) => (f === 1 || d.kind === "angle" ? d : { ...d, value: d.value * f, text: d.text + `（${dxf.units}→mm ×${f}）` }));
+    return { source: "dxf", fileName, units: f === 1 ? dxf.units : "mm", unitNote: f === 1 ? "" : `圖檔單位 ${dxf.units}，尺寸已 ×${f} 換算為 mm`, items: dxf.texts.map((t) => ({ s: t.s, x: t.x, y: -t.y, h: t.h })), dims, circles: dxf.circles.map((c) => ({ ...c, r: c.r * f })) };
   }
 
-  const API = { recognize, fromDXF, buildLines, matchMaterial, norm };
+  const API = { recognize, fromDXF, buildLines, matchMaterial, norm, fixOcr };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.DrawingParser = API;
 })(typeof globalThis !== "undefined" ? globalThis : this);

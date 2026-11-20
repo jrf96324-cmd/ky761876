@@ -38,37 +38,341 @@
     return ocrWorker;
   }
 
-  function preprocess(src, maxSide = 4200) {
-    // 灰階 + 對比拉伸，放大到適合 OCR 的解析度
-    const k = Math.max(1, Math.min(maxSide / Math.max(src.width, src.height), 3));
+  // ───────────── 掃描圖前處理 ─────────────
+  let lineWorker = null;
+  async function getLineOcr() { // 尺寸行專用：英文模型 + 字元白名單
+    if (lineWorker) return lineWorker;
+    await loadScript(VENDOR.tess);
+    lineWorker = await root.Tesseract.createWorker(["eng"], 1, { workerPath: base(VENDOR.tessWorker), corePath: base(VENDOR.tessCore), langPath: base(VENDOR.tessLang), workerBlobURL: false, gzip: true });
+    await lineWorker.setParameters({ tessedit_pageseg_mode: "7", tessedit_char_whitelist: "0123456789.,+-±RMxXhHgGfFjJkKpPnNsSLT@Ø°/ ", user_defined_dpi: "300" });
+    return lineWorker;
+  }
+  async function readLine(canvas) {
+    const lw = await getLineOcr(); await lw.setParameters({ tessedit_pageseg_mode: "7" }); const { data } = await lw.recognize(canvas);
+    return { words: (data.words || []).filter((x) => x.text.trim()), conf: data.confidence };
+  }
+
+  /** 判斷一行文字的第一個字形是否為 Ø：寬字形 + 兩個封閉孔（斜線把圓切成兩半） */
+  function firstGlyphIsDiameter(canvas) {
+    const W = canvas.width, H = canvas.height, bin = adaptiveBin(toGray(canvas), W, H);
+    const lab = new Int32Array(W * H), comps = []; let id = 0;
+    for (let p0 = 0; p0 < W * H; p0++) {
+      if (!bin[p0] || lab[p0]) continue; id++;
+      let x0 = W, x1 = 0, y0 = H, y1 = 0, n = 0; const st = [p0]; lab[p0] = id;
+      while (st.length) { const p = st.pop(), x = p % W, y = (p / W) | 0; n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        for (const q of [p - 1, p + 1, p - W, p + W]) if (q >= 0 && q < W * H && bin[q] && !lab[q] && Math.abs((q % W) - x) <= 1) { lab[q] = id; st.push(q); } }
+      if (n > 20) comps.push({ id, x0, x1, y0, y1, n });
+    }
+    if (!comps.length) return false;
+    const hmax = Math.max(...comps.map((c) => c.y1 - c.y0));
+    const first = comps.filter((c) => c.y1 - c.y0 > hmax * 0.6).sort((a, b) => a.x0 - b.x0)[0];
+    if (!first) return false;
+    const w = first.x1 - first.x0 + 1, h = first.y1 - first.y0 + 1;
+    if (w / h < 0.7) return false;
+    // 計算封閉孔數：從外框灌水，剩下的背景區塊即為孔
+    const bw = w + 2, bh = h + 2, seen = new Uint8Array(bw * bh);
+    const fg = (x, y) => x >= 0 && y >= 0 && x < w && y < h && lab[(first.y0 + y) * W + first.x0 + x] === first.id;
+    const fill = (sx, sy) => { let area = 0; const st = [[sx, sy]]; seen[sy * bw + sx] = 1;
+      while (st.length) { const [x, y] = st.pop(); area++; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= bw || ny >= bh || seen[ny * bw + nx] || fg(nx - 1, ny - 1)) continue; seen[ny * bw + nx] = 1; st.push([nx, ny]); } }
+      return area; };
+    fill(0, 0);
+    let holes = 0;
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (!seen[y * bw + x] && !fg(x - 1, y - 1)) { if (fill(x, y) > w * h * 0.02) holes++; }
+    return holes >= 2;
+  }
+
+  /** 數字/符號專用全頁稀疏辨識（英文模型 + 白名單）：尺寸數字、孔/牙標註 */
+  async function numericPass(canvas, tag) {
+    const lw = await getLineOcr(); await lw.setParameters({ tessedit_pageseg_mode: "11" });
+    const { data } = await lw.recognize(canvas);
+    return { tag, conf: data.confidence, words: (data.words || []).filter((x) => x.text.trim() && x.confidence > 40 && /\d/.test(x.text)) };
+  }
+
+  function scaledCanvas(src, longSide, blurPx = 0) {
+    const k = longSide / Math.max(src.width, src.height);
     const c = document.createElement("canvas"); c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
-    const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.imageSmoothingQuality = "high"; ctx.drawImage(src, 0, 0, c.width, c.height);
-    const img = ctx.getImageData(0, 0, c.width, c.height), d = img.data;
-    const W = c.width, H = c.height, bin = new Uint8Array(W * H);
-    for (let i = 0, p = 0; i < d.length; i += 4, p++) bin[p] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) < 150 ? 1 : 0;
-    // 移除圖框、表格線、尺寸線（長直線會讓 OCR 把標題欄文字讀錯）
-    const L = Math.max(70, Math.round(Math.min(W, H) * 0.035)), kill = new Uint8Array(W * H);
-    for (let y = 0; y < H; y++) { let run = 0; for (let x = 0; x <= W; x++) { const b = x < W && bin[y * W + x]; if (b) run++; else { if (run >= L) for (let k = x - run; k < x; k++) kill[y * W + k] = 1; run = 0; } } }
-    for (let x = 0; x < W; x++) { let run = 0; for (let y = 0; y <= H; y++) { const b = y < H && bin[y * W + x]; if (b) run++; else { if (run >= L) for (let k = y - run; k < y; k++) kill[k * W + x] = 1; run = 0; } } }
-    for (let p = 0, i = 0; p < W * H; p++, i += 4) { const v = bin[p] && !kill[p] ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = v; }
+    const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.imageSmoothingQuality = "high"; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    if (blurPx) ctx.filter = `blur(${blurPx}px)`;
+    ctx.drawImage(src, 0, 0, c.width, c.height); ctx.filter = "none";
+    return { c, k };
+  }
+  /** 翻拍螢幕/手機照片判斷：亮部有明顯彩色條紋（摩爾紋）或亮度不均 */
+  function isPhoto(c) {
+    const d = c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data;
+    let sat = 0, n = 0, s1 = 0, s2 = 0;
+    for (let i = 0; i < d.length; i += 4 * 97) { const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]); if (mx > 150) { sat += mx - mn; n++; const g = (d[i] + d[i + 1] + d[i + 2]) / 3; s1 += g; s2 += g * g; } }
+    if (!n) return false;
+    const std = Math.sqrt(Math.max(0, s2 / n - (s1 / n) ** 2));
+    return sat / n > 4 || std > 14; // 彩色雜訊或底色明暗不均 → 翻拍/手機照片
+  }
+  function toGray(c, photo) {
+    const d = c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data, g = new Uint8Array(c.width * c.height);
+    if (photo) for (let i = 0, p = 0; p < g.length; i += 4, p++) g[p] = Math.max(d[i], d[i + 1], d[i + 2]); // 取最亮通道：彩色摩爾紋變成均勻底色，黑字不受影響
+    else for (let i = 0, p = 0; p < g.length; i += 4, p++) g[p] = (77 * d[i] + 150 * d[i + 1] + 29 * d[i + 2]) >> 8;
+    return g;
+  }
+  /** 自適應二值化（局部平均，處理掃描灰底、陰影、褪色） */
+  function adaptiveBin(g, W, H, photo) {
+    const I = new Float64Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) { let row = 0; for (let x = 0; x < W; x++) { row += g[y * W + x]; I[(y + 1) * (W + 1) + x + 1] = I[y * (W + 1) + x + 1] + row; } }
+    const r = Math.max(12, Math.round(Math.min(W, H) / 70)), bin = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) {
+      const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+      for (let x = 0; x < W; x++) {
+        const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
+        const mean = (I[y1 * (W + 1) + x1] - I[y0 * (W + 1) + x1] - I[y1 * (W + 1) + x0] + I[y0 * (W + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+        const v = g[y * W + x]; bin[y * W + x] = photo ? (v < mean * 0.78 && mean - v > 28 ? 1 : 0) : (v < mean * 0.82 && v < 215 ? 1 : 0);
+      }
+    }
+    return bin;
+  }
+  /** 傾斜角估計：投影輪廓變異數最大者（±4°） */
+  function skewAngle(bin, W, H) {
+    const f = Math.max(1, Math.ceil(Math.max(W, H) / 1400)), pts = [];
+    for (let y = 0; y < H; y += f) for (let x = 0; x < W; x += f) if (bin[y * W + x]) pts.push(x, y);
+    if (pts.length < 200) return 0;
+    let best = 0, bestV = -1;
+    for (let a = -4; a <= 4.001; a += 0.1) {
+      const t = Math.tan(a * Math.PI / 180), hist = new Float64Array(Math.ceil(H / f) + Math.ceil(W / f) + 10), off = Math.ceil(W * Math.abs(t) / f) + 2;
+      for (let i = 0; i < pts.length; i += 2) hist[Math.round((pts[i + 1] - pts[i] * t) / f) + off]++;
+      let v = 0; for (const h of hist) v += h * h;
+      if (v > bestV) { bestV = v; best = a; }
+    }
+    return best;
+  }
+  function rotateCanvas(src, deg) {
+    const q = ((deg % 360) + 360) % 360, quarter = q === 90 || q === 270, r = deg * Math.PI / 180;
+    const c = document.createElement("canvas");
+    if (q % 90 === 0) { c.width = quarter ? src.height : src.width; c.height = quarter ? src.width : src.height; }
+    else { c.width = Math.ceil(Math.abs(src.width * Math.cos(r)) + Math.abs(src.height * Math.sin(r))); c.height = Math.ceil(Math.abs(src.width * Math.sin(r)) + Math.abs(src.height * Math.cos(r))); }
+    const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.translate(c.width / 2, c.height / 2); ctx.rotate(deg * Math.PI / 180); ctx.drawImage(src, -src.width / 2, -src.height / 2);
+    return c;
+  }
+  /** 去除圖框/表格/尺寸線 + 去雜點，輸出黑白 canvas */
+  function cleanCanvas(src, photo) {
+    const W = src.width, H = src.height, bin = adaptiveBin(toGray(src, photo), W, H, photo);
+    // 長直線（容許 3px 斷點、±1px 殘邊）視為圖框/表格/尺寸線
+    const L = Math.max(60, Math.round(Math.min(W, H) * 0.025)), GAP = 3, kill = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) {
+      let start = -1, last = -1;
+      for (let x = 0; x <= W; x++) {
+        const on = x < W && bin[y * W + x];
+        if (on) { if (start < 0 || x - last > GAP + 1) { if (start >= 0 && last - start + 1 >= L) for (let k = start; k <= last; k++) kill[y * W + k] = 1; start = x; } last = x; }
+        else if (x === W && start >= 0 && last - start + 1 >= L) for (let k = start; k <= last; k++) kill[y * W + k] = 1;
+      }
+    }
+    for (let x = 0; x < W; x++) {
+      let start = -1, last = -1;
+      for (let y = 0; y <= H; y++) {
+        const on = y < H && bin[y * W + x];
+        if (on) { if (start < 0 || y - last > GAP + 1) { if (start >= 0 && last - start + 1 >= L) for (let k = start; k <= last; k++) kill[k * W + x] = 1; start = y; } last = y; }
+        else if (y === H && start >= 0 && last - start + 1 >= L) for (let k = start; k <= last; k++) kill[k * W + x] = 1;
+      }
+    }
+    // 殘邊：被刪線上下/左右 2px 內、且自身不是長筆畫的像素
+    const k2 = kill.slice();
+    for (let y = 2; y < H - 2; y++) for (let x = 2; x < W - 2; x++) {
+      const p = y * W + x; if (!bin[p] || k2[p]) continue;
+      if (k2[p - W] || k2[p + W] || k2[p - 2 * W] || k2[p + 2 * W]) { if (!(bin[p - 3 * W] && bin[p + 3 * W])) kill[p] = 2; }
+      else if (k2[p - 1] || k2[p + 1] || k2[p - 2] || k2[p + 2]) { if (!(bin[p - 3] && bin[p + 3])) kill[p] = 2; }
+    }
+    // 去雜點：面積過小的連通區塊（摩爾紋、灰塵、紙紋）
+    const on = new Uint8Array(W * H); for (let p = 0; p < W * H; p++) on[p] = bin[p] && !kill[p] ? 1 : 0;
+    const minArea = photo ? Math.max(14, Math.round(W * H / 400000)) : 3, lab = new Uint8Array(W * H), stack = new Int32Array(W * H);
+    for (let p0 = 0; p0 < W * H; p0++) {
+      if (!on[p0] || lab[p0]) continue;
+      let sp = 0, n = 0; stack[sp++] = p0; lab[p0] = 1; const list = [];
+      while (sp) { const p = stack[--sp]; n++; if (n <= minArea) list.push(p); const x = p % W;
+        if (x > 0 && on[p - 1] && !lab[p - 1]) { lab[p - 1] = 1; stack[sp++] = p - 1; } if (x < W - 1 && on[p + 1] && !lab[p + 1]) { lab[p + 1] = 1; stack[sp++] = p + 1; }
+        if (p >= W && on[p - W] && !lab[p - W]) { lab[p - W] = 1; stack[sp++] = p - W; } if (p < W * (H - 1) && on[p + W] && !lab[p + W]) { lab[p + W] = 1; stack[sp++] = p + W; } }
+      if (n < minArea) for (const p of list) on[p] = 0;
+    }
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const ctx = c.getContext("2d"), img = ctx.createImageData(W, H), d = img.data;
+    for (let p = 0, i = 0; p < W * H; p++, i += 4) { const v = on[p] ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
     ctx.putImageData(img, 0, 0);
-    return { canvas: c, k };
+    return { c, bin, W, H };
   }
 
+  const ANCHOR = /(圖\s*號|品\s*名|名\s*稱|材\s*[料質]|數\s*量|表\s*面|熱\s*處|比\s*例|單\s*位|CAD|DWG|MATERIAL|Q'?TY|SCALE|TITLE)/i;
+  const CALLOUT = /^\d{1,2}\s*-\s*[ØM@0O]|^\d{1,2}-[A-Z]|^M\d{1,2}|^[Ø@]\d|^PT|x\s*\d+(\.\d+)?L$|通$/i;
+  // 斜向孔/牙標註：「N-Ø…」「N-M…」開頭即可（後段常因 CAD 線字讀不準，但數量與孔徑已足夠估價）
+  const SLANT_CALLOUT = /^\d{1,2}\s*-\s*(Ø\s*\d|M\s*\d|PT)/i;
+  /** 孔/牙標註修正：8-26 / 8-@6 / 8-P6 → 8-Ø6；8-06.5x011 → 8-Ø6.5xØ11 */
+  function fixCallout(t) {
+    return t.replace(/^[@]/, "Ø").replace(/^(\d{1,2})\s*-\s*[0O@P2Ø](?=\d)/, "$1-Ø").replace(/^(\d{1,2})\s*-\s*[NW](?=\d)/, "$1-M").replace(/([xX×])\s*[0O@](?=\d)/g, "$1Ø").replace(/^(\d{1,2})-N(?=\d)/, "$1-M");
+  }
+  const JUNK = /^[一二三_\-—–=~.·,'"`|上丁]{1,}$|^[^\p{L}\p{N}Ø±]+$/u; // 殘線、雜點被讀成的字
+  const DIMLIKE = /^(\d+\s*[-xX×]\s*)?[ØR@0oO]?\s*\d{1,4}(\.\d{1,3})?(\s*[±+\-]\s*0?\.\d+)?(\s*[a-hA-H]\d{1,2})?$/;
+
+  async function ocrPass(worker, canvas, psm, tag) {
+    await worker.setParameters({ tessedit_pageseg_mode: String(psm), preserve_interword_spaces: "1", user_defined_dpi: "300" });
+    const { data } = await worker.recognize(canvas);
+    const words = (data.words || []).filter((x) => x.text.trim() && x.confidence > 30 && !JUNK.test(x.text.trim()));
+    return { tag, conf: data.confidence, words, anchors: words.filter((w) => ANCHOR.test(w.text) || (w.line && ANCHOR.test(w.line.text) && w.confidence > 50)).length };
+  }
+  const toItem = (w, mapFn, k) => { const p = mapFn(w.bbox); return { s: w.text.replace(/^[@]/, "Ø").replace(/[|]/g, "1"), x: p.x / k, y: p.y / k, h: p.h / k, conf: w.confidence }; };
+
+  /**
+   * 掃描圖 OCR（加強版）
+   *  1. 縮放到約 300 dpi → 自適應二值化 → 自動校正傾斜
+   *  2. 方向判斷：0° / 90° / 270° / 180° 以標題欄關鍵字數決定
+   *  3. 主方向全頁辨識（稀疏文字）＋ 旋轉 90° 辨識直書尺寸
+   *  4. 標題欄區域裁切放大，以表格模式再辨識一次，取代原結果
+   */
   async function ocrCanvas(canvas, langs, onProgress) {
-    const w = await getOcr(langs, onProgress);
-    const { canvas: pc, k } = preprocess(canvas);
-    const { data } = await w.recognize(pc);
-    const items = (data.words || []).filter((x) => x.confidence > 35 && x.text.trim()).map((x) => ({
-      s: x.text.replace(/^[@]/, "Ø").replace(/[|]/g, "1"), x: x.bbox.x0 / k, y: x.bbox.y1 / k, h: (x.bbox.y1 - x.bbox.y0) / k, conf: x.confidence,
-    }));
-    return { items, meanConf: data.confidence };
+    const w = await getOcr(langs);
+    const step = (m) => onProgress && onProgress(m);
+    const photo = isPhoto(canvas);
+    const { c: big, k } = scaledCanvas(canvas, 4600, photo ? 1.6 : 0);
+    step(photo ? "前處理：翻拍照片模式（去摩爾紋）、二值化、校正傾斜" : "前處理：二值化、校正傾斜");
+    const pre = cleanCanvas(big, photo);
+    const ang = skewAngle(pre.bin, pre.W, pre.H);
+    const straight = Math.abs(ang) > 0.15 ? rotateCanvas(big, -ang) : big;
+    const clean0 = Math.abs(ang) > 0.15 ? cleanCanvas(straight, photo).c : pre.c;
+    const W = clean0.width, H = clean0.height;
+    // 各方向的座標換回 straight 座標
+    const maps = {
+      0: (b) => ({ x: b.x0, y: b.y1, h: b.y1 - b.y0 }),
+      90: (b) => { const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; return { x: cy - (b.y1 - b.y0) / 2, y: H - cx + (b.x1 - b.x0) / 2, h: b.y1 - b.y0 }; },   // 畫面順時針轉 90°
+      270: (b) => { const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; return { x: W - cy - (b.y1 - b.y0) / 2, y: cx + (b.x1 - b.x0) / 2, h: b.y1 - b.y0 }; },
+      180: (b) => ({ x: W - b.x1, y: H - b.y0, h: b.y1 - b.y0 }),
+    };
+    step("OCR 0°");
+    const p0 = await ocrPass(w, clean0, 11, 0);
+    step("OCR 90°（直書尺寸／橫放圖）");
+    const c90 = rotateCanvas(clean0, 90);
+    const p90 = await ocrPass(w, c90, 11, 90);
+    let main = p0, side = p90, mainCanvas = clean0;
+    const canv = { 0: clean0, 90: c90 };
+    if (p90.anchors > p0.anchors + 1) { main = p90; side = p0; mainCanvas = c90; }
+    if (main.anchors < 2) {
+      step("OCR 270°／180°");
+      for (const deg of [270, 180]) {
+        const cc = rotateCanvas(clean0, deg), pp = await ocrPass(w, cc, 11, deg); canv[deg] = cc;
+        if (pp.anchors > main.anchors + 1) { if (main.tag === 0) side = p90; main = pp; mainCanvas = cc; }
+      }
+    }
+    // 直書尺寸方向 = 主方向再順時針 90°（CAD 直書文字為逆時針 90°）
+    const sideDeg = (main.tag + 90) % 360;
+    if (side.tag !== sideDeg) {
+      const known = { 0: p0, 90: p90 }[sideDeg];
+      if (!canv[sideDeg]) canv[sideDeg] = rotateCanvas(clean0, sideDeg);
+      side = known || await (step(`OCR ${sideDeg}°（直書尺寸）`), ocrPass(w, canv[sideDeg], 11, sideDeg));
+    }
+    // 尺寸行重讀：配合公差（g6、H7）或 ± 旁邊的數字常漏讀 → 裁切該行放大 3 倍、單行模式再讀
+    const grayRot = {}; const gray = (deg) => (grayRot[deg] = grayRot[deg] || (deg ? rotateCanvas(straight, deg) : straight));
+    async function reread(pass, canvas) {
+      const extra = [];
+      const keys = pass.words.filter((x) => /^[a-hA-H]\d{1,2}$|^[±+]\s*0?\.\d+$|^Ø$/.test(x.text.trim()));
+      for (const kw of keys.slice(0, 8)) {
+        const h = kw.bbox.y1 - kw.bbox.y0, x0 = Math.max(0, kw.bbox.x0 - h * 7), x1 = Math.min(canvas.width, kw.bbox.x1 + h * 2);
+        const y0 = Math.max(0, kw.bbox.y0 - h * 0.6), y1 = Math.min(canvas.height, kw.bbox.y1 + h * 0.6), sc = 3;
+        const cc = document.createElement("canvas"); cc.width = Math.round((x1 - x0) * sc); cc.height = Math.round((y1 - y0) * sc);
+        const cx = cc.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, cc.width, cc.height); cx.imageSmoothingQuality = "high"; cx.drawImage(canvas, x0, y0, x1 - x0, y1 - y0, 0, 0, cc.width, cc.height);
+        cx.fillRect(0, 0, cc.width, cc.height); cx.drawImage(gray(pass.tag), x0, y0, x1 - x0, y1 - y0, 0, 0, cc.width, cc.height);
+        const r = await readLine(cc);
+        // 白名單下 Ø 常被讀成 0 / 2 / 3 / @：以字形判斷第一個字是否為 Ø
+        r.words.forEach((x) => { x.text = x.text.replace(/^[@]/, "Ø"); });
+        if (r.words[0] && /^\d{2,5}(\.\d+)?$/.test(r.words[0].text)) {
+          const tight = document.createElement("canvas"), bx = r.words[0].bbox, pad = 6;
+          tight.width = bx.x1 - bx.x0 + pad * 2; tight.height = bx.y1 - bx.y0 + pad * 2;
+          const tc = tight.getContext("2d"); tc.fillStyle = "#fff"; tc.fillRect(0, 0, tight.width, tight.height); tc.drawImage(cc, bx.x0 - pad, bx.y0 - pad, tight.width, tight.height, 0, 0, tight.width, tight.height);
+          if (firstGlyphIsDiameter(tight)) r.words[0].text = "Ø" + r.words[0].text.slice(1);
+        }
+        const txt = r.words.map((x) => x.text).join(" ").trim();
+        const strong = /^Ø?\d{1,4}(\.\d+)?\s*([a-hA-H]\d{1,2}|±\s*0?\.\d+)$/.test(txt); // 「數字 + 配合公差」型態本身就可信
+        if (txt && (r.conf > 50 || strong) && /\d/.test(txt)) extra.push({ text: txt, confidence: Math.max(r.conf, strong ? 70 : 0), bbox: { x0, y0, x1, y1 } });
+      }
+      return extra;
+    }
+    step("尺寸行重讀");
+    side.words = side.words.concat(await reread(side, canv[side.tag]));
+    main.words = main.words.concat(await reread(main, canv[main.tag]));
+    // 主方向座標系：輸出一律換成「主方向畫面」座標，讓標題欄左右/上下關係正確
+    const mW = mainCanvas.width, mH = mainCanvas.height;
+    const toMain = (pt) => { // straight 座標 → 主方向座標
+      if (main.tag === 0) return pt;
+      if (main.tag === 90) return { x: H - pt.y, y: pt.x, h: pt.h };
+      if (main.tag === 270) return { x: pt.y, y: W - pt.x, h: pt.h };
+      return { x: W - pt.x, y: H - pt.y, h: pt.h };
+    };
+    let items = main.words.filter((x) => x.confidence > 40).map((x) => toItem(x, (b) => ({ x: b.x0, y: b.y1, h: b.y1 - b.y0 }), k));
+    // 直書尺寸：從另一方向取數字型文字
+    const sideMap = (b) => toMain(maps[side.tag](b));
+    for (const x of side.words) {
+      if (x.confidence < 55 || !(DIMLIKE.test(x.text.trim()) || /^[ØR@0oO]?\s*\d{1,4}(\.\d+)?\s*([a-hA-H]\d{1,2}|±\s*0?\.\d+)$/.test(x.text.trim()))) continue;
+      const it = toItem(x, sideMap, k);
+      if (!items.some((o) => o.s === it.s && Math.abs(o.x - it.x) < it.h * 3 && Math.abs(o.y - it.y) < it.h * 3)) items.push({ ...it, vertical: true });
+    }
+    // 數字專用辨識（主方向 + 直書方向）：取代同位置信心較低的數字
+    {
+      step("數字專用辨識");
+      for (const [pass, cvs, mapFn] of [[main, canv[main.tag], (b) => ({ x: b.x0, y: b.y1, h: b.y1 - b.y0 })], [side, canv[side.tag], sideMap]]) {
+        const np = await numericPass(cvs, "n" + pass.tag);
+        for (const x of np.words) {
+          const t = fixCallout(x.text.trim()); if (x.confidence < 60 || !(DIMLIKE.test(t) || CALLOUT.test(t))) continue;
+          const it = { ...toItem({ ...x, text: t }, mapFn, k), numeric: true, vertical: pass === side || undefined };
+          const near = items.filter((o) => Math.abs(o.x - it.x) < it.h * 2.5 && Math.abs(o.y - it.y) < it.h * 0.8 && /\d/.test(o.s));
+          if (near.some((o) => o.s === it.s)) continue;
+          if (near.length && near.every((o) => (o.conf || 0) < x.confidence)) items = items.filter((o) => !near.includes(o));
+          if (!near.length || near.every((o) => (o.conf || 0) < x.confidence)) items.push(it);
+        }
+      }
+    }
+
+    // 斜引線標註（孔、螺牙）：以 ±20°/±35°/±50° 各讀一次，只保留孔/牙型文字
+    const have = items.filter((it) => CALLOUT.test(it.s)).length;
+    {
+      const { c: mid, k: km } = scaledCanvas(gray(main.tag), 3000);
+      for (const deg of [-20, 20, -35, 35, -50, 50]) {
+        step(`OCR 斜向標註 ${deg}°`);
+        const rc = rotateCanvas(mid, deg), rcc = cleanCanvas(rc, photo).c, pr = await ocrPass(w, rcc, 11, "a" + deg); // 轉正後引線變水平，順便被去線
+        const cxr = rc.width / 2, cyr = rc.height / 2, cx0 = mid.width / 2, cy0 = mid.height / 2, rr = -deg * Math.PI / 180;
+        for (const x of pr.words) {
+          const t = fixCallout(x.text.trim()); if (x.confidence < 15 || !SLANT_CALLOUT.test(t)) continue;
+          const px = (x.bbox.x0 + x.bbox.x1) / 2 - cxr, py = (x.bbox.y0 + x.bbox.y1) / 2 - cyr;
+          const ox = (px * Math.cos(rr) - py * Math.sin(rr) + cx0) / km, oy = (px * Math.sin(rr) + py * Math.cos(rr) + cy0) / km; // 換回主方向座標
+          const it = { s: t, x: ox / k, y: oy / k, h: (x.bbox.y1 - x.bbox.y0) / km / k, conf: x.confidence, slanted: deg };
+          if (!items.some((o) => Math.hypot(o.x - it.x, o.y - it.y) < it.h * 4 && (o.s === it.s || (o.slanted != null && o.conf >= it.conf)))) {
+            items = items.filter((o) => !(o.slanted != null && Math.hypot(o.x - it.x, o.y - it.y) < it.h * 4));
+            items.push(it);
+          }
+        }
+      }
+      void have;
+    }
+
+    // 標題欄裁切重辨識
+    const anchors = main.words.filter((x) => ANCHOR.test(x.text) && x.confidence > 40);
+    if (anchors.length >= 2) {
+      step("OCR 標題欄");
+      const hh = Math.max(...anchors.map((a) => a.bbox.y1 - a.bbox.y0));
+      const bx0 = Math.max(0, Math.min(...anchors.map((a) => a.bbox.x0)) - hh), by0 = Math.max(0, Math.min(...anchors.map((a) => a.bbox.y0)) - hh * 1.5);
+      const bx1 = Math.min(mW, Math.max(...anchors.map((a) => a.bbox.x1)) + mW * 0.32), by1 = Math.min(mH, Math.max(...anchors.map((a) => a.bbox.y1)) + hh * 2);
+      const s = 2, crop = document.createElement("canvas"); crop.width = Math.round((bx1 - bx0) * s); crop.height = Math.round((by1 - by0) * s);
+      const cx = crop.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, crop.width, crop.height); cx.imageSmoothingQuality = "high";
+      cx.drawImage(mainCanvas, bx0, by0, bx1 - bx0, by1 - by0, 0, 0, crop.width, crop.height);
+      const back = (b) => ({ x: bx0 + b.x0 / s, y: by0 + b.y1 / s, h: (b.y1 - b.y0) / s });
+      // 稀疏 + 表格兩種模式各跑一次，同位置取信心高者
+      const pa = await ocrPass(w, crop, 11, "tb11"), pb = await ocrPass(w, crop, 6, "tb6");
+      const cand = [...pa.words, ...pb.words].filter((x) => x.confidence > 45).map((x) => toItem(x, back, k)).sort((a, b) => b.conf - a.conf);
+      const tbItems = [];
+      for (const it of cand) if (!tbItems.some((o) => Math.abs(o.y - it.y) < it.h * 0.6 && it.x < o.x + o.s.length * o.h && o.x < it.x + it.s.length * it.h)) tbItems.push(it);
+      if (tbItems.length >= 4) {
+        const inBox = (it) => it.x * k >= bx0 && it.x * k <= bx1 && it.y * k >= by0 && it.y * k <= by1 + hh;
+        items = items.filter((it) => !inBox(it)).concat(tbItems.map((t) => ({ ...t, titleBlock: true })));
+      }
+    }
+    return { items, photo, meanConf: main.conf, rotation: main.tag, skew: ang, titleBox: anchors.length >= 2, view: gray(main.tag), k };
   }
 
-  function thumb(canvas, w = 520) {
-    const k = w / canvas.width, c = document.createElement("canvas"); c.width = w; c.height = Math.round(canvas.height * k);
-    const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(canvas, 0, 0, c.width, c.height);
-    return c.toDataURL("image/jpeg", 0.82);
+  /** 預覽圖（1400px 寬）＋ 圖面座標 → 預覽像素的換算，供標示辨識位置 */
+  function thumb(canvas, map = { sx: 1, ox: 0, sy: 1, oy: 0 }, w = 1400) {
+    const f = Math.min(1, w / canvas.width) || 1, c = document.createElement("canvas"); c.width = Math.round(canvas.width * f); c.height = Math.round(canvas.height * f);
+    const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); ctx.imageSmoothingQuality = "high"; ctx.drawImage(canvas, 0, 0, c.width, c.height);
+    return { preview: c.toDataURL("image/jpeg", 0.85), previewSize: { w: c.width, h: c.height }, previewMap: { sx: map.sx * f, ox: map.ox * f, sy: map.sy * f, oy: map.oy * f } };
   }
 
   /** 讀一個檔案 → 一或多張圖面（PDF 每頁一張） */
@@ -81,7 +385,8 @@
       const c = document.createElement("canvas"); const bw = dxf.bbox.x1 - dxf.bbox.x0, bh = dxf.bbox.y1 - dxf.bbox.y0;
       c.width = 1400; c.height = Math.max(200, Math.round(1400 * bh / Math.max(bw, 1e-6)));
       root.DXF.drawDXF(dxf, c);
-      return [{ fileName: name, page: 1, source: "dxf", preview: thumb(c, 900), input: root.DrawingParser.fromDXF(dxf, name), note: `DXF 單位：${dxf.units}；文字 ${dxf.texts.length}、標註 ${dxf.dims.length}、圓 ${dxf.circles.length}` }];
+      const pad = 8, sc = Math.min((c.width - 2 * pad) / Math.max(bw, 1e-6), (c.height - 2 * pad) / Math.max(bh, 1e-6));
+      return [{ fileName: name, page: 1, source: "dxf", ...thumb(c, { sx: sc, ox: pad - dxf.bbox.x0 * sc, sy: sc, oy: c.height - pad + dxf.bbox.y0 * sc }), input: root.DrawingParser.fromDXF(dxf, name), note: `DXF 單位：${dxf.units}；文字 ${dxf.texts.length}、標註 ${dxf.dims.length}、圓 ${dxf.circles.length}` }];
     }
     if (ext === "pdf") {
       onStep("讀取 PDF");
@@ -94,17 +399,18 @@
         const vp = page.getViewport({ scale: 1 });
         const tc = await page.getTextContent();
         let items = tc.items.filter((i) => i.str && i.str.trim()).map((i) => ({ s: i.str, x: i.transform[4], y: vp.height - i.transform[5], h: Math.hypot(i.transform[2], i.transform[3]) || 8 }));
-        const scale = Math.min(2.5, 3200 / Math.max(vp.width, vp.height));
+        const scale = Math.min(4.2, 4600 / Math.max(vp.width, vp.height)); // 約 300 dpi
         const c = document.createElement("canvas"); const v2 = page.getViewport({ scale }); c.width = v2.width; c.height = v2.height;
         const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
         await page.render({ canvasContext: ctx, viewport: v2 }).promise;
-        let source = "pdf", note = `PDF 文字層 ${items.length} 段`;
+        let source = "pdf", note = `PDF 文字層 ${items.length} 段`, view = thumb(c, { sx: scale, ox: 0, sy: scale, oy: 0 });
         if (items.length < 6 && opts.ocrPdf !== false) {
           onStep(`第 ${n} 頁無文字層，OCR 辨識中`);
-          const r = await ocrCanvas(c, langs, (p) => onStep(`第 ${n} 頁 OCR ${Math.round(p * 100)}%`));
-          items = r.items.map((i) => ({ ...i, x: i.x / scale, y: i.y / scale, h: i.h / scale })); source = "ocr"; note = `掃描/向量字 PDF，OCR 信心 ${Math.round(r.meanConf)}%`;
+          const r = await ocrCanvas(c, langs, (m) => onStep(`第 ${n} 頁 ${m}`));
+          items = r.items.map((i) => ({ ...i, x: i.x / scale, y: i.y / scale, h: i.h / scale })); source = "ocr";
+          view = thumb(r.view, { sx: scale * r.k, ox: 0, sy: scale * r.k, oy: 0 }); // 顯示校正後（轉正、去傾斜）的圖 note = `掃描 PDF，OCR 信心 ${Math.round(r.meanConf)}%${r.rotation ? `，已轉正 ${r.rotation}°` : ""}${Math.abs(r.skew) > 0.15 ? `，校正傾斜 ${r.skew.toFixed(1)}°` : ""}`;
         }
-        out.push({ fileName: pdf.numPages > 1 ? `${name.replace(/\.pdf$/i, "")}_p${n}.pdf` : name, page: n, source, preview: thumb(c, 900), input: { source, fileName: name, items, dims: [], circles: [] }, note });
+        out.push({ fileName: pdf.numPages > 1 ? `${name.replace(/\.pdf$/i, "")}_p${n}.pdf` : name, page: n, source, ...view, input: { source, fileName: name, items, dims: [], circles: [] }, note });
       }
       return out;
     }
@@ -113,8 +419,8 @@
       const bmp = await createImageBitmap(file);
       const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; c.getContext("2d").drawImage(bmp, 0, 0);
       onStep("OCR 辨識中");
-      const r = await ocrCanvas(c, langs, (p) => onStep(`OCR ${Math.round(p * 100)}%`));
-      return [{ fileName: name, page: 1, source: "ocr", preview: thumb(c, 900), input: { source: "ocr", fileName: name, items: r.items, dims: [], circles: [] }, note: `OCR 信心 ${Math.round(r.meanConf)}%，請核對尺寸` }];
+      const r = await ocrCanvas(c, langs, onStep);
+      return [{ fileName: name, page: 1, source: "ocr", ...thumb(r.view, { sx: r.k, ox: 0, sy: r.k, oy: 0 }), input: { source: "ocr", fileName: name, items: r.items, dims: [], circles: [] }, note: `OCR 信心 ${Math.round(r.meanConf)}%${r.rotation ? `，已轉正 ${r.rotation}°` : ""}${Math.abs(r.skew) > 0.15 ? `，校正傾斜 ${r.skew.toFixed(1)}°` : ""}，請核對尺寸` }];
     }
     throw new Error(`不支援的格式 .${ext}（支援 DXF、PDF、PNG、JPG）。DWG 請先在 CAD 另存為 DXF 或 PDF。`);
   }

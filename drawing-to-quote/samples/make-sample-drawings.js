@@ -34,7 +34,7 @@ const DRAWINGS = [
       L.push([40, 120, 100, 120], [100, 120, 100, 200], [100, 200, 40, 200], [40, 200, 40, 120], [40, 145, 100, 145], [40, 175, 100, 175]);
       // 側視圖：同心圓
       C.push([180, 160, 40], [180, 160, 15], [180, 190, 3], [180, 130, 3], [150, 160, 3], [210, 160, 3]);
-      D.push({ kind: "diameter", v: 80, s: "Ø80 g6", x: 20, y: 160 }, { kind: "diameter", v: 30, s: "Ø30 H7", x: 110, y: 160 }, { kind: "linear", v: 60, s: "60", x: 70, y: 110 });
+      D.push({ kind: "diameter", v: 80, s: "Ø80 g6", x: 20, y: 150, rot: 90 }, { kind: "diameter", v: 30, s: "Ø30 H7", x: 110, y: 160 }, { kind: "linear", v: 60, s: "60", x: 70, y: 110 });
       T.push({ x: 160, y: 95, h: 3.5, s: "4-Ø6 通" }, { x: 30, y: 80, h: 3.5, s: "外徑 Ra1.6" }, { x: 30, y: 72, h: 3.5, s: "未註公差 ±0.1" }, { x: 30, y: 64, h: 3.5, s: "去毛邊、倒角 C0.5" }, { x: 30, y: 56, h: 3.5, s: "退刀槽 2 處" });
       return { L, C, T, D };
     },
@@ -49,7 +49,7 @@ const DRAWINGS = [
       L.push([170, 140, 220, 140], [220, 140, 220, 220], [220, 220, 170, 220], [170, 220, 170, 140]); // 右視
       for (const [x, y] of [[45, 155], [135, 155], [45, 205], [135, 205], [90, 155], [90, 205]]) C.push([x, y, 3.3]);
       for (const [x, y] of [[60, 180], [75, 180], [105, 180], [120, 180]]) C.push([x, y, 2.5]);
-      D.push({ kind: "linear", v: 120, s: "120±0.01", x: 90, y: 228 }, { kind: "linear", v: 80, s: "80", x: 22, y: 180 }, { kind: "linear", v: 50, s: "50", x: 22, y: 95 }, { kind: "linear", v: 35, s: "35", x: 60, y: 135 });
+      D.push({ kind: "linear", v: 120, s: "120±0.01", x: 90, y: 228 }, { kind: "linear", v: 80, s: "80", x: 22, y: 176, rot: 90 }, { kind: "linear", v: 50, s: "50", x: 22, y: 92, rot: 90 }, { kind: "linear", v: 35, s: "35", x: 60, y: 135 });
       T.push({ x: 160, y: 120, h: 3.5, s: "右視圖" }, { x: 30, y: 60, h: 3.5, s: "6-Ø6.6 通 沉頭Ø11 深6.5" }, { x: 30, y: 52, h: 3.5, s: "8-M5x0.8 深10" },
         { x: 30, y: 44, h: 3.5, s: "4-PT1/8 流道交叉孔 Ø6 深60" }, { x: 30, y: 36, h: 3.5, s: "流道面 Ra0.8 需清洗、氣密測試" });
       return { L, C, T, D };
@@ -62,7 +62,7 @@ const DRAWINGS = [
       const L = [], C = [], T = [], D = [];
       L.push([30, 120, 210, 120], [210, 120, 210, 180], [210, 180, 30, 180], [30, 180, 30, 120], [90, 120, 90, 180], [150, 120, 150, 180]);
       for (const [x, y] of [[50, 140], [50, 160], [190, 140], [190, 160]]) C.push([x, y, 2.75]);
-      D.push({ kind: "linear", v: 180, s: "180", x: 120, y: 188 }, { kind: "linear", v: 60, s: "60", x: 22, y: 150 });
+      D.push({ kind: "linear", v: 180, s: "180", x: 120, y: 188 }, { kind: "linear", v: 60, s: "60", x: 22, y: 146, rot: 90 });
       T.push({ x: 92, y: 110, h: 3.5, s: "UP 90° R2" }, { x: 152, y: 110, h: 3.5, s: "DOWN 90° R2" }, { x: 30, y: 70, h: 3.5, s: "4-Ø5.5 通" }, { x: 30, y: 62, h: 3.5, s: "2-M4 壓鉚螺帽" }, { x: 30, y: 54, h: 3.5, s: "展開圖 板厚 t=2.0" });
       return { L, C, T, D };
     },
@@ -90,7 +90,7 @@ function toSVG(d) {
   [...tb.L, ...g.L].forEach(([a, b, c, e]) => p.push(`<line x1="${a}" y1="${Y(b)}" x2="${c}" y2="${Y(e)}"/>`));
   g.C.forEach(([x, y, r]) => p.push(`<circle cx="${x}" cy="${Y(y)}" r="${r}"/>`));
   p.push(`</g><g font-family="WenQuanYi Zen Hei, Noto Sans CJK TC, sans-serif" fill="#000">`);
-  [...tb.T, ...g.T, ...g.D.map((m) => ({ x: m.x, y: m.y, h: 3.5, s: m.s }))].forEach((t) => p.push(`<text x="${t.x}" y="${Y(t.y)}" font-size="${t.h}">${t.s.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`));
+  [...tb.T, ...g.T, ...g.D.map((m) => ({ x: m.x, y: m.y, h: 3.5, s: m.s, rot: m.rot }))].forEach((t) => p.push(`<text x="${t.x}" y="${Y(t.y)}" font-size="${t.h}"${t.rot ? ` transform="rotate(${-t.rot} ${t.x} ${Y(t.y)})"` : ""}>${t.s.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text>`));
   p.push("</g></svg>");
   return p.join("");
 }

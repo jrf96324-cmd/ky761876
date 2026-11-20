@@ -53,3 +53,24 @@ assert.deepStrictEqual([e12["材料"], e12["外形"], e12["板厚T"], e12["折�
 const est2 = E.estimateAll([e08, e10, e12]);
 assert.strictEqual(est2.results.length, 3);
 console.log("DXF 辨識測試通過 ✔", est2.results.map((r) => `${r.part.name}:${r.best.id}`).join(" "));
+
+// ── 掃描 PDF 的 OCR 結果 → 欄位辨識（回歸測試；OCR 原始文字存在 test/fixtures）──
+const truthScan = {
+  scan_E08: { 圖號: "0202501-E08", 材料: "S50C", 數量: "2+2", 外形: "round", 長L: 60, 外徑OD: 80, 內徑ID: 30, 孔數: 4, 公差: "嚴", 粗糙度: "Ra1.6", 表面處理: "染黑", 熱處理: "高周波" },
+  scan_E10: { 圖號: "0202501-E10", 材料: "SUS304", 數量: "2", 外形: "block", 長L: 120, 寬W: 80, 高H: 50, 孔數: 6, 攻牙數: 8, PT牙數: 4, 公差: "嚴", 粗糙度: "Ra0.8", 表面處理: "無" },
+  scan_E12_rot: { 圖號: "0202501-E12", 材料: "SPCC", 數量: "10", 外形: "sheet", 長L: 180, 寬W: 60, 板厚T: 2, 孔數: 4, 攻牙數: 2, 折彎數: 2, 表面處理: "烤漆" },
+};
+let okN = 0, totN = 0; const miss = [];
+for (const [f, t] of Object.entries(truthScan)) {
+  const r = DP.recognize(JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", f + "_ocr.json"), "utf8"))).fields;
+  for (const [k, v] of Object.entries(t)) { totN++; if (String(r[k] ?? "") === String(v)) okN++; else miss.push(`${f}.${k}=${r[k] ?? "∅"}(應為${v})`); }
+}
+assert.ok(okN / totN >= 0.9, `掃描辨識正確率 ${okN}/${totN} 低於 90%：${miss.join("、")}`);
+console.log(`掃描 PDF 欄位辨識 ${okN}/${totN} = ${Math.round(okN / totN * 100)}% ✔${miss.length ? "（未中：" + miss.join("、") + "）" : ""}`);
+
+// ── 計算檢核：英吋 DXF 換算、板件未填板厚 ──
+const inch = DXF.parseDXF("0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n1\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nDIMENSION\n70\n0\n42\n4\n1\n<>\n11\n0\n21\n0\n0\nENDSEC\n0\nEOF\n");
+assert.strictEqual(DP.fromDXF(inch, "x.dxf").dims[0].value, 101.6);
+const noT = E.estimatePart({ 圖號: "T1", 材料: "A6061", 數量: 1, 外形: "plate", 長L: 200, 寬W: 100 });
+assert.ok(noT.part.warnings.some((w) => /板厚未填/.test(w)) && noT.best.price.fair > 0);
+console.log("計算檢核測試通過 ✔");

@@ -101,8 +101,8 @@
       else shape = "block";
     }
     p.shape = shape;
-    if (shape === "plate" && !p.T) p.T = p.H;
-    if (shape === "sheet" && !p.T) p.T = p.H || 2;
+    if (shape === "plate" && !p.T) { p.T = p.H || 10; if (!p.H) p.warnings.push("板厚未填，暫以 10mm 估算，請補板厚"); }
+    if (shape === "sheet" && !p.T) { p.T = p.H || 2; if (!p.H) p.warnings.push("板厚未填，暫以 2mm 估算，請補板厚"); }
     if ((shape === "plate" || shape === "sheet") && !p.H) p.H = p.T;
     if (shape === "round" && !p.L) p.L = p.H;
     if (!p.solidity) p.solidity = { round: 1.0, block: 0.7, plate: 0.85, sheet: 0.9, frame: 0.25 }[shape];
@@ -151,6 +151,11 @@
     }
     if (p.netWeightKg && p.shape !== "frame") g.partVol = p.netWeightKg * 1000 / rho;
     g.removeVol = Math.max(0, g.stockVol - g.partVol);
+    // 計算檢核
+    if (p.shape !== "frame" && g.stockVol * rho / 1000 > 300 && !p.__checked) p.warnings.push(`胚料約 ${Math.round(g.stockVol * rho / 1000)} kg，請確認尺寸單位或外形分類（是否為架構件）`);
+    if (p.shape === "frame" && !p.netWeightKg && !p.__checked) p.warnings.push("架構件重量為估算值，建議填「淨重kg」提高準確度");
+    if (p.shape === "round" && p.ID && p.ID >= p.OD) p.warnings.push("內徑 ≥ 外徑，請確認");
+    p.__checked = true;
     g.stockKg = g.stockVol * rho / 1000;
     g.partKg = g.partVol * rho / 1000;
     return g;

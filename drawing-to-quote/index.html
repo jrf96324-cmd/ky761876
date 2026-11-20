@@ -133,7 +133,7 @@ table.steps tfoot td { font-weight: 700; border-top: 2px solid var(--ink); }
 .opts { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); align-items: center; }
 .opts label { display: inline-flex; gap: 6px; align-items: center; }
 .rq { display: grid; gap: 14px; }
-.rc { border: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); min-width: 0; }
+.rc { border: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); min-width: 0; }
 .rc.added { border-color: var(--lo); }
 @media (max-width: 760px) { .rc { grid-template-columns: 1fr; } }
 .rc .thumb { background: #fff; border-right: 1px solid var(--line); display: grid; align-content: start; cursor: zoom-in; min-width: 0; }
@@ -149,8 +149,21 @@ table.steps tfoot td { font-weight: 700; border-top: 2px solid var(--ink); }
 .prog { height: 4px; background: var(--line); } .prog i { display: block; height: 100%; background: var(--accent); width: 0; }
 .evid { font-size: 12px; color: var(--muted); margin: 0; padding-left: 16px; columns: 2 260px; }
 .banner { border: 1px solid var(--mid); background: var(--mid-soft); color: var(--ink); padding: 10px 12px; font-size: 13px; border-radius: 4px; }
-dialog { border: 1px solid var(--line-strong); padding: 0; max-width: min(96vw, 1400px); background: var(--panel); color: var(--ink); }
-dialog img { display: block; max-width: 100%; max-height: 86vh; }
+dialog { border: 1px solid var(--line-strong); padding: 0; max-width: 96vw; width: 96vw; background: var(--panel); color: var(--ink); }
+dialog img { display: block; width: 100%; height: auto; }
+.ovw { position: relative; line-height: 0; }
+.ovw svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ovw svg .bx rect { fill: none; vector-effect: non-scaling-stroke; stroke-width: 1.5; }
+.ovw svg .bx text { font: 700 28px var(--f-mono); paint-order: stroke; stroke: #fff; stroke-width: 6px; }
+.ovw svg .k-field rect { stroke: #d92d20; stroke-width: 2.5; fill: rgba(217, 45, 32, .08); } .ovw svg .k-field text { fill: #d92d20; }
+.ovw svg .k-callout rect { stroke: #c26a00; stroke-width: 2.5; fill: rgba(194, 106, 0, .08); } .ovw svg .k-callout text { fill: #c26a00; }
+.ovw svg .k-title rect { stroke: #1d7a46; } .ovw svg .k-num rect { stroke: #1f6fd1; stroke-dasharray: 4 3; }
+#viewer .ovw svg { pointer-events: auto; } #viewer .ovw svg .bx { cursor: pointer; } #viewer .ovw svg .bx rect { pointer-events: all; } #viewer .ovw svg .bx:hover rect { stroke-width: 4; fill: rgba(31, 111, 209, .15); }
+#viewer .ovw svg .bx.sel rect { stroke: #7a2bd9; stroke-width: 4; fill: rgba(122, 43, 217, .15); }
+.vbar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; position: sticky; top: 0; background: var(--panel); z-index: 2; }
+.vbar .lg { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+.vbar .lg i { width: 14px; height: 10px; border: 2px solid var(--c); display: inline-block; }
+.vscroll { max-height: calc(100vh - 140px); overflow: auto; }
 dialog form { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; gap: 10px; }
 @media (prefers-reduced-motion: no-preference) { .bar i, .hbar .trk i { transition: width .3s ease; } }
 </style>
@@ -267,7 +280,13 @@ dialog form { display: flex; justify-content: space-between; align-items: center
 <script src="engine/dxf.js"></script>
 <script src="engine/drawing-parser.js"></script>
 <script src="engine/recognizer-browser.js"></script>
-<dialog id="viewer"><form method="dialog"><span id="viewerName" class="mono"></span><button type="submit">關閉</button></form><img id="viewerImg" alt="圖面預覽"></dialog>
+<dialog id="viewer">
+  <div class="vbar"><b class="mono" id="viewerName"></b>
+    <span class="lg"><i style="--c:#d92d20"></i>已採用尺寸</span><span class="lg"><i style="--c:#c26a00"></i>孔／牙標註</span><span class="lg"><i style="--c:#1d7a46"></i>標題欄</span><span class="lg"><i style="--c:#1f6fd1"></i>其他數字</span>
+    <span class="spacer"></span><span id="assignBar" class="muted">點圖上的框可把數字指定為尺寸</span>
+    <form method="dialog"><button type="submit">關閉</button></form></div>
+  <div class="vscroll"><div class="ovw" id="viewerWrap"></div></div>
+</dialog>
 <script>
 (() => {
   const E = window.Estimator, $ = (s) => document.querySelector(s);
@@ -527,7 +546,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
         const pages = await DrawingReader.readFile(f, { langs: $("#optChi").checked ? "eng+chi_tra" : "eng", ocrPdf: $("#optOcrPdf").checked }, (msg) => { r.status = msg; const m = msg.match(/(\d+)%/); r.progress = m ? +m[1] : r.progress; updateStatus(r); });
         const idx = recogs.indexOf(r); const made = pages.map((pg, i) => {
           const rec = DrawingParser.recognize(pg.input);
-          return { id: i ? ++rid : r.id, fileName: pg.fileName, source: pg.source, preview: pg.preview, note: pg.note, status: "完成", fields: rec.fields, conf: rec.conf, evidence: rec.evidence, score: rec.score };
+          return { id: i ? ++rid : r.id, fileName: pg.fileName, source: pg.source, preview: pg.preview, previewMap: pg.previewMap, previewSize: pg.previewSize, items: pg.input.items, dims: pg.input.dims, note: pg.note, status: "完成", fields: rec.fields, conf: rec.conf, evidence: rec.evidence, score: rec.score };
         });
         recogs.splice(idx, 1, ...made);
         if ($("#optAuto").checked) made.forEach(addToParts);
@@ -563,7 +582,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
       const lvl = r.score >= 80 ? "低" : r.score >= 60 ? "中" : "高";
       const ev = Object.entries(r.evidence).filter(([, v]) => v).map(([k, v]) => `<li><b>${esc(k)}</b>：${esc(v)}</li>`).join("");
       return `<article class="rc${r.added ? " added" : ""}">
-        <div class="thumb" data-view="${r.id}" title="點擊放大"><img src="${r.preview}" alt="${esc(r.fileName)} 預覽"></div>
+        <div class="thumb" data-view="${r.id}" title="點擊放大核對"><div class="ovw"><img src="${r.preview}" alt="${esc(r.fileName)} 預覽">${overlaySvg(r)}</div></div>
         <div class="body">
           <div class="head"><span class="fname">${esc(r.fileName)}</span><span class="pill tag">${srcLabel[r.source] || r.source}</span><span class="pill ${lvl}">辨識信心 ${r.score}%</span>
             <span class="spacer"></span>${r.added ? '<span class="pill 低">已加入估價</span>' : `<button type="button" class="primary" data-add="${r.id}">加入估價</button>`}<button class="ghost" data-rm="${r.id}" type="button">移除</button></div>
@@ -577,10 +596,57 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     const a = e.target.closest("[data-add]"), rm = e.target.closest("[data-rm]"), vw = e.target.closest("[data-view]");
     if (a) { addToParts(recogs.find((x) => x.id === +a.dataset.add)); renderRecog(); }
     if (rm) { recogs = recogs.filter((x) => x.id !== +rm.dataset.rm); renderRecog(); }
-    if (vw) { const r = recogs.find((x) => x.id === +vw.dataset.view); $("#viewerImg").src = r.preview; $("#viewerName").textContent = r.fileName; $("#viewer").showModal(); }
+    if (vw) openViewer(recogs.find((x) => x.id === +vw.dataset.view));
   });
   $("#btnAddAll").onclick = () => { recogs.filter((r) => r.status === "完成" && !r.added).forEach(addToParts); renderRecog(); };
   $("#btnClearRecog").onclick = () => { recogs = recogs.filter((r) => r.status !== "完成" && r.status !== "失敗"); renderRecog(); };
+
+  // ── 辨識位置標示（圖上框出讀到的數字與標註，可點選指定欄位）──
+  const DIM_FIELDS = [["長L", "L"], ["寬W", "W"], ["高H", "H"], ["板厚T", "T"], ["外徑OD", "Ø"], ["內徑ID", "ID"]];
+  const CALLOUT_RE = /^\d{1,2}\s*-\s*(Ø|M|PT)|^M\d|^PT|^\d+-[ØM]/i;
+  function overlayBoxes(r) {
+    const m = r.previewMap; if (!m) return [];
+    const estW = (s, h) => [...s].reduce((a, ch) => a + (/[\u3400-\u9fff]/.test(ch) ? 1 : 0.62), 0) * h;
+    const src = [...(r.items || []), ...(r.dims || []).filter((d) => d.x != null).map((d) => ({ s: d.text, x: d.x, y: -d.y, h: 2.5 }))];
+    return src.map((it, i) => {
+      const s = (r.source === "ocr" ? DrawingParser.fixOcr(DrawingParser.norm(String(it.s || ""))) : String(it.s || "")).trim(); if (!s || (!/\d/.test(s) && !it.titleBlock)) return null;
+      let kind = it.titleBlock ? "title" : CALLOUT_RE.test(s) ? "callout" : "num", label = kind === "callout" ? (/M|PT/i.test(s) ? "牙" : "孔") : "";
+      const vm = s.match(/^[ØR]?\s*(\d+(?:\.\d+)?)/), v = vm ? +vm[1] : null;
+      if (v != null && kind !== "title") for (const [f, short] of DIM_FIELDS) if (r.fields[f] !== "" && r.fields[f] != null && Math.abs(+r.fields[f] - v) < 1e-6 && (f !== "外徑OD" || /^Ø/.test(s) || !/^\d/.test(s) || true)) { kind = "field"; label = short; break; }
+      const h = (it.h || 3) * m.sx, w = estW(s, it.h || 3) * m.sx, X = it.x * m.sx + m.ox, Y = it.y * m.sy + m.oy;
+      let x, y, bw, bh, rot = 0;
+      if (it.slanted != null) { bw = w; bh = h; x = X - w / 2; y = Y - h / 2; rot = -it.slanted; }
+      else if (it.vertical) { x = X; y = Y - w; bw = h; bh = w; }
+      else { x = X; y = Y - h; bw = w; bh = h; }
+      return { i, s, v, kind, label, x: x - 3, y: y - 3, w: bw + 6, h: bh + 6, rot };
+    }).filter(Boolean);
+  }
+  function overlaySvg(r) {
+    if (!r.previewSize) return "";
+    const fs = Math.max(14, r.previewSize.w / 50);
+    return `<svg viewBox="0 0 ${r.previewSize.w} ${r.previewSize.h}" preserveAspectRatio="none" aria-hidden="true">${overlayBoxes(r).map((b) => `<g class="bx k-${b.kind}" data-bi="${b.i}"${b.rot ? ` transform="rotate(${b.rot} ${b.x + b.w / 2} ${b.y + b.h / 2})"` : ""}><rect x="${b.x.toFixed(1)}" y="${b.y.toFixed(1)}" width="${b.w.toFixed(1)}" height="${b.h.toFixed(1)}" rx="3"/>${b.label ? `<text x="${(b.x + b.w + 3).toFixed(1)}" y="${(b.y + fs * 0.9).toFixed(1)}" style="font-size:${fs.toFixed(0)}px">${esc(b.label)}</text>` : ""}<title>${esc(b.s)}</title></g>`).join("")}</svg>`;
+  }
+  let viewing = null;
+  function openViewer(r) {
+    viewing = r; $("#viewerName").textContent = `${r.fileName}（${srcLabel[r.source] || r.source}，信心 ${r.score}%）`;
+    $("#viewerWrap").innerHTML = `<img src="${r.preview}" alt="${esc(r.fileName)} 放大">${overlaySvg(r)}`;
+    $("#assignBar").innerHTML = "點圖上的框可把數字指定為尺寸";
+    if (!$("#viewer").open) $("#viewer").showModal();
+  }
+  $("#viewerWrap").addEventListener("click", (e) => {
+    const g = e.target.closest(".bx"); if (!g || !viewing) return;
+    $("#viewerWrap").querySelectorAll(".bx.sel").forEach((x) => x.classList.remove("sel")); g.classList.add("sel");
+    const b = overlayBoxes(viewing).find((x) => x.i === +g.dataset.bi); if (!b) return;
+    const callout = CALLOUT_RE.test(b.s), cnt = (b.s.match(/^(\d{1,2})\s*-/) || [])[1];
+    $("#assignBar").innerHTML = `「<b class="mono">${esc(b.s)}</b>」設為：` + (b.v != null && !callout ? DIM_FIELDS.map(([f]) => `<button type="button" data-assign="${f}" data-v="${b.v}">${f}</button>`).join(" ") : "") +
+      (callout && cnt ? ` <button type="button" data-assign="${/M|PT/i.test(b.s) ? "攻牙數" : "孔數"}" data-v="${cnt}" data-add="1">${/M|PT/i.test(b.s) ? "攻牙數" : "孔數"} +${cnt}</button>` : "");
+  });
+  $("#assignBar").addEventListener("click", (e) => {
+    const bt = e.target.closest("[data-assign]"); if (!bt || !viewing) return;
+    const f = bt.dataset.assign, v = +bt.dataset.v;
+    viewing.fields[f] = bt.dataset.add ? (+viewing.fields[f] || 0) + v : v; viewing.conf[f] = "high"; viewing.evidence[f] = "圖上點選";
+    renderRecog(); openViewer(viewing); toast(`${f} = ${viewing.fields[f]}`);
+  });
 
   function addToParts(r) {
     if (!r || r.added) return;
@@ -588,9 +654,22 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     const row = Object.fromEntries(E.CSV_HEADERS.map((h) => [h, r.fields[h] ?? ""]));
     row["辨識來源"] = `${srcLabel[r.source] || r.source} ${r.score}%`;
     const i = parts.findIndex((p) => p["圖號"] && p["圖號"] === row["圖號"]);
-    const scoreOf = (x) => parseInt((String(x["辨識來源"] || "").match(/(\d+)%/) || [])[1] || "101", 10); // 人工輸入視為最高
-    if (i >= 0 && scoreOf(parts[i]) >= r.score) { r.added = true; toast(`${row["圖號"]} 已有信心較高的版本，保留原資料`); return; }
-    if (i >= 0) parts[i] = row; else parts.push(row);
+    if (i >= 0) {
+      // 同一圖號有多個來源（DXF／PDF／掃描）：逐欄位取信心較高者合併
+      const rank = { high: 3, mid: 2, low: 1 }, srcRank = { dxf: 3, pdf: 2, ocr: 1 };
+      const prevR = recogs.find((x) => x !== r && x.added && x.fields["圖號"] === row["圖號"]);
+      if (!prevR && !String(parts[i]["辨識來源"] || "")) { r.added = true; toast(`${row["圖號"]} 已有人工輸入資料，保留原資料`); renderRecog(); return; }
+      const merged = { ...parts[i] }; let changed = 0;
+      for (const h of E.CSV_HEADERS) {
+        const nv = r.fields[h]; if (nv === undefined || nv === "") continue;
+        const oldC = prevR ? (rank[prevR.conf[h]] || 0) * 10 + (srcRank[prevR.source] || 0) : 0, newC = (rank[r.conf[h]] || 0) * 10 + (srcRank[r.source] || 0);
+        if (merged[h] === "" || merged[h] == null || newC > oldC) { if (String(merged[h]) !== String(nv)) changed++; merged[h] = nv; if (prevR) { prevR.fields[h] = nv; prevR.conf[h] = r.conf[h]; } }
+      }
+      merged["辨識來源"] = `${merged["辨識來源"]}＋${srcLabel[r.source] || r.source} ${r.score}%`.replace(/^＋/, "");
+      parts[i] = merged; r.added = true; store.set("d2q.parts", parts); renderPartsTable(); compute();
+      toast(`${row["圖號"]} 已合併多來源資料（更新 ${changed} 個欄位）`); return;
+    }
+    parts.push(row);
     r.added = true; store.set("d2q.parts", parts); renderPartsTable(); compute();
     toast(`已加入：${row["圖號"] || r.fileName}`);
   }
