@@ -94,7 +94,7 @@
     return zip(files);
   }
 
-  const API = { buildXlsx };
+  const API = { buildXlsx, zip };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.XlsxWriter = API;
 })(typeof globalThis !== "undefined" ? globalThis : this);

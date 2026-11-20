@@ -2,6 +2,38 @@
 
 依《多張製作圖自動製程審查系統》規劃落地的 **版本 A/B**：零件資料（人工或 AI 讀圖後填入）→ 多條製程路線自動估價 → 推薦路線、風險、降本建議 → 一鍵輸出 Excel 報價分析與詢價單。單價採 **台灣本地加工行情**，可自行回填校正。
 
+## 離線單機版（2D 圖面辨識 + 多張估價統計）
+
+| 平台 | 啟動 |
+|---|---|
+| Windows | 雙擊 `START-Windows.bat`（免安裝，用內建 PowerShell 開本機伺服器；有 Node.js 時改用 Node） |
+| macOS / Linux | `./start-mac-linux.sh`（Node.js 或 Python 3） |
+| 打包發給同事 | `node tools/build-offline.js` → `dist/Drawing-to-Quote-離線版.zip`（約 13 MB，解壓即用） |
+
+所有函式庫與 OCR 字庫都在 `vendor/`（pdf.js 3.11、tesseract.js 5.1 + 繁中/英文字庫），**完全不連網，圖面不會上傳**。
+
+### 2D 圖面辨識流程
+
+```
+多張 DXF / PDF / PNG / JPG 拖曳進來
+  ├─ DXF：直接讀 TEXT / MTEXT / 屬性 / DIMENSION 標註值 / CIRCLE（展開圖塊，支援 UTF-8 與 Big5）
+  ├─ PDF：讀文字層（CAD 匯出 PDF）；無文字層或 SHX 線字 → 自動轉 OCR；多頁 = 多張圖
+  └─ 圖片：灰階/對比前處理 → Tesseract OCR（稀疏文字模式，繁中＋英文）
+        ↓
+規則式欄位辨識（engine/drawing-parser.js）
+  ① 標題欄：圖號、CAD NO、品名、材料、數量、表面處理、熱處理 → 取標籤右方或下方的值
+  ② 註記：N-ØD 孔、M 螺牙（含深度→深孔判斷）、PT/NPT/Rc 管牙、交叉孔/流道、清角、焊接、UP/DOWN 折彎、板厚 t=
+  ③ 品質：±公差、+/- 上下限、H7/g6 配合等級 → 一般/中等/嚴；Ra 值或 ▽ 符號 → 粗糙度
+  ④ 尺寸：最大三個線性尺寸 = 長寬高；最大 Ø = 外徑；帶 H 公差的次大 Ø = 內徑
+  ⑤ 外形：直徑為主→圓件、板厚/折彎→鈑金、焊接+大尺寸→架構件、厚度遠小於長寬→板件
+        ↓
+每個欄位附信心色條（綠＝標題欄、黃＝推斷、紅＝猜測）與辨識依據，人工核對後一鍵加入估價
+        ↓
+多元製程估價 + 整批統計（材料別、外形別、製程別、資料來源、辨識平均信心）+ Excel 9 表
+```
+
+準確度：DXF > CAD 匯出 PDF > 掃描圖。DWG 請先另存 DXF 或 PDF。`samples/drawings/` 有三張示範圖（同一圖面的 DXF / PDF / PNG 版本）可試用。
+
 ## 使用方式
 
 | 方式 | 指令 / 操作 |
@@ -9,7 +41,7 @@
 | 網頁版 | 直接用瀏覽器開啟 `index.html`（免安裝、可離線） |
 | 命令列 | `node cli.js samples/parts.csv -o out/報價分析.xlsx --project 專案名 --due 交期 --deadline 截止日` |
 | 自訂單價 | 網頁「單價設定」修改後匯出 JSON，CLI 加 `--db 單價.json` |
-| 測試 | `node test/run-test.js` |
+| 測試 | `node test/run-test.js`（含估價與 DXF 辨識回歸測試） |
 
 不需 `npm install`，Node 18 以上即可。
 

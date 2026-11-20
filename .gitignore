@@ -3,3 +3,4 @@ data/
 cloudflared.exe
 node_modules/
 .env
+dist/

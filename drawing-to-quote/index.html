@@ -118,6 +118,32 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
 .note { font-size: 12px; color: var(--muted); border-left: 3px solid var(--line-strong); padding-left: 10px; }
 .flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
 .flow b { color: var(--ink); font-weight: 500; background: var(--bg); border: 1px solid var(--line); padding: 1px 7px; border-radius: 3px; }
+/* recognition */
+.drop { border: 2px dashed var(--line-strong); background: var(--bg); padding: 22px 16px; text-align: center; display: grid; gap: 8px; justify-items: center; cursor: pointer; border-radius: 4px; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { font-size: 16px; }
+.opts { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); align-items: center; }
+.opts label { display: inline-flex; gap: 6px; align-items: center; }
+.rq { display: grid; gap: 14px; }
+.rc { border: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); min-width: 0; }
+.rc.added { border-color: var(--lo); }
+@media (max-width: 760px) { .rc { grid-template-columns: 1fr; } }
+.rc .thumb { background: #fff; border-right: 1px solid var(--line); display: grid; align-content: start; cursor: zoom-in; min-width: 0; }
+.rc .thumb img { width: 100%; display: block; }
+.rc .thumb .ph { height: 180px; display: grid; place-items: center; color: #5a6a80; font-size: 13px; }
+.rc .body { padding: 10px 12px; display: grid; gap: 10px; min-width: 0; }
+.rc .head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.rc .fname { font-family: var(--f-mono); font-weight: 600; overflow-wrap: anywhere; }
+.fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px 8px; }
+.fgrid label { display: grid; gap: 2px; font-size: 11px; color: var(--muted); min-width: 0; }
+.fgrid input, .fgrid select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-left-width: 4px; background: var(--panel); color: var(--ink); border-radius: 3px; width: 100%; min-width: 0; }
+.fgrid .c-high { border-left-color: var(--lo); } .fgrid .c-mid { border-left-color: var(--mid); } .fgrid .c-low { border-left-color: var(--hi); } .fgrid .c-none { border-left-color: var(--line); }
+.prog { height: 4px; background: var(--line); } .prog i { display: block; height: 100%; background: var(--accent); width: 0; }
+.evid { font-size: 12px; color: var(--muted); margin: 0; padding-left: 16px; columns: 2 260px; }
+.banner { border: 1px solid var(--mid); background: var(--mid-soft); color: var(--ink); padding: 10px 12px; font-size: 13px; border-radius: 4px; }
+dialog { border: 1px solid var(--line-strong); padding: 0; max-width: min(96vw, 1400px); background: var(--panel); color: var(--ink); }
+dialog img { display: block; max-width: 100%; max-height: 86vh; }
+dialog form { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; gap: 10px; }
 @media (prefers-reduced-motion: no-preference) { .bar i, .hbar .trk i { transition: width .3s ease; } }
 </style>
 
@@ -148,7 +174,8 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
   </section>
 
   <nav class="tabs" role="tablist" id="tabs">
-    <button role="tab" data-tab="parts" aria-selected="true">零件輸入</button>
+    <button role="tab" data-tab="recog" aria-selected="true">圖面辨識</button>
+    <button role="tab" data-tab="parts">零件輸入</button>
     <button role="tab" data-tab="routes">多元製程估價</button>
     <button role="tab" data-tab="costdown">降本建議</button>
     <button role="tab" data-tab="stats">統計</button>
@@ -156,7 +183,26 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
     <button role="tab" data-tab="db">單價設定</button>
   </nav>
 
-  <section class="panel" data-pane="parts">
+  <section class="panel" data-pane="recog">
+    <div class="toolbar"><h2>2D 圖面辨識（多張）</h2><span class="muted" id="recogStat"></span><span class="spacer"></span>
+      <button id="btnAddAll" type="button" class="primary" disabled>全部加入估價</button><button id="btnClearRecog" type="button">清除清單</button></div>
+    <div class="banner" id="fileBanner" hidden>目前以檔案直接開啟：DXF 與含文字的 PDF 可辨識；掃描圖、照片的 OCR 需要用資料夾內的 <b>START-Windows.bat</b>（或 start-mac-linux.sh）啟動。</div>
+    <label class="drop" id="drop" for="fileDraw">
+      <strong>拖曳多張製作圖到這裡，或點此選擇檔案</strong>
+      <span class="muted">支援 DXF（最準，直接讀尺寸標註）、PDF（多頁＝多張圖）、PNG / JPG 掃描圖（離線 OCR 繁中＋英文）</span>
+      <input id="fileDraw" type="file" multiple accept=".dxf,.pdf,.png,.jpg,.jpeg,.bmp,.webp,.tif,.tiff" hidden>
+    </label>
+    <div class="opts">
+      <label><input type="checkbox" id="optOcrPdf" checked> PDF 無文字層時自動 OCR</label>
+      <label><input type="checkbox" id="optChi" checked> OCR 含繁體中文</label>
+      <label><input type="checkbox" id="optAuto"> 辨識完成自動加入估價</label>
+      <span>欄位左側色條：<span class="pill 低">綠＝標題欄讀到</span> <span class="pill 中">黃＝註記推斷</span> <span class="pill 高">紅＝猜測/預設，請核對</span></span>
+    </div>
+    <div class="rq" id="recogQueue"></div>
+    <p class="note">辨識方式：①標題欄標籤（圖號、品名、材料、數量、表面處理、熱處理）取右方或下方的值；②註記關鍵字（N-ØD 孔、M 螺牙、PT 管牙、深孔、Ra、±公差、H7/g6 配合、UP/DOWN 折彎、焊接）；③尺寸標註取最大三個為外形尺寸、最大 Ø 為外徑；④ DXF 另用圓形圖元輔助計孔。全部在本機執行，圖面不會上傳。DWG 請先另存 DXF 或 PDF。</p>
+  </section>
+
+  <section class="panel" data-pane="parts" hidden>
     <div class="toolbar"><h2>零件清單</h2><span class="muted" id="sampleNote"></span><span class="spacer"></span><button id="btnAdd" type="button">＋ 新增零件</button></div>
     <div class="scroll" style="max-height:70vh"><table id="partsTable"></table></div>
     <p class="note">外形留空會依尺寸自動判斷（有外徑→圓件、有折彎→鈑金、有焊道→架構件）。數量可填「2+2」。實體率 = 成品體積 ÷ 外形包絡體積，方塊件低於 45% 會自動評估「改焊接/組合件」路線。</p>
@@ -198,6 +244,10 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
 <script src="engine/estimator.js"></script>
 <script src="engine/report.js"></script>
 <script src="engine/xlsx-writer.js"></script>
+<script src="engine/dxf.js"></script>
+<script src="engine/drawing-parser.js"></script>
+<script src="engine/recognizer-browser.js"></script>
+<dialog id="viewer"><form method="dialog"><span id="viewerName" class="mono"></span><button type="submit">關閉</button></form><img id="viewerImg" alt="圖面預覽"></dialog>
 <script>
 (() => {
   const E = window.Estimator, $ = (s) => document.querySelector(s);
@@ -231,7 +281,7 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
     ...["孔數", "攻牙數", "PT牙數", "槽數", "口袋數", "深孔數", "交叉孔數", "內直角數", "外螺紋數", "退刀槽數", "加工面數", "折彎數", "焊道長mm", "雷切周長mm"].map((h) => ({ h, g: "加工特徵" })),
     { h: "公差", g: "品質", sel: () => Object.keys(db.tolerance) , w: "w-m" }, { h: "粗糙度", g: "品質", sel: () => Object.keys(db.roughness), w: "w-m" },
     { h: "表面處理", g: "品質", sel: () => Object.keys(db.surfaces), w: "w-m" }, { h: "熱處理", g: "品質", sel: () => Object.keys(db.heatTreats), w: "w-m" },
-    { h: "備註", g: "品質", w: "w-l" },
+    { h: "備註", g: "品質", w: "w-l" }, { h: "辨識來源", g: "來源", w: "w-m" },
   ];
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const nt = (v) => "NT$ " + Math.round(v).toLocaleString("en-US");
@@ -336,7 +386,10 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
       hbars("成本結構 NT$", [["材料", m.material, `<small class="muted">${pct(m.material / t)}</small>`], ["加工", m.machining, `<small class="muted">${pct(m.machining / t)}</small>`], ["委外表處/熱處理", m.outsource, `<small class="muted">${pct(m.outsource / t)}</small>`], ["管銷利潤", m.overheadProfit, `<small class="muted">${pct(m.overheadProfit / t)}</small>`]]) +
       hbars("製程類別金額", Object.entries(s.byProcess).sort((a, b) => b[1] - a[1])) +
       hbars("零件成本排行 (小計)", [...est.results].sort((a, b) => b.lineTotal - a.lineTotal).map((r) => [`${r.part.name} ${r.part.drawingNo.slice(-3)}`, r.lineTotal, `<span class="pill ${r.risk.level}">${r.risk.level}</span>`])) +
-      hbars("降本潛力 (首要建議 × 數量)", est.results.filter((r) => r.suggestions[0]?.saving).map((r) => [r.part.name, r.suggestions[0].saving * r.part.qty]).sort((a, b) => b[1] - a[1]));
+      hbars("材料別金額", Object.entries(s.byMaterial).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => [k, v.amount, `<small class="muted">${v.count} 張</small>`])) +
+      hbars("外形分類金額", Object.entries(s.byShape).sort((a, b) => b[1].amount - a[1].amount).map(([k, v]) => [k, v.amount, `<small class="muted">${v.count} 張</small>`])) +
+      hbars(`資料來源${s.avgConfidence != null ? `（辨識平均信心 ${Math.round(s.avgConfidence)}%）` : ""}`, Object.entries(s.bySource).map(([k, v]) => [k, v.amount, `<small class="muted">${v.count} 張</small>`])) +
+      hbars("降本潛力 (首要建議 × 數量)", est.results.filter((r) => r.suggestions[0]?.saving).map((r) => [r.part.name || r.part.drawingNo, r.suggestions[0].saving * r.part.qty]).sort((a, b) => b[1] - a[1]));
   }
 
   // ── price DB editor ──
@@ -401,15 +454,106 @@ textarea { width: 100%; min-height: 320px; font-family: var(--f-mono); font-size
   function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.style.color = bad ? "var(--hi)" : "var(--lo)"; clearTimeout(toast.t); toast.t = setTimeout(() => (t.textContent = ""), 4000); }
   function deepMerge(a, b) { for (const k of Object.keys(b || {})) a[k] = b[k] && typeof b[k] === "object" && !Array.isArray(b[k]) ? deepMerge(a[k] || {}, b[k]) : b[k]; return a; }
 
+  // ── 2D 圖面辨識 ──
+  const RFIELDS = [["圖號"], ["零件名稱"], ["材料", "mat"], ["數量"], ["外形", "shape"], ["長L"], ["寬W"], ["高H"], ["外徑OD"], ["內徑ID"], ["板厚T"], ["孔數"], ["攻牙數"], ["PT牙數"],
+    ["深孔數"], ["交叉孔數"], ["折彎數"], ["外螺紋數"], ["加工面數"], ["公差", "tol"], ["粗糙度", "ra"], ["表面處理", "surf"], ["熱處理", "heat"], ["CAD NO"]];
+  let recogs = []; let rid = 0; let busy = false; const jobs = [];
+  if (window.DrawingReader && DrawingReader.isFileProtocol()) $("#fileBanner").hidden = false;
+  const drop = $("#drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => enqueue([...e.dataTransfer.files]));
+  $("#fileDraw").onchange = (e) => { enqueue([...e.target.files]); e.target.value = ""; };
+
+  function enqueue(files) {
+    for (const f of files) { const r = { id: ++rid, fileName: f.name, status: "等待中", progress: 0 }; recogs.push(r); jobs.push({ r, f }); }
+    renderRecog(); pump();
+  }
+  async function pump() {
+    if (busy) return; busy = true;
+    while (jobs.length) {
+      const { r, f } = jobs.shift(); r.status = "辨識中"; renderRecog();
+      try {
+        const pages = await DrawingReader.readFile(f, { langs: $("#optChi").checked ? "eng+chi_tra" : "eng", ocrPdf: $("#optOcrPdf").checked }, (msg) => { r.status = msg; const m = msg.match(/(\d+)%/); r.progress = m ? +m[1] : r.progress; updateStatus(r); });
+        const idx = recogs.indexOf(r); const made = pages.map((pg, i) => {
+          const rec = DrawingParser.recognize(pg.input);
+          return { id: i ? ++rid : r.id, fileName: pg.fileName, source: pg.source, preview: pg.preview, note: pg.note, status: "完成", fields: rec.fields, conf: rec.conf, evidence: rec.evidence, score: rec.score };
+        });
+        recogs.splice(idx, 1, ...made);
+        if ($("#optAuto").checked) made.forEach(addToParts);
+      } catch (err) { console.error(err); r.status = "失敗"; r.error = err.message || String(err); }
+      renderRecog();
+    }
+    busy = false;
+  }
+  function updateStatus(r) { const el = document.getElementById("st-" + r.id); if (el) el.textContent = r.status; const pg = document.getElementById("pg-" + r.id); if (pg) pg.style.width = r.progress + "%"; }
+
+  const srcLabel = { dxf: "DXF 向量", pdf: "PDF 文字層", ocr: "OCR 影像" };
+  function fieldCtl(r, [k, type]) {
+    const v = r.fields[k] ?? "", c = r.conf[k] || "none", id = `rf-${r.id}-${k}`;
+    const title = esc(r.evidence[k] || "未辨識到，請手動輸入");
+    let ctl;
+    const options = type === "mat" ? ["", ...Object.keys(db.materials)] : type === "shape" ? Object.keys(E.SHAPES) : type === "tol" ? Object.keys(db.tolerance) : type === "ra" ? Object.keys(db.roughness) : type === "surf" ? Object.keys(db.surfaces) : type === "heat" ? Object.keys(db.heatTreats) : null;
+    if (options) {
+      const opts = v !== "" && !options.includes(String(v)) ? [...options, String(v)] : options;
+      ctl = `<select id="${id}" class="c-${c}" data-rid="${r.id}" data-k="${k}" title="${title}">${opts.map((o) => `<option value="${esc(o)}"${String(o) === String(v) ? " selected" : ""}>${esc(type === "shape" ? E.SHAPES[o] : o || "—")}</option>`).join("")}</select>`;
+    } else ctl = `<input id="${id}" class="c-${c}" data-rid="${r.id}" data-k="${k}" value="${esc(v)}" title="${title}">`;
+    return `<label for="${id}">${k}${ctl}</label>`;
+  }
+  function renderRecog() {
+    const done = recogs.filter((r) => r.status === "完成");
+    const avg = done.length ? Math.round(done.reduce((a, r) => a + r.score, 0) / done.length) : 0;
+    $("#recogStat").textContent = recogs.length ? `${recogs.length} 張 · 完成 ${done.length} · 平均信心 ${avg}% · 已加入 ${recogs.filter((r) => r.added).length}` : "";
+    $("#btnAddAll").disabled = !done.some((r) => !r.added);
+    $("#btnAddAll").textContent = `全部加入估價 (${done.filter((r) => !r.added).length})`;
+    $("#recogQueue").innerHTML = recogs.map((r) => {
+      if (r.status !== "完成") return `<article class="rc"><div class="thumb"><div class="ph">${r.status === "失敗" ? "無法讀取" : "處理中…"}</div></div><div class="body">
+        <div class="head"><span class="fname">${esc(r.fileName)}</span><span class="pill ${r.status === "失敗" ? "高" : "tag"}" id="st-${r.id}">${esc(r.status)}</span><span class="spacer"></span><button class="ghost" data-rm="${r.id}" type="button">移除</button></div>
+        ${r.error ? `<p class="note">${esc(r.error)}</p>` : `<div class="prog"><i id="pg-${r.id}" style="width:${r.progress}%"></i></div>`}</div></article>`;
+      const lvl = r.score >= 80 ? "低" : r.score >= 60 ? "中" : "高";
+      const ev = Object.entries(r.evidence).filter(([, v]) => v).map(([k, v]) => `<li><b>${esc(k)}</b>：${esc(v)}</li>`).join("");
+      return `<article class="rc${r.added ? " added" : ""}">
+        <div class="thumb" data-view="${r.id}" title="點擊放大"><img src="${r.preview}" alt="${esc(r.fileName)} 預覽"></div>
+        <div class="body">
+          <div class="head"><span class="fname">${esc(r.fileName)}</span><span class="pill tag">${srcLabel[r.source] || r.source}</span><span class="pill ${lvl}">辨識信心 ${r.score}%</span>
+            <span class="spacer"></span>${r.added ? '<span class="pill 低">已加入估價</span>' : `<button type="button" class="primary" data-add="${r.id}">加入估價</button>`}<button class="ghost" data-rm="${r.id}" type="button">移除</button></div>
+          <div class="fgrid">${RFIELDS.filter(([k]) => !(r.fields["外形"] === "round" && ["寬W", "高H", "板厚T", "折彎數"].includes(k)) && !(r.fields["外形"] !== "round" && ["外徑OD", "內徑ID", "外螺紋數"].includes(k))).map((f) => fieldCtl(r, f)).join("")}</div>
+          <details><summary>辨識依據（${esc(r.note || "")}）</summary><ul class="evid">${ev}</ul>${r.fields["備註"] ? `<p class="note">圖面註記：${esc(r.fields["備註"])}</p>` : ""}</details>
+        </div></article>`;
+    }).join("") || `<p class="muted">尚未加入圖面。可先試試 samples/drawings 資料夾內的示範 DXF / PDF / PNG。</p>`;
+  }
+  $("#recogQueue").addEventListener("input", (e) => { const t = e.target; if (!t.dataset.k) return; const r = recogs.find((x) => x.id === +t.dataset.rid); if (!r) return; r.fields[t.dataset.k] = t.value; r.conf[t.dataset.k] = "high"; r.evidence[t.dataset.k] = "人工修正"; t.className = "c-high"; });
+  $("#recogQueue").addEventListener("click", (e) => {
+    const a = e.target.closest("[data-add]"), rm = e.target.closest("[data-rm]"), vw = e.target.closest("[data-view]");
+    if (a) { addToParts(recogs.find((x) => x.id === +a.dataset.add)); renderRecog(); }
+    if (rm) { recogs = recogs.filter((x) => x.id !== +rm.dataset.rm); renderRecog(); }
+    if (vw) { const r = recogs.find((x) => x.id === +vw.dataset.view); $("#viewerImg").src = r.preview; $("#viewerName").textContent = r.fileName; $("#viewer").showModal(); }
+  });
+  $("#btnAddAll").onclick = () => { recogs.filter((r) => r.status === "完成" && !r.added).forEach(addToParts); renderRecog(); };
+  $("#btnClearRecog").onclick = () => { recogs = recogs.filter((r) => r.status !== "完成" && r.status !== "失敗"); renderRecog(); };
+
+  function addToParts(r) {
+    if (!r || r.added) return;
+    if (isSample) { parts = []; isSample = false; }
+    const row = Object.fromEntries(E.CSV_HEADERS.map((h) => [h, r.fields[h] ?? ""]));
+    row["辨識來源"] = `${srcLabel[r.source] || r.source} ${r.score}%`;
+    const i = parts.findIndex((p) => p["圖號"] && p["圖號"] === row["圖號"]);
+    const scoreOf = (x) => parseInt((String(x["辨識來源"] || "").match(/(\d+)%/) || [])[1] || "101", 10); // 人工輸入視為最高
+    if (i >= 0 && scoreOf(parts[i]) >= r.score) { r.added = true; toast(`${row["圖號"]} 已有信心較高的版本，保留原資料`); return; }
+    if (i >= 0) parts[i] = row; else parts.push(row);
+    r.added = true; store.set("d2q.parts", parts); renderPartsTable(); compute();
+    toast(`已加入：${row["圖號"] || r.fileName}`);
+  }
+
   // ── tabs (hash routed) ──
   function showTab(name) {
-    if (!document.querySelector(`[data-pane="${name}"]`)) name = "parts";
+    if (!document.querySelector(`[data-pane="${name}"]`)) name = "recog";
     document.querySelectorAll("[data-pane]").forEach((p) => (p.hidden = p.dataset.pane !== name));
     document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name));
   }
   $("#tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { history.replaceState(null, "", "#" + b.dataset.tab); showTab(b.dataset.tab); } });
   window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
 
-  renderDb(); renderPartsTable(); compute(); showTab(location.hash.slice(1) || "parts");
+  renderDb(); renderPartsTable(); compute(); showTab(location.hash.slice(1) || "recog");
 })();
 </script>

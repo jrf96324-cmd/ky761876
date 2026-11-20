@@ -75,6 +75,7 @@
       surfaceInput: String(raw.surface ?? raw["表面處理"] ?? "").trim(),
       heatInput: String(raw.heat ?? raw["熱處理"] ?? "").trim(),
       notes: String(raw.notes ?? raw["備註"] ?? "").trim(),
+      source: String(raw.source ?? raw["辨識來源"] ?? "").trim(),
       warnings: [],
     };
     p.qty = parseQty(p.qtyInput);
@@ -473,13 +474,19 @@
     results.forEach((r) => { const k = r.best.name.split(/[ (（]/)[0]; byProcess[k] = (byProcess[k] || 0) + r.lineTotal; });
     const costMix = { material: 0, machining: 0, outsource: 0, overheadProfit: 0 };
     results.forEach((r) => { const pr = r.best.price, q = r.part.qty; costMix.material += pr.material * q; costMix.machining += pr.machining * q; costMix.outsource += pr.outsource * q; costMix.overheadProfit += (pr.fair - pr.direct) * q; });
-    return { results, summary: { count: results.length, total, totalLow, totalRush, potential, riskCount, byProcess, costMix } };
+    const group = (fn) => { const o = {}; results.forEach((r) => { const k = fn(r) || "—"; o[k] = o[k] || { amount: 0, count: 0, qty: 0 }; o[k].amount += r.lineTotal; o[k].count++; o[k].qty += r.part.qty; }); return o; };
+    const byMaterial = group((r) => r.part.material);
+    const byShape = group((r) => SHAPES[r.part.shape]);
+    const bySource = group((r) => (r.part.source || "人工輸入").replace(/\s*\d+%$/, ""));
+    const recog = results.map((r) => parseInt((r.part.source.match(/(\d+)%/) || [])[1], 10)).filter(Number.isFinite);
+    const avgConfidence = recog.length ? recog.reduce((a, b) => a + b, 0) / recog.length : null;
+    return { results, summary: { count: results.length, total, totalLow, totalRush, potential, riskCount, byProcess, costMix, byMaterial, byShape, bySource, avgConfidence } };
   }
 
   // ───────────────────────── CSV ─────────────────────────
   const CSV_HEADERS = ["圖號", "CAD NO", "零件名稱", "材料", "數量", "外形", "長L", "寬W", "高H", "外徑OD", "內徑ID", "板厚T",
     "實體率%", "淨重kg", "孔數", "攻牙數", "PT牙數", "槽數", "口袋數", "深孔數", "交叉孔數", "內直角數", "外螺紋數", "退刀槽數",
-    "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註"];
+    "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註", "辨識來源"];
 
   function parseCSV(text) {
     const rows = []; let row = [], cell = "", q = false;
