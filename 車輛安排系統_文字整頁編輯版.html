@@ -97,6 +97,16 @@
     .te-mtabs b{display:inline-block;min-width:18px;border-radius:999px;background:var(--orange);color:#fff;font-size:11px;padding:0 5px}
     .te-mtabs b:empty{display:none}
     .modal{z-index:115}
+    .tf{position:fixed;inset:0;z-index:118;background:var(--card);color:var(--text);display:flex;flex-direction:column;height:100vh;height:100dvh}
+    .tf-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,#0f172a,#1e3a8a);color:#fff}
+    .tf-head b{flex:1;font-size:16px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tf-bar{display:flex;gap:6px;padding:6px 8px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--card2);scrollbar-width:none}.tf-bar::-webkit-scrollbar{display:none}
+    .tf-bar button{flex:none;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-weight:900;font-size:13px}
+    .tf-ta{flex:1;min-height:0;border:0;border-radius:0;resize:none;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Consolas,"Microsoft JhengHei",monospace;line-height:1.75;white-space:pre;overflow:auto;background:var(--card)}
+    .tf-ta:focus{box-shadow:none}
+    .tf-foot{display:flex;gap:8px;align-items:center;padding:6px 10px calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--card2);font-size:12px;color:var(--muted);font-weight:900}
+    .te-ver{font-size:11px;font-weight:900;opacity:.6;margin-left:6px}
+    .te-full-btn{background:var(--brand)!important;color:#fff!important;border-color:var(--brand)!important}
     body.te-open .toast{bottom:auto;top:12px}body.te-open .toast.show{bottom:auto;top:64px}
     @media (max-width:1180px){.te-body{grid-template-columns:1fr 1fr}.te-col.te-side-col{grid-column:1/-1;border-top:1px solid var(--line);max-height:42vh}.te-act-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
     @media (max-width:720px){
@@ -372,6 +382,7 @@
           <button class="btn purple" onclick="app.exportCSV()">📄 匯出 CSV 名單</button>
           <button class="btn green" onclick="app.printPage()">🖨️ 列印分車表</button>
           <button class="btn light" onclick="app.toggleTheme()">🌙 切換深色模式</button>
+          <button class="btn gray" onclick="app.forceUpdate()">🔄 強制更新到最新版</button>
           <button class="btn red" onclick="app.resetDemo()">♻️ 還原範例資料</button>
         </div>
         <div class="hr"></div>
@@ -487,6 +498,7 @@
   /* ================= 文字整頁編輯：資料 ⇄ 文字 ================= */
   const BLOCK_SEP = '==============================';
   const TE_OPT_KEY = 'vehiclePlanner_textEditOpts_v1';
+  const TE_VER = '3.0';
   let editor = null; // {sources, key, origText, results, view, opts, timer}
 
   function snapOf(src){ // 統一成 {name,eventDate,meetPoint,notice,people,vehicles}
@@ -697,20 +709,46 @@
     document.body.classList.add('te-open');
     renderEditor(editor.origText);
     computeEditor();
+    if(key==='blank') setTimeout(()=>app.teFullPage(),80);
   }
+  /* 全螢幕彈出編輯器：整頁／修改選取行／新增行 共用 */
+  let fullCb=null, fullInit='';
+  function openFull(title, text, onSave, opt={}){
+    fullCb=onSave; fullInit=text||'';
+    let fs=16; try{fs=+localStorage.getItem('vehiclePlanner_tfFont')||16}catch{}
+    let host=document.getElementById('teFullHost'); if(!host){host=document.createElement('div'); host.id='teFullHost'; document.body.appendChild(host)}
+    host.innerHTML=`<div class="tf">
+      <div class="tf-head"><button class="btn small ghost" onclick="app.tfClose()">✕ 取消</button><b>${h(title)}</b><button class="btn small green" onclick="app.tfSave()">✅ 完成</button></div>
+      <div class="tf-bar">
+        <button onclick="app.tfCopy()">📋 複製全部</button>
+        <button onclick="app.tfPaste()">📥 貼上</button>
+        <button onclick="app.tfSelAll()">▣ 全選</button>
+        <button onclick="app.tfClear()">⌫ 清空</button>
+        <button onclick="app.tfRestore()">↺ 還原</button>
+        <button onclick="app.tfFont(-1)">A−</button><button onclick="app.tfFont(1)">A＋</button>
+        <button onclick="app.tfWrap()">↩ 自動換行</button>
+      </div>
+      <textarea id="tfText" class="tf-ta" spellcheck="false" placeholder="${h(opt.placeholder||'在此輸入或貼上文字，每行一筆')}" style="font-size:${fs}px" oninput="app.tfCount()"></textarea>
+      <div class="tf-foot"><span id="tfCount"></span><span style="flex:1">${h(opt.hint||'')}</span></div>
+    </div>`;
+    const ta=document.getElementById('tfText'); ta.value=fullInit; app.tfCount();
+    setTimeout(()=>{ta.focus(); if(opt.cursorEnd!==false){ta.selectionStart=ta.selectionEnd=ta.value.length}},60);
+  }
+  function closeFull(){const host=document.getElementById('teFullHost'); if(host) host.innerHTML=''; fullCb=null}
   function isMobile(){return window.matchMedia('(max-width:720px)').matches}
   function renderEditor(text){
     const srcs=editorSources(), k=editor.key, o=editor.opts, E=editor;
     const opt=(id,label,desc)=>`<label class="te-opt"><input type="checkbox" ${o[id]?'checked':''} onchange="app.teOpt('${id}',this.checked)"><span><b>${label}</b>${desc?`<br><span class="te-help">${desc}</span>`:''}</span></label>`;
     const ab=(fn,label,cls='',extra='')=>`<button class="${cls}" onclick="app.${fn}" ${extra}>${label}</button>`;
     document.getElementById('editorHost').innerHTML=`<div class="te"><div class="te-panel">
-      <div class="te-head"><span>📝 文字編輯<span class="te-hide-m">｜比對｜轉成新資料</span></span><button class="iconbtn" onclick="app.closeTextEditor()">✕</button></div>
+      <div class="te-head"><span>📝 文字編輯<span class="te-hide-m">｜比對｜轉成新資料</span><span class="te-ver">v${TE_VER}</span></span><button class="iconbtn" onclick="app.closeTextEditor()">✕</button></div>
       <div class="te-bar">
         <select onchange="app.teSource(this.value)" title="來源">
           ${srcs.map(s=>`<option value="${h(s.id)}" ${k===s.id?'selected':''}>來源：${h(s.label)}</option>`).join('')}
           ${state.historyEvents.length?`<option value="all" ${k==='all'?'selected':''}>來源：全部歷史（${state.historyEvents.length} 筆，整批）</option>`:''}
           <option value="blank" ${k==='blank'?'selected':''}>來源：空白（貼上外部文字）</option>
         </select>
+        <button class="btn small blue" onclick="app.teFullPage()">⛶ 整頁編輯</button>
         <button class="btn small cyan" onclick="app.teCopy('orig')">📋 複製原文</button>
         <button class="btn small green" onclick="app.teCopy('edit')">📋 複製編輯後</button>
         <button class="btn small purple" onclick="app.teFormat()">✨ 整理格式</button>
@@ -742,7 +780,7 @@
         </div>
         <div class="te-col te-edit-col">
           <div class="te-col-head"><span>編輯區</span>
-            <span class="row" style="gap:6px"><span id="teLines"></span>
+            <span class="row" style="gap:6px"><span id="teLines" class="te-hide-m"></span><span class="te-seg"><button class="te-full-btn on" onclick="app.teFullPage()">⛶ 整頁</button></span>
             <span class="te-seg"><button id="teMLines" class="${E.mode==='lines'?'on':''}" onclick="app.teMode('lines')">逐行</button><button id="teMText" class="${E.mode==='text'?'on':''}" onclick="app.teMode('text')">文字</button></span></span></div>
           <textarea id="teEdit" class="te-text" spellcheck="false" oninput="app.teInput()"></textarea>
           <div id="teEditList" class="tl-list" onclick="app.teTap(event,'edit')" ondblclick="app.teDbl(event)"></div>
@@ -817,7 +855,7 @@
     [...sel].forEach(i=>{if(i>=L.length) sel.delete(i)});
     el.innerHTML=L.length && !(L.length===1 && !L[0])
       ? L.map((t,i)=>`<div class="tl ${lineCls(t)} ${sel.has(i)?'sel':''}" data-i="${i}"><i>${i+1}</i><span>${h(t)||'　'}</span></div>`).join('')
-      : `<div class="empty" style="margin:12px">${which==='edit'?'編輯區是空的：按「➕ 新增行」或「📥 貼上」，或切到「文字」模式直接貼上':'（空白來源）'}</div>`;
+      : `<div class="empty" style="margin:12px">${which==='edit'?'編輯區是空的<br><button class="btn blue mt" onclick="app.teFullPage()">⛶ 開啟整頁編輯／貼上文字</button>':'（空白來源）'}</div>`;
     updateActBar(which);
   }
   function updateActBar(which){
@@ -907,7 +945,7 @@
     openTextEditor(key){openEditor(key||'current')},
     closeTextEditor(){
       if(editor && document.getElementById('teEdit') && document.getElementById('teEdit').value!==editor.origText && !confirm('編輯內容尚未轉換，確定關閉？')) return;
-      clearTimeout(editor?.timer); editor=null; document.getElementById('editorHost').innerHTML=''; document.body.classList.remove('te-open');
+      clearTimeout(editor?.timer); closeFull(); editor=null; document.getElementById('editorHost').innerHTML=''; document.body.classList.remove('te-open');
     },
     teInput(){clearTimeout(editor.timer); editor.timer=setTimeout(computeEditor,250)},
     teSource(key){
@@ -969,20 +1007,33 @@
     teUndo(){if(!editor.undo.length) return; const prev=editor.undo.pop(); document.getElementById('teEdit').value=prev; editor.sel.edit.clear(); renderLineList('edit'); computeEditor(); toast('已復原','ok')},
     teEditLines(){
       const s=sortedSel('edit'); const L=editLines(); if(!s.length) return;
-      showModal(`修改 ${s.length} 行`,`<textarea id="teLineBox" class="te-modal-ta">${h(s.map(i=>L[i]).join('\n'))}</textarea><div class="sub mt">可改字、加行、刪行；儲存後會放回第 ${s[0]+1} 行的位置。</div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn blue" onclick="app.teSaveLines()">儲存</button>`);
-      setTimeout(()=>document.getElementById('teLineBox')?.focus(),50);
-    },
-    teSaveLines(){
-      const s=sortedSel('edit'); const L=editLines(); const nl=document.getElementById('teLineBox').value.replace(/\r/g,'').split('\n');
-      const set=new Set(s); const at=s[0]; const before=L.slice(0,at).filter((_,i)=>!set.has(i)).length;
-      const rest=L.filter((_,i)=>!set.has(i)); rest.splice(before,0,...nl);
-      this.closeModal(); setEditLines(rest, nl.map((_,k)=>before+k));
+      openFull(`✏️ 修改 ${s.length} 行`, s.map(i=>L[i]).join('\n'), text=>{
+        const L=editLines(); const nl=text.replace(/\r/g,'').split('\n'); const set=new Set(s);
+        const before=L.slice(0,s[0]).filter((_,i)=>!set.has(i)).length;
+        const rest=L.filter((_,i)=>!set.has(i)); rest.splice(before,0,...nl);
+        setEditLines(rest, nl.map((_,k)=>before+k)); scrollToLine('edit',before);
+      }, {hint:`儲存後放回第 ${s[0]+1} 行位置`});
     },
     teAddLines(){
-      showModal('新增行',`<textarea id="teLineBox" class="te-modal-ta" placeholder="每行一筆，例如：\n陳先生｜暈車\n林小姐、王小妹\n【車】黃大哥｜7｜7人座"></textarea><div class="sub mt">會加在目前選取行的下方（未選取則加在最後）。</div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn blue" onclick="app.teSaveAdd()">加入</button>`);
-      setTimeout(()=>document.getElementById('teLineBox')?.focus(),50);
+      const at=insertAt();
+      openFull('➕ 新增行', '', text=>{const nl=text.replace(/\r/g,'').replace(/\n+$/,'').split('\n'); if(nl.length===1&&!nl[0]) return; insertLines(nl, at)},
+        {placeholder:'每行一筆，例如：\n陳先生｜暈車\n林小姐、王小妹\n【車】黃大哥｜7｜7人座', hint:`加在第 ${at} 行之後`});
     },
-    teSaveAdd(){const nl=document.getElementById('teLineBox').value.replace(/\r/g,'').replace(/\n+$/,'').split('\n'); this.closeModal(); if(nl.length===1&&!nl[0]) return; insertLines(nl, insertAt())},
+    teFullPage(){
+      openFull('⛶ 整頁編輯（全部內容）', document.getElementById('teEdit').value, text=>{setEditLines(text.replace(/\r/g,'').split('\n'),[])},
+        {placeholder:'可直接貼上整份文字（歷史文字、LINE 通知…）', hint:'完成後回到逐行／比對畫面'});
+    },
+    tfSave(){const t=document.getElementById('tfText').value; const cb=fullCb; closeFull(); if(cb) cb(t); toast('已更新編輯區','ok')},
+    tfClose(){const t=document.getElementById('tfText')?.value; if(t!==fullInit && !confirm('放棄這次修改？')) return; closeFull()},
+    tfCount(){const t=document.getElementById('tfText').value; const el=document.getElementById('tfCount'); if(el) el.textContent=`${t?t.split('\n').length:0} 行｜${t.length} 字`},
+    async tfCopy(){const ta=document.getElementById('tfText'); toast((await writeClip(ta.value))?'已複製全部':'複製失敗，請按「全選」後長按複製','ok')},
+    async tfPaste(){const ta=document.getElementById('tfText'); let t=''; try{t=await navigator.clipboard.readText()}catch{} if(!t && editor?.clip?.length) t=editor.clip.join('\n'); if(!t) return toast('無法讀取剪貼簿，請在文字框長按 → 貼上','warn');
+      const a=ta.selectionStart, b=ta.selectionEnd; ta.value=ta.value.slice(0,a)+t+ta.value.slice(b); ta.selectionStart=ta.selectionEnd=a+t.length; ta.focus(); this.tfCount()},
+    tfSelAll(){const ta=document.getElementById('tfText'); ta.focus(); ta.select()},
+    tfClear(){if(!confirm('清空全部文字？（可按「還原」）'))return; const ta=document.getElementById('tfText'); ta.value=''; ta.focus(); this.tfCount()},
+    tfRestore(){const ta=document.getElementById('tfText'); ta.value=fullInit; this.tfCount(); toast('已還原為開啟時的內容','ok')},
+    tfFont(d){const ta=document.getElementById('tfText'); const fs=Math.min(24,Math.max(12,(parseInt(ta.style.fontSize)||16)+d*2)); ta.style.fontSize=fs+'px'; try{localStorage.setItem('vehiclePlanner_tfFont',fs)}catch{}},
+    tfWrap(){const ta=document.getElementById('tfText'); ta.style.whiteSpace=ta.style.whiteSpace==='pre-wrap'?'pre':'pre-wrap'},
     teMoveTo(){
       const L=editLines(); const set=new Set(sortedSel('edit'));
       const heads=[]; L.forEach((t,i)=>{if(set.has(i)) return; if(/^\s*[【\[]\s*(車|車輛|自行|自理|未安排|未分配|待安排|候補|注意|備註)/.test(t) || /^\s*第\s*\d+\s*車/.test(t)) heads.push({i,t:t.trim()})});
@@ -1050,6 +1101,12 @@
       if(!state.historyEvents.length) return toast('尚無歷史紀錄','warn');
       const t=snapsToText(state.historyEvents.map(snapOf));
       try{await navigator.clipboard.writeText(t); toast(`已複製 ${state.historyEvents.length} 筆歷史文字`,'ok')}catch{openEditor('all'); toast('瀏覽器不允許直接複製，已開啟編輯器','warn')}
+    },
+    async forceUpdate(){
+      if(!confirm('清除網頁快取並重新載入最新版？（活動資料不會被刪除）')) return;
+      try{const regs=await navigator.serviceWorker?.getRegistrations?.()||[]; await Promise.all(regs.map(r=>r.unregister()))}catch{}
+      try{const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k)))}catch{}
+      const u=new URL(location.href); u.searchParams.set('v',Date.now()); location.replace(u.toString());
     },
     setTab(t){activeTab=t; render()},
     updateField(k,v){state[k]=v; touch()},
