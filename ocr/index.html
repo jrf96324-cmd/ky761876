@@ -47,6 +47,11 @@ input[type=file]{display:none}
 .pdfnav input[type=number]{width:4.2em;text-align:center}
 .copy-big{background:linear-gradient(135deg,#178d62,#24b47e);border-color:#53ddb0;padding:.55rem 1.1rem;font-size:1rem}
 .title-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dict{margin-top:12px;background:rgba(17,27,46,.94);border:1px solid var(--line);border-radius:16px;padding:10px 14px;box-shadow:var(--shadow)}
+.dict summary{cursor:pointer;font-weight:800;color:#d8e6f8}
+.dict textarea{width:100%;min-height:110px;margin-top:10px;background:#0d1626;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;line-height:1.6}
+.dict-actions{display:flex;gap:10px;align-items:center;margin-top:8px;color:var(--muted)}
+.dict+.exports{margin-top:12px}
 .main{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr);gap:14px;min-height:590px}
 .panel{background:rgba(17,27,46,.95);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-width:0}
 .panel-title{padding:13px 15px;background:linear-gradient(180deg,#1c2c48,#16243c);border-bottom:1px solid var(--line);font-weight:900;display:flex;justify-content:space-between;align-items:center;gap:12px}
@@ -108,10 +113,11 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
     <select id="psm"><option value="6">一般文字／名單</option><option value="3">自動整頁</option><option value="4">多欄文字</option><option value="7">單行文字</option><option value="11">散佈文字</option><option value="12">稀疏文字＋方向</option><option value="5">直書文字</option></select>
   </label>
   <label>放大
-    <select id="scale"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option></select>
+    <select id="scale"><option value="auto" selected>自動</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select>
   </label>
   <label><input id="gray" type="checkbox" checked>灰階</label>
   <label><input id="invert" type="checkbox">反白（深色底）</label>
+  <label><input id="autoInvert" type="checkbox" checked>自動判斷深色底</label>
   <label><input id="contrastOn" type="checkbox" checked>加強對比</label>
   <label class="range-group">對比 <input id="contrast" type="range" min="0" max="100" value="32"><span id="contrastValue">32</span></label>
   <label><input id="thresholdOn" type="checkbox">黑白二值化</label>
@@ -122,6 +128,11 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
   <label><input id="pdfTextOn" type="checkbox" checked>PDF 優先取內嵌文字</label>
   <label><input id="halfOn" type="checkbox" checked>全形英數轉半形</label>
   <label><input id="autoCopy" type="checkbox" checked>辨識完自動複製</label>
+  <label title="自動偵測並轉正輕微歪斜的掃描或翻拍"><input id="deskew" type="checkbox" checked>自動校正歪斜</label>
+  <label title="以原圖與自動二值化各辨識一次，取信心值較高者；時間約兩倍"><input id="hiAcc" type="checkbox">高精度（雙重比對）</label>
+  <label title="例：4O0→400、l2→12、400Ww→400W、中文間的半形標點轉全形"><input id="fixNum" type="checkbox" checked>工程數字／標點校正</label>
+  <label title="依文字位置對齊欄位，欄與欄之間以 Tab 分隔，可直接貼入 Excel"><input id="tableOn" type="checkbox">表格模式（保留欄位）</label>
+  <label title="在預覽圖上以紅框標出信心值低的字，方便人工核對"><input id="markLow" type="checkbox" checked>標示低信心字</label>
 </section>
 
 <main class="main">
@@ -140,9 +151,16 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
   </section>
 </main>
 
+<details class="dict" id="dictBox">
+  <summary>📝 自訂校正字典（常錯字自動替換，存在本機瀏覽器）</summary>
+  <textarea id="dictText" spellcheck="false" placeholder="每行一組：錯誤=>正確&#10;例：&#10;汽壓缸=>氣壓缸&#10;伺眼=>伺服&#10;SU5304=>SUS304"></textarea>
+  <div class="dict-actions"><button id="dictApply" class="small">套用到目前結果</button><small>辨識完成時會自動套用。</small></div>
+</details>
+
 <section class="exports">
   <button id="cleanBtn">清理文字</button>
   <button id="rosterBtn">轉成名單分欄</button>
+  <button id="joinBtn">合併斷行成段落</button>
   <button id="copyBtn" class="success">📋 一鍵複製</button>
   <button id="txtBtn">匯出 TXT</button>
   <button id="csvBtn">匯出 CSV</button>
@@ -150,7 +168,7 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
 </section>
 
 <div class="statusbar"><div class="status" id="status">程式已就緒，請載入截圖或圖片。</div><div class="progress"><div id="progressBar"></div></div></div>
-<div class="notice">建議：文字先放大至 150%～200% 再截圖；表格或名單使用「一般文字／名單」；單行內容使用「單行文字」；深色背景請勾「反白」。一次選多張圖片／PDF 會依序辨識並累加結果。PDF 若本身含文字（非掃描檔）會直接讀取內嵌文字，最快也最準；掃描版 PDF 則逐頁轉成影像後 OCR。若 PDF 讀出亂碼，請取消「PDF 優先取內嵌文字」改用 OCR。第一次辨識需載入 OCR 資料，之後可重複使用。</div>
+<div class="notice">建議：放大選「自動」會依圖片大小自動調整；深色背景會自動反白；數字、型號較多時建議開「高精度」；紅框處請人工核對。文字先放大至 150%～200% 再截圖效果更好；表格或名單使用「一般文字／名單」；單行內容使用「單行文字」；深色背景請勾「反白」。一次選多張圖片／PDF 會依序辨識並累加結果。PDF 若本身含文字（非掃描檔）會直接讀取內嵌文字，最快也最準；掃描版 PDF 則逐頁轉成影像後 OCR。若 PDF 讀出亂碼，請取消「PDF 優先取內嵌文字」改用 OCR。第一次辨識需載入 OCR 資料，之後可重複使用。</div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -166,8 +184,11 @@ const els = {
  status:$('status'),progress:$('progressBar'),badge:$('modeBadge'),
  clean:$('cleanBtn'),roster:$('rosterBtn'),copy:$('copyBtn'),copyTop:$('copyTopBtn'),txt:$('txtBtn'),csv:$('csvBtn'),clear:$('clearBtn'),toast:$('toast'),
  pdfNav:$('pdfNav'),prevPage:$('prevPage'),nextPage:$('nextPage'),pageNum:$('pageNum'),pageTotal:$('pageTotal'),pdfScope:$('pdfScope'),
- pdfTextOn:$('pdfTextOn'),halfOn:$('halfOn'),autoCopy:$('autoCopy')
+ pdfTextOn:$('pdfTextOn'),halfOn:$('halfOn'),autoCopy:$('autoCopy'),
+ autoInvert:$('autoInvert'),deskew:$('deskew'),hiAcc:$('hiAcc'),fixNum:$('fixNum'),tableOn:$('tableOn'),markLow:$('markLow'),
+ dictText:$('dictText'),dictApply:$('dictApply'),join:$('joinBtn')
 };
+let lowBoxes=[]; // 低信心字的位置（source 座標）
 const ctx = els.canvas.getContext('2d');
 const original = document.createElement('canvas');
 const originalCtx = original.getContext('2d',{willReadFrequently:true});
@@ -216,7 +237,7 @@ function loadBitmap(bitmap,label='圖片'){
   original.width=source.width=w;original.height=source.height=h;
   originalCtx.clearRect(0,0,w,h);originalCtx.drawImage(bitmap,0,0,w,h);
   sourceCtx.clearRect(0,0,w,h);sourceCtx.drawImage(original,0,0);
-  hasImage=true;selection=null;showProcessed=false;els.empty.style.display='none';els.imageInfo.textContent=`${label}｜${w} × ${h} px`;
+  hasImage=true;selection=null;showProcessed=false;lowBoxes=[];els.empty.style.display='none';els.imageInfo.textContent=`${label}｜${w} × ${h} px`;
   setButtons(true);drawPreview();setStatus(pdfDoc?'PDF 已載入，可切換頁面、框選區域或直接開始辨識。':'圖片已載入，可框選區域或直接開始辨識。',0);
   if(bitmap.close) bitmap.close();
 }
@@ -296,6 +317,11 @@ function drawPreview(){
   const dw=img.width*s,dh=img.height*s,dx=(els.canvas.width-dw)/2,dy=(els.canvas.height-dh)/2;
   ctx.fillStyle='#070b12';ctx.fillRect(0,0,els.canvas.width,els.canvas.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,dx,dy,dw,dh);
   drawMap={dx,dy,dw,dh,s,dpr};
+  if(!showProcessed && els.markLow.checked && lowBoxes.length){
+    ctx.save();ctx.strokeStyle='#ff4d6d';ctx.fillStyle='rgba(255,77,109,.18)';ctx.lineWidth=1.5*dpr;
+    for(const b of lowBoxes){const r=sourceRectToCanvas(b);ctx.fillRect(r.x,r.y,r.w,r.h);ctx.strokeRect(r.x,r.y,r.w,r.h)}
+    ctx.restore();
+  }
   if(selection){
     const r=sourceRectToCanvas(selection);ctx.save();
     ctx.fillStyle='rgba(0,0,0,.45)';ctx.beginPath();ctx.rect(dx,dy,dw,dh);ctx.rect(r.x,r.y,r.w,r.h);ctx.fill('evenodd');
@@ -317,14 +343,23 @@ function selRect(){if(!selection)return null;const x=Math.round(selection.x),y=M
 function applyCrop(){
   const r=selRect();if(!r){toast('尚未框選區域');return}
   const tmp=document.createElement('canvas');tmp.width=r.w;tmp.height=r.h;tmp.getContext('2d').drawImage(source,r.x,r.y,r.w,r.h,0,0,r.w,r.h);
-  source.width=r.w;source.height=r.h;sourceCtx.drawImage(tmp,0,0);selection=null;els.imageInfo.textContent=`已裁切｜${r.w} × ${r.h} px`;drawPreview();toast('已套用框選區域');
+  source.width=r.w;source.height=r.h;sourceCtx.drawImage(tmp,0,0);selection=null;lowBoxes=[];els.imageInfo.textContent=`已裁切｜${r.w} × ${r.h} px`;drawPreview();toast('已套用框選區域');
 }
-function restoreOriginal(){source.width=original.width;source.height=original.height;sourceCtx.drawImage(original,0,0);selection=null;els.imageInfo.textContent=`原始圖片｜${source.width} × ${source.height} px`;drawPreview();toast('已還原原圖')}
+function restoreOriginal(){source.width=original.width;source.height=original.height;sourceCtx.drawImage(original,0,0);selection=null;lowBoxes=[];els.imageInfo.textContent=`原始圖片｜${source.width} × ${source.height} px`;drawPreview();toast('已還原原圖')}
 
 /* ---------- 影像前處理 ---------- */
-function buildOcrCanvas(forceScale=null,rect=selRect()){
+function autoScale(r){const m=Math.max(r.w,r.h);return m<900?3:m<2200?2:1.5}
+// 取樣平均亮度，判斷是否為深色底白字
+function isDarkBg(r){
+  const d=sourceCtx.getImageData(r.x,r.y,r.w,r.h).data;let sum=0,n=0;
+  const step=Math.max(4,Math.floor(d.length/4/40000)*4);
+  for(let i=0;i<d.length;i+=step){sum+=.299*d[i]+.587*d[i+1]+.114*d[i+2];n++}
+  return n>0 && sum/n<110;
+}
+function effInvert(r){return els.invert.checked || (els.autoInvert.checked && isDarkBg(r))}
+function buildOcrCanvas(forceScale=null,rect=selRect(),opt={}){
   const r=rect||{x:0,y:0,w:source.width,h:source.height};
-  let scale=forceScale??Number(els.scale.value);
+  let scale=forceScale??(els.scale.value==='auto'?autoScale(r):Number(els.scale.value));
   const maxPx=forceScale?Infinity:5000;scale=Math.min(scale,maxPx/Math.max(r.w,r.h));scale=Math.max(scale,Math.min(1,scale));
   const pad=forceScale?0:Math.round(12*scale); // 留白邊，邊緣文字較易辨識
   const out=document.createElement('canvas');const ow=Math.max(1,Math.round(r.w*scale)),oh=Math.max(1,Math.round(r.h*scale));
@@ -332,8 +367,8 @@ function buildOcrCanvas(forceScale=null,rect=selRect()){
   const c=out.getContext('2d',{willReadFrequently:true});c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
   c.drawImage(source,r.x,r.y,r.w,r.h,pad,pad,ow,oh);
   const img=c.getImageData(0,0,out.width,out.height),d=img.data;
-  const contrast=Number(els.contrast.value),factor=(259*(contrast+255))/(255*(259-contrast)),threshold=Number(els.threshold.value);
-  const gray=els.gray.checked,inv=els.invert.checked,con=els.contrastOn.checked,thr=els.thresholdOn.checked;
+  const contrast=Number(els.contrast.value),factor=(259*(contrast+255))/(255*(259-contrast)),threshold=opt.threshold??Number(els.threshold.value);
+  const gray=els.gray.checked,inv=opt.invert??effInvert(r),con=els.contrastOn.checked,thr=opt.thr??els.thresholdOn.checked;
   // 邊框區先用背景色填滿：反白時填黑，處理後成白
   const padVal=inv?0:255;
   for(let y=0;y<out.height;y++)for(let x=0;x<out.width;x++){
@@ -348,16 +383,19 @@ function buildOcrCanvas(forceScale=null,rect=selRect()){
     if(thr){const v=rr>=threshold?255:0;rr=gg=bb=v}
     d[i]=rr<0?0:rr>255?255:rr;d[i+1]=gg<0?0:gg>255?255:gg;d[i+2]=bb<0?0:bb>255?255:bb;d[i+3]=255;
   }
-  c.putImageData(img,0,0);return out;
+  c.putImageData(img,0,0);out._meta={r,scale,pad};return out;
 }
-function otsuThreshold(){
-  const r=selRect()||{x:0,y:0,w:source.width,h:source.height};
+function otsuValue(r,inv){
   const d=sourceCtx.getImageData(r.x,r.y,r.w,r.h).data;const hist=new Array(256).fill(0);let n=0;
-  for(let i=0;i<d.length;i+=16){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];if(els.invert.checked)y=255-y;hist[y|0]++;n++}
+  for(let i=0;i<d.length;i+=16){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];if(inv)y=255-y;hist[y|0]++;n++}
   let sum=0;for(let t=0;t<256;t++)sum+=t*hist[t];
   let sumB=0,wB=0,best=0,th=128;
   for(let t=0;t<256;t++){wB+=hist[t];if(!wB)continue;const wF=n-wB;if(!wF)break;sumB+=t*hist[t];const mB=sumB/wB,mF=(sum-sumB)/wF;const v=wB*wF*(mB-mF)**2;if(v>best){best=v;th=t}}
-  th=Math.max(40,Math.min(230,th+1));els.threshold.value=th;els.thresholdValue.textContent=th;els.thresholdOn.checked=true;
+  return Math.max(40,Math.min(230,th+1));
+}
+function otsuThreshold(){
+  const r=selRect()||{x:0,y:0,w:source.width,h:source.height};
+  const th=otsuValue(r,effInvert(r));els.threshold.value=th;els.thresholdValue.textContent=th;els.thresholdOn.checked=true;
   if(showProcessed)drawPreview();toast(`自動門檻：${th}（已開啟二值化）`);
 }
 
@@ -386,8 +424,36 @@ async function ensureWorker(){
 async function runOcrOnSource(rect){
   const w=await ensureWorker();
   await w.setParameters({tessedit_pageseg_mode:els.psm.value,preserve_interword_spaces:'1',user_defined_dpi:'300'});
-  const ret=await w.recognize(rect===undefined?buildOcrCanvas():buildOcrCanvas(null,rect));
-  return {text:normalizeText(ret.data.text||''),conf:Math.round(ret.data.confidence||0)};
+  const r=(rect===undefined?selRect():rect)||{x:0,y:0,w:source.width,h:source.height};
+  const opts={rotateAuto:els.deskew.checked};
+  const c1=buildOcrCanvas(null,r);
+  let ret=await w.recognize(c1,opts),canvas=c1,pass='';
+  if(els.hiAcc.checked && !cancelled){
+    // 第二次：切換二值化（原本沒開就用自動門檻開啟，原本有開就關閉），取信心值高者
+    const inv=effInvert(r),useThr=!els.thresholdOn.checked;
+    const c2=buildOcrCanvas(null,r,{thr:useThr,threshold:useThr?otsuValue(r,inv):undefined,invert:inv});
+    const ret2=await w.recognize(c2,opts);
+    if((ret2.data.confidence||0)>(ret.data.confidence||0)){ret=ret2;canvas=c2;pass=useThr?'（二值化較佳）':'（原圖較佳）'}
+  }
+  const d=ret.data;
+  // 低信心字位置換算回原圖座標（有旋轉校正時座標不對應，略過）
+  const rotated=Math.abs(d.rotateRadians||0)>0.002;
+  const m=canvas._meta;
+  const words=(d.words||[]);
+  const low=rotated?[]:words.filter(x=>x.confidence<60 && x.text.trim()).map(x=>({x:m.r.x+(x.bbox.x0-m.pad)/m.scale,y:m.r.y+(x.bbox.y0-m.pad)/m.scale,w:(x.bbox.x1-x.bbox.x0)/m.scale,h:(x.bbox.y1-x.bbox.y0)/m.scale}));
+  lowBoxes=low;drawPreview();
+  const raw=els.tableOn.checked&&words.length?tableText(d):(d.text||'');
+  return {text:normalizeText(ocrFix(raw)),conf:Math.round(d.confidence||0),low:low.length,pass};
+}
+// 依字的 X 座標判斷欄位間距，欄位之間以 Tab 分隔
+function tableText(d){
+  const lines=(d.lines||[]).filter(l=>l.words&&l.words.length);
+  return lines.map(l=>{
+    const ws=l.words.slice().sort((a,b)=>a.bbox.x0-b.bbox.x0);
+    const h=ws.reduce((s,x)=>s+(x.bbox.y1-x.bbox.y0),0)/ws.length||10;
+    let out='';ws.forEach((x,i)=>{if(i){const gap=x.bbox.x0-ws[i-1].bbox.x1;out+=gap>h*1.4?'\t':gap>h*.25?' ':''}out+=x.text});
+    return out;
+  }).join('\n');
 }
 function putResult(text){
   if(els.appendOn.checked && els.result.value.trim()) els.result.value=els.result.value.replace(/\s+$/,'')+'\n\n'+text;
@@ -414,10 +480,10 @@ async function recognize(){
       toast(r.text?'PDF 辨識完成':'沒有辨識到文字，請調整影像處理或取消「PDF 優先取內嵌文字」');
       return;
     }
-    const {text,conf}=await runOcrOnSource();
+    const {text,conf,low,pass}=await runOcrOnSource();
     if(cancelled)return;
     putResult(text);
-    setStatus(`辨識完成｜信心值 ${conf}%${selection?'（框選區域）':''}${conf<60?'｜信心偏低，可試試放大 3× 或二值化':''}`,100);
+    setStatus(`辨識完成｜信心值 ${conf}%${pass}${selection?'（框選區域）':''}${low&&els.markLow.checked?`｜${low} 處低信心字已用紅框標示`:''}${conf<60?'｜信心偏低，可試試「高精度」或放大 3×':''}`,100);
     toast(text?'辨識完成':'沒有辨識到文字，請調整框選或影像處理');
   }catch(err){
     if(cancelled)return;
@@ -463,7 +529,36 @@ function normalizeText(t){
   t=t.replace(/\r\n?/g,'\n').replace(/　/g,' ').replace(/[ \t]+$/gm,'').replace(/^[ \t]*[|｜¦]+|[|｜¦]+[ \t]*$/gm,'');
   if(els.halfOn.checked){t=t.replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/(\d)[．](?=\d)/g,'$1.')}
   if(els.cjkSpace.checked){t=t.replace(cjkGap,'$1').replace(cjkGap,'$1')} // 只移除單一空白，保留 2 格以上的欄位分隔
+  t=applyDict(t);
   return t.replace(/\n{3,}/g,'\n\n').trim();
+}
+// OCR 常見英數誤判校正（只作用在含數字的片段）
+function ocrFix(t){
+  if(!els.fixNum.checked)return t;
+  const L='A-Za-z';
+  t=t.replace(new RegExp(`(?<![${L}])[0-9OoIl][0-9OoIl.,]*[0-9OoIl]`,'g'),tok=>{
+    const digits=(tok.match(/[0-9]/g)||[]).length,letters=(tok.match(/[OoIl]/g)||[]).length;
+    if(!digits||letters>digits)return tok;
+    return tok.replace(/[Oo]/g,"0").replace(/[Il]/g,"1");
+  });
+  t=t.replace(/(\d)\s?(Ww|wW|ww|w)(?![A-Za-z])/g,'$1W').replace(/(\d)\s?(Vv|vV)(?![A-Za-z])/g,'$1V').replace(/(\d) ?(mm|cm|kg|kW|Hz|rpm|mA|MPa|N·m|Nm)(?![A-Za-z])/g,'$1$2');
+  // 中文之間的半形標點轉全形
+  const cj=`[${CJK}]`;
+  t=t.replace(new RegExp(` ?, ?(?=${cj})`,'g'),'，').replace(new RegExp(`(${cj}) ?,`,'g'),'$1，').replace(new RegExp(`(${cj}) ?: ?`,'g'),'$1：').replace(new RegExp(`(${cj}) ?; ?(?=${cj})`,'g'),'$1；').replace(new RegExp(`(${cj}) ?\\? ?(?=${cj}|$)`,'gm'),'$1？').replace(new RegExp(`(${cj}) ?! ?(?=${cj}|$)`,'gm'),'$1！');
+  // 含中文的行，行尾半形逗號／句點改全形
+  const hasCj=new RegExp(cj);
+  t=t.split('\n').map(l=>hasCj.test(l)?l.replace(/ ?,$/,'，').replace(new RegExp(`(${cj}) ?\\.$`),'$1。'):l).join('\n');
+  return t;
+}
+function dictPairs(){return (els.dictText.value||'').split(/\n/).map(l=>l.split(/=>|→|\t/)).filter(p=>p.length===2&&p[0].trim()).map(p=>[p[0].trim(),p[1].trim()])}
+function applyDict(t){for(const [a,b] of dictPairs())t=t.split(a).join(b);return t}
+function joinParagraphs(t){
+  const cj=new RegExp(`[${CJK}]`);
+  return t.split(/\n{2,}/).map(par=>par.split('\n').map(x=>x.trim()).filter(Boolean).reduce((acc,line)=>{
+    if(!acc)return line;
+    if(/[。！？：；」』）.!?:]$/.test(acc))return acc+'\n'+line;
+    return acc+(cj.test(acc.slice(-1))||cj.test(line[0])?'':' ')+line;
+  },'')).join('\n\n');
 }
 function rosterText(t){return normalizeText(t).split('\n').filter(x=>x.trim()).map(line=>line.trim().split(/[\t,，、;；|｜]+| {2,}/).map(x=>x.trim()).filter(Boolean).join('\t')).join('\n')}
 function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`}
@@ -502,7 +597,7 @@ els.restore.addEventListener('click',restoreOriginal);
 els.previewBtn.addEventListener('click',()=>{showProcessed=!showProcessed;setButtons(true);drawPreview();toast(showProcessed?'目前顯示影像處理後效果（調整設定會即時更新）':'已切回原圖')});
 els.otsu.addEventListener('click',otsuThreshold);
 els.ocr.addEventListener('click',recognize);
-els.clean.addEventListener('click',()=>{els.result.value=normalizeText(els.result.value);updateTextInfo();toast('文字已清理')});
+els.clean.addEventListener('click',()=>{els.result.value=normalizeText(ocrFix(els.result.value));updateTextInfo();toast('文字已清理')});
 els.roster.addEventListener('click',()=>{els.result.value=rosterText(els.result.value);updateTextInfo();toast('已轉成 Tab 分欄，可直接貼入 Excel')});
 async function copyText(auto=false){
   const v=els.result.value;if(!v.trim()){if(!auto)toast('沒有可複製的文字');return false}
@@ -515,6 +610,12 @@ async function copyText(auto=false){
   return ok;
 }
 els.copy.addEventListener('click',()=>copyText());
+els.join.addEventListener('click',()=>{els.result.value=joinParagraphs(els.result.value);updateTextInfo();toast('已合併斷行成段落')});
+try{els.dictText.value=localStorage.getItem('ocrDict')||'';if(localStorage.getItem('ocrDictOpen')==='1')$('dictBox').open=true}catch{}
+els.dictText.addEventListener('input',()=>{try{localStorage.setItem('ocrDict',els.dictText.value)}catch{}});
+$('dictBox').addEventListener('toggle',()=>{try{localStorage.setItem('ocrDictOpen',$('dictBox').open?'1':'0')}catch{}});
+els.dictApply.addEventListener('click',()=>{const n=dictPairs().length;els.result.value=applyDict(els.result.value);updateTextInfo();toast(n?`已套用 ${n} 組校正`:'字典是空的')});
+els.markLow.addEventListener('change',drawPreview);
 els.copyTop.addEventListener('click',()=>copyText());
 els.prevPage.addEventListener('click',()=>showPdfPage(pdfPage-1));
 els.nextPage.addEventListener('click',()=>showPdfPage(pdfPage+1));
@@ -528,7 +629,7 @@ els.result.addEventListener('input',updateTextInfo);
 let redrawTimer;const liveRedraw=()=>{if(!showProcessed)return;clearTimeout(redrawTimer);redrawTimer=setTimeout(drawPreview,60)};
 els.contrast.addEventListener('input',()=>{els.contrastValue.textContent=els.contrast.value;liveRedraw()});
 els.threshold.addEventListener('input',()=>{els.thresholdValue.textContent=els.threshold.value;liveRedraw()});
-[els.gray,els.invert,els.contrastOn,els.thresholdOn].forEach(x=>x.addEventListener('change',liveRedraw));
+[els.gray,els.invert,els.autoInvert,els.contrastOn,els.thresholdOn].forEach(x=>x.addEventListener('change',liveRedraw));
 
 window.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();if(hasImage)recognize()}
