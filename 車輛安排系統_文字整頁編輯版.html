@@ -66,8 +66,63 @@
     .te-foot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:var(--card2)}
     .te-help{font-size:12px;color:var(--muted);line-height:1.6}
     .te-help code{font-family:ui-monospace,Consolas,monospace;background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:0 4px}
-    @media (max-width:1180px){.te-body{grid-template-columns:1fr 1fr}.te-col.te-side-col{grid-column:1/-1;border-top:1px solid var(--line);max-height:42vh}}
-    @media (max-width:720px){.te{padding:0}.te-panel{border-radius:0}.te-body{grid-template-columns:1fr;overflow:auto}.te-col{border-right:0;border-bottom:1px solid var(--line)}.te-col.te-orig-col{max-height:34vh}.te-text{min-height:46vh}.te-col.te-orig-col .te-text{min-height:0}.te-col.te-side-col{max-height:none}.te-foot .btn{flex:1}}
+    .te-mtabs{display:none}
+    .te-diff-sum{padding:6px 12px 8px;display:flex!important;gap:6px;align-items:center;flex-wrap:wrap}
+    .te-diff .gap{justify-content:center;color:var(--muted);font-size:12px;background:var(--card2);padding:3px 0;margin:2px 0}
+    .tl-list{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:6px}
+    .tl{display:flex;gap:8px;align-items:flex-start;padding:6px 12px;border-bottom:1px dashed var(--line);font-size:14px;line-height:1.55;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+    .tl i{flex:none;min-width:34px;text-align:right;color:var(--muted);font-style:normal;font-size:12px;padding-top:2px}
+    .tl span{flex:1;min-width:0;white-space:pre-wrap;word-break:break-all}
+    .tl.hd{background:rgba(37,99,235,.08);font-weight:950;color:var(--brand)}
+    .tl.sep{color:var(--muted);background:var(--card2)}
+    .tl.cm{color:var(--muted);font-style:italic}
+    .tl.blank{min-height:20px;padding-top:2px;padding-bottom:2px}
+    .tl.sel{background:rgba(249,115,22,.2);box-shadow:inset 5px 0 0 var(--orange)}
+    .tl.sel i{color:var(--orange);font-weight:1000}
+    .tl.sel i:before{content:"✓"}
+    .te-act{border-top:1px solid var(--line);background:var(--card2);padding:6px 8px;display:flex;flex-direction:column;gap:6px}
+    .te-act-row{display:flex;gap:6px;overflow-x:auto;align-items:center;scrollbar-width:none}
+    .te-act-row::-webkit-scrollbar{display:none}
+    .te-act button{flex:none;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-weight:900;font-size:13px}
+    .te-act button:disabled{opacity:.35;cursor:not-allowed}
+    .te-act button.on{background:var(--orange);color:#fff;border-color:var(--orange)}
+    .te-act button.pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .te-act button.dan:not(:disabled){color:var(--red)}
+    .te-act-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px}
+    .te-act-grid button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;font-size:17px;line-height:1.1}
+    .te-act-grid small{font-size:11px;font-weight:900}
+    .te-cnt{flex:none;font-size:12px;font-weight:1000;color:var(--orange);min-width:64px}
+    .te-modal-ta{min-height:42vh;font-family:ui-monospace,Consolas,"Microsoft JhengHei",monospace;font-size:16px;line-height:1.7}
+    .te-move-btn{justify-content:flex-start;text-align:left;white-space:normal;gap:8px;padding:12px}
+    .te-mtabs b{display:inline-block;min-width:18px;border-radius:999px;background:var(--orange);color:#fff;font-size:11px;padding:0 5px}
+    .te-mtabs b:empty{display:none}
+    .modal{z-index:115}
+    body.te-open .toast{bottom:auto;top:12px}body.te-open .toast.show{bottom:auto;top:64px}
+    @media (max-width:1180px){.te-body{grid-template-columns:1fr 1fr}.te-col.te-side-col{grid-column:1/-1;border-top:1px solid var(--line);max-height:42vh}.te-act-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+    @media (max-width:720px){
+      .te{padding:0}.te-panel{border-radius:0}
+      .te-hide-m{display:none!important}
+      .te-head{padding:8px 12px;font-size:16px}
+      .te-bar{flex-wrap:nowrap;overflow-x:auto;padding:8px 10px;scrollbar-width:none}.te-bar::-webkit-scrollbar{display:none}
+      .te-bar .btn,.te-bar select{flex:none}.te-bar select{max-width:230px}
+      .te-mtabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--card)}
+      .te-mtabs button{background:var(--card2);color:var(--muted);border:1px solid var(--line);border-radius:12px;padding:9px 2px;font-weight:950;font-size:13px}
+      .te-mtabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+      .te-body{display:flex;flex-direction:column;overflow:hidden}
+      .te-body .te-col{display:none;flex:1;min-height:0;border:0;max-height:none}
+      .te-body[data-pane=edit] .te-edit-col,.te-body[data-pane=orig] .te-orig-col,.te-body[data-pane=diff] .te-orig-col,.te-body[data-pane=result] .te-side-col{display:flex}
+      .te-side-col{overflow:auto}.te-side{flex:1}
+      .te-text{font-size:16px;min-height:0}
+      .tl{font-size:16px;padding:9px 12px;line-height:1.5}
+      .tl i{min-width:28px}
+      .te-diff{font-size:15px}
+      .te-act{padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+      .te-act-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+      .te-act-grid button{padding:7px 0;font-size:18px}
+      .te-foot{padding:6px 8px;gap:6px;flex-wrap:nowrap}.te-foot .btn{flex:1;padding:11px 6px;font-size:14px}
+      .te-foot #tePickWrap select{max-width:120px;padding:8px}
+      .te-col-head{padding:6px 10px}
+    }
     @media print{.te{display:none!important}}
 
   </style>
@@ -637,37 +692,78 @@
 
   function openEditor(key){
     const orig=editorOriginal(key);
-    editor={key, origList:orig.list, origText:orig.text, results:[], logs:[], view:'orig', opts:loadOpts(), pick:0};
-    renderEditor(orig.text);
+    let mode='lines'; try{mode=localStorage.getItem('vehiclePlanner_teMode')||(isMobile()?'lines':'text')}catch{}
+    editor={key, origList:orig.list, origText:orig.text.replace(/\n$/,''), results:[], logs:[], view:'orig', opts:loadOpts(), pick:0, mode, pane:'edit', sel:{edit:new Set(),orig:new Set()}, anchor:{edit:null,orig:null}, range:false, clip:[], undo:[], diffOnly:isMobile(), ops:null};
+    document.body.classList.add('te-open');
+    renderEditor(editor.origText);
     computeEditor();
   }
+  function isMobile(){return window.matchMedia('(max-width:720px)').matches}
   function renderEditor(text){
-    const srcs=editorSources(), k=editor.key, o=editor.opts;
+    const srcs=editorSources(), k=editor.key, o=editor.opts, E=editor;
     const opt=(id,label,desc)=>`<label class="te-opt"><input type="checkbox" ${o[id]?'checked':''} onchange="app.teOpt('${id}',this.checked)"><span><b>${label}</b>${desc?`<br><span class="te-help">${desc}</span>`:''}</span></label>`;
+    const ab=(fn,label,cls='',extra='')=>`<button class="${cls}" onclick="app.${fn}" ${extra}>${label}</button>`;
     document.getElementById('editorHost').innerHTML=`<div class="te"><div class="te-panel">
-      <div class="te-head"><span>📝 文字整頁編輯｜比對｜轉成新資料</span><button class="iconbtn" onclick="app.closeTextEditor()">✕</button></div>
+      <div class="te-head"><span>📝 文字編輯<span class="te-hide-m">｜比對｜轉成新資料</span></span><button class="iconbtn" onclick="app.closeTextEditor()">✕</button></div>
       <div class="te-bar">
-        <span class="sub" style="font-weight:900">來源</span>
-        <select onchange="app.teSource(this.value)">
-          ${srcs.map(s=>`<option value="${h(s.id)}" ${k===s.id?'selected':''}>${h(s.label)}</option>`).join('')}
-          ${state.historyEvents.length?`<option value="all" ${k==='all'?'selected':''}>全部歷史（${state.historyEvents.length} 筆，整批）</option>`:''}
-          <option value="blank" ${k==='blank'?'selected':''}>空白（貼上外部文字）</option>
+        <select onchange="app.teSource(this.value)" title="來源">
+          ${srcs.map(s=>`<option value="${h(s.id)}" ${k===s.id?'selected':''}>來源：${h(s.label)}</option>`).join('')}
+          ${state.historyEvents.length?`<option value="all" ${k==='all'?'selected':''}>來源：全部歷史（${state.historyEvents.length} 筆，整批）</option>`:''}
+          <option value="blank" ${k==='blank'?'selected':''}>來源：空白（貼上外部文字）</option>
         </select>
         <button class="btn small cyan" onclick="app.teCopy('orig')">📋 複製原文</button>
         <button class="btn small green" onclick="app.teCopy('edit')">📋 複製編輯後</button>
+        <button class="btn small purple" onclick="app.teFormat()">✨ 整理格式</button>
         <button class="btn small light" onclick="app.teReset()">↺ 還原原文</button>
-        <button class="btn small purple" onclick="app.teFormat()" title="依解析與優化結果重新產生標準格式文字">✨ 整理成標準格式</button>
-        <button class="btn small light" onclick="app.teHelp()">❔ 格式說明</button>
+        <button class="btn small light" onclick="app.teHelp()">❔ 說明</button>
       </div>
-      <div class="te-body">
+      <div class="te-mtabs">
+        <button data-p="edit" onclick="app.tePane('edit')">✏️ 編輯</button>
+        <button data-p="orig" onclick="app.tePane('orig')">📄 原文</button>
+        <button data-p="diff" onclick="app.tePane('diff')">🔀 比對 <b id="teDiffBadge"></b></button>
+        <button data-p="result" onclick="app.tePane('result')">📊 結果 <b id="teResBadge"></b></button>
+      </div>
+      <div class="te-body" data-pane="${E.pane}">
         <div class="te-col te-orig-col">
-          <div class="te-col-head"><span>原始資料（唯讀）</span><span class="te-seg"><button id="teVOrig" class="${editor.view==='orig'?'on':''}" onclick="app.teView('orig')">原文</button><button id="teVDiff" class="${editor.view==='diff'?'on':''}" onclick="app.teView('diff')">逐行比對</button></span></div>
-          <textarea id="teOrig" class="te-text ${editor.view==='orig'?'':'hidden'}" readonly></textarea>
-          <div id="teDiff" class="te-diff ${editor.view==='diff'?'':'hidden'}"></div>
+          <div class="te-col-head"><span>原始資料（唯讀）</span>
+            <span class="row" style="gap:6px">
+              <span class="te-seg te-hide-m"><button id="teVOrig" class="${E.view==='orig'?'on':''}" onclick="app.teView('orig')">原文</button><button id="teVDiff" class="${E.view==='diff'?'on':''}" onclick="app.teView('diff')">逐行比對</button></span>
+              <span class="te-seg" id="teDiffOnlyWrap"><button id="teDiffOnly" class="${E.diffOnly?'on':''}" onclick="app.teDiffOnly()">只看差異</button></span>
+            </span></div>
+          <div id="teOrigList" class="tl-list" onclick="app.teTap(event,'orig')"></div>
+          <div class="te-act" id="teOrigAct">
+            <div class="te-act-row">
+              <span class="te-cnt" id="teOrigCnt">點行選取</span>
+              ${ab("teSelAll('orig')",'全選')}${ab("teSelNone('orig')",'取消')}${ab("teRange()",'↔ 範圍','te-range')}${ab("teSection('orig')",'▤ 整段','te-need-orig')}
+              ${ab("teCopyLines('orig')",'📋 複製','te-need-orig')}${ab("teOrigToEdit()",'➕ 加入編輯區','te-need-orig pri')}
+            </div>
+          </div>
+          <div id="teDiff" class="te-diff"></div>
         </div>
-        <div class="te-col">
-          <div class="te-col-head"><span>編輯區（可整頁修改／貼上）</span><span id="teLines"></span></div>
+        <div class="te-col te-edit-col">
+          <div class="te-col-head"><span>編輯區</span>
+            <span class="row" style="gap:6px"><span id="teLines"></span>
+            <span class="te-seg"><button id="teMLines" class="${E.mode==='lines'?'on':''}" onclick="app.teMode('lines')">逐行</button><button id="teMText" class="${E.mode==='text'?'on':''}" onclick="app.teMode('text')">文字</button></span></span></div>
           <textarea id="teEdit" class="te-text" spellcheck="false" oninput="app.teInput()"></textarea>
+          <div id="teEditList" class="tl-list" onclick="app.teTap(event,'edit')" ondblclick="app.teDbl(event)"></div>
+          <div class="te-act" id="teEditAct">
+            <div class="te-act-row">
+              <span class="te-cnt" id="teEditCnt">點行選取</span>
+              ${ab("teSelAll('edit')",'全選')}${ab("teSelNone('edit')",'取消')}${ab("teRange()",'↔ 範圍','te-range')}${ab("teSection('edit')",'▤ 整段','te-need')}${ab("teUndo()",'↶ 復原','','id="teUndoBtn"')}
+            </div>
+            <div class="te-act-grid">
+              ${ab("teCopyLines('edit')",'📋<small>複製</small>','te-need')}
+              ${ab("teCut()",'✂️<small>剪下</small>','te-need')}
+              ${ab("tePaste()",'📥<small>貼上</small>','','id="tePasteBtn"')}
+              ${ab("teMoveTo()",'🚚<small>移到…</small>','te-need pri')}
+              ${ab("teShift(-1)",'⬆️<small>上移</small>','te-need')}
+              ${ab("teShift(1)",'⬇️<small>下移</small>','te-need')}
+              ${ab("teEditLines()",'✏️<small>修改</small>','te-need')}
+              ${ab("teAddLines()",'➕<small>新增行</small>')}
+              ${ab("teDelLines()",'🗑️<small>刪除</small>','te-need dan')}
+              ${ab("teDup()",'⧉<small>複製一份</small>','te-need')}
+            </div>
+          </div>
         </div>
         <div class="te-col te-side-col"><div class="te-side">
           <div class="te-box"><h4><span>⚙️ 轉換優化</span></h4>
@@ -683,14 +779,77 @@
       </div>
       <div class="te-foot">
         <span id="tePickWrap"></span>
-        <button class="btn light" onclick="app.closeTextEditor()">取消</button>
-        <button class="btn purple" onclick="app.teSaveHistory()">🗂️ 另存為新歷史</button>
-        <button class="btn blue" onclick="app.teApply()">✅ 轉成新資料（套用為目前活動）</button>
+        <button class="btn light te-hide-m" onclick="app.closeTextEditor()">取消</button>
+        <button class="btn purple" onclick="app.teSaveHistory()">🗂️ 另存歷史</button>
+        <button class="btn blue" onclick="app.teApply()">✅ 轉成新資料</button>
       </div>
     </div></div>`;
-    document.getElementById('teOrig').value=editor.origText || '（空白來源：請在右側貼上文字）';
     document.getElementById('teEdit').value=text;
+    applyLayout();
   }
+  function editLines(){return (document.getElementById('teEdit')?.value||'').split('\n')}
+  function origLines(){return editor.origText? editor.origText.replace(/\n$/,'').split('\n') : []}
+  function applyLayout(){
+    const E=editor, m=isMobile();
+    const body=document.querySelector('.te-body'); if(!body) return;
+    body.dataset.pane=E.pane;
+    document.querySelectorAll('.te-mtabs button').forEach(b=>b.classList.toggle('on',b.dataset.p===E.pane));
+    // 原文欄：手機依分頁；桌機依 view
+    const showDiff = m ? E.pane==='diff' : E.view==='diff';
+    document.getElementById('teOrigList').classList.toggle('hidden',showDiff);
+    document.getElementById('teOrigAct').classList.toggle('hidden',showDiff);
+    document.getElementById('teDiff').classList.toggle('hidden',!showDiff);
+    document.getElementById('teDiffOnlyWrap').classList.toggle('hidden',!showDiff);
+    document.getElementById('teVOrig')?.classList.toggle('on',!showDiff); document.getElementById('teVDiff')?.classList.toggle('on',showDiff);
+    // 編輯欄：逐行 / 文字
+    const lines=E.mode==='lines';
+    document.getElementById('teEdit').classList.toggle('hidden',lines);
+    document.getElementById('teEditList').classList.toggle('hidden',!lines);
+    document.getElementById('teEditAct').classList.toggle('hidden',!lines);
+    document.getElementById('teMLines').classList.toggle('on',lines); document.getElementById('teMText').classList.toggle('on',!lines);
+    if(lines) renderLineList('edit');
+    if(!showDiff) renderLineList('orig'); else renderDiffView();
+  }
+  function lineCls(t){return /^\s*[【\[]/.test(t)?'hd':/^\s*={5,}/.test(t)?'sep':/^\s*(#|\/\/)/.test(t)?'cm':!t.trim()?'blank':''}
+  function renderLineList(which){
+    const el=document.getElementById(which==='edit'?'teEditList':'teOrigList'); if(!el) return;
+    const L=which==='edit'?editLines():origLines(), sel=editor.sel[which];
+    [...sel].forEach(i=>{if(i>=L.length) sel.delete(i)});
+    el.innerHTML=L.length && !(L.length===1 && !L[0])
+      ? L.map((t,i)=>`<div class="tl ${lineCls(t)} ${sel.has(i)?'sel':''}" data-i="${i}"><i>${i+1}</i><span>${h(t)||'　'}</span></div>`).join('')
+      : `<div class="empty" style="margin:12px">${which==='edit'?'編輯區是空的：按「➕ 新增行」或「📥 貼上」，或切到「文字」模式直接貼上':'（空白來源）'}</div>`;
+    updateActBar(which);
+  }
+  function updateActBar(which){
+    const n=editor.sel[which].size;
+    const cnt=document.getElementById(which==='edit'?'teEditCnt':'teOrigCnt'); if(cnt) cnt.textContent=n?`已選 ${n} 行`:'點行選取';
+    document.querySelectorAll(which==='edit'?'#teEditAct .te-need':'#teOrigAct .te-need-orig').forEach(b=>b.disabled=!n);
+    document.querySelectorAll('.te-range').forEach(b=>b.classList.toggle('on',!!editor.range));
+    const u=document.getElementById('teUndoBtn'); if(u) u.disabled=!editor.undo.length;
+    const p=document.getElementById('tePasteBtn'); if(p) p.innerHTML=`📥<small>貼上${editor.clip.length?`(${editor.clip.length})`:''}</small>`;
+  }
+  function setEditLines(L, newSel, keepUndo){
+    const ta=document.getElementById('teEdit');
+    if(!keepUndo){editor.undo.push(ta.value); if(editor.undo.length>60) editor.undo.shift()}
+    ta.value=L.join('\n');
+    editor.sel.edit=new Set(newSel||[]); editor.fresh=!!(newSel&&newSel.length);
+    renderLineList('edit'); computeEditor();
+  }
+  function sortedSel(which){return [...editor.sel[which]].sort((a,b)=>a-b)}
+  function insertAt(which){ // 插入位置：最後一個選取行之後，無選取則放最後
+    const s=sortedSel('edit'); const L=editLines();
+    if(s.length) return s[s.length-1]+1;
+    return (L.length===1 && !L[0]) ? 0 : L.length;
+  }
+  function insertLines(newLines, at){
+    let L=editLines(); if(L.length===1 && !L[0]) L=[];
+    at=Math.min(at,L.length);
+    L.splice(at,0,...newLines);
+    setEditLines(L, newLines.map((_,k)=>at+k));
+    scrollToLine('edit', at);
+  }
+  function scrollToLine(which,i){setTimeout(()=>{const el=document.querySelector(`#${which==='edit'?'teEditList':'teOrigList'} .tl[data-i="${i}"]`); el?.scrollIntoView({block:'center',behavior:'smooth'})},30)}
+  async function writeClip(t){try{await navigator.clipboard.writeText(t); return true}catch{try{const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); return true}catch{return false}}}
   function computeEditor(){
     if(!editor) return;
     const text=document.getElementById('teEdit')?.value||'';
@@ -699,22 +858,34 @@
       const src=editor.key==='all'?editor.origList[i]:editor.origList[0];
       const log=optimize(r,src,editor.opts); editor.logs.push(log); return r;
     });
-    const lines=text?text.split('\n').length:0; const le=document.getElementById('teLines'); if(le) le.textContent=`${lines} 行｜${parsed.length} 筆活動`;
-    if(editor.view==='diff') renderDiffView();
+    const lines=text?text.split('\n').length:0; const le=document.getElementById('teLines'); if(le) le.textContent=`${lines} 行｜${parsed.length} 筆`;
+    const ops=lineDiff(editor.origText,text); editor.ops=ops;
+    const db=document.getElementById('teDiffBadge'); if(db) db.textContent=ops?(ops.filter(o=>o[0]!=='eq').length||''):'';
+    if(!document.getElementById('teDiff')?.classList.contains('hidden')) renderDiffView();
     renderResult();
   }
   function renderDiffView(){
     const el=document.getElementById('teDiff'); if(!el) return;
-    const ops=lineDiff(editor.origText, document.getElementById('teEdit').value);
-    if(!ops){el.innerHTML='<div class="empty" style="margin:12px">內容過長，請改用右側「變更清單」比對</div>'; return}
+    const ops=editor.ops||lineDiff(editor.origText, document.getElementById('teEdit').value);
+    if(!ops){el.innerHTML='<div class="empty" style="margin:12px">內容過長，請改看「結果」的變更清單</div>'; return}
     const a=ops.filter(o=>o[0]==='add').length, d=ops.filter(o=>o[0]==='del').length;
-    el.innerHTML=`<div style="padding:4px 12px 8px;display:block"><span class="pill ok">+${a} 行</span> <span class="pill bad">−${d} 行</span></div>`+
-      ops.map(o=>`<div class="${o[0]}"><i>${o[0]==='add'?o[3]:o[2]}</i><span>${h(o[1])||' '}</span></div>`).join('');
+    let rows=ops.map((o,k)=>({o,k}));
+    if(editor.diffOnly){
+      const keep=new Set(); ops.forEach((o,k)=>{if(o[0]!=='eq') for(let x=k-1;x<=k+1;x++) keep.add(x)});
+      const out=[]; let skip=0;
+      rows.forEach(r=>{if(keep.has(r.k)){if(skip){out.push({gap:skip}); skip=0} out.push(r)} else skip++}); if(skip) out.push({gap:skip});
+      rows=out;
+    }
+    el.innerHTML=`<div class="te-diff-sum"><span class="pill ok">+${a} 新增</span> <span class="pill bad">−${d} 刪除</span> <span class="sub">綠＝編輯後新增，紅＝原文被刪</span></div>`+
+      (a+d===0?'<div class="empty" style="margin:12px">與原文完全相同</div>':'')+
+      rows.map(r=>r.gap?`<div class="gap"><span>⋯ 相同 ${r.gap} 行 ⋯</span></div>`:`<div class="${r.o[0]}"><i>${r.o[0]==='add'?r.o[3]:r.o[2]}</i><span>${h(r.o[1])||' '}</span></div>`).join('');
   }
   function renderResult(){
     const el=document.getElementById('teResult'); if(!el) return;
     const R=editor.results;
-    if(!R.length){el.innerHTML='<div class="empty">右側尚無可轉換的內容</div>'; document.getElementById('tePickWrap').innerHTML=''; return}
+    const rb=document.getElementById('teResBadge');
+    if(!R.length){if(rb) rb.textContent=''; el.innerHTML='<div class="empty">編輯區尚無可轉換的內容</div>'; document.getElementById('tePickWrap').innerHTML=''; return}
+    if(rb){const n=R.reduce((t,r,i)=>t+diffSnap(editor.key==='all'?editor.origList[i]:editor.origList[0],r).length,0); rb.textContent=n||''}
     const icon={add:['ok','新增'],del:['bad','移除'],move:['info','換車'],chg:['warn','修改'],info:['cyan','說明']};
     el.innerHTML=R.map((r,i)=>{
       const s=snapStats(r); const src=editor.key==='all'?editor.origList[i]:editor.origList[0];
@@ -736,20 +907,111 @@
     openTextEditor(key){openEditor(key||'current')},
     closeTextEditor(){
       if(editor && document.getElementById('teEdit') && document.getElementById('teEdit').value!==editor.origText && !confirm('編輯內容尚未轉換，確定關閉？')) return;
-      clearTimeout(editor?.timer); editor=null; document.getElementById('editorHost').innerHTML='';
+      clearTimeout(editor?.timer); editor=null; document.getElementById('editorHost').innerHTML=''; document.body.classList.remove('te-open');
     },
     teInput(){clearTimeout(editor.timer); editor.timer=setTimeout(computeEditor,250)},
     teSource(key){
       const cur=document.getElementById('teEdit').value;
-      if(cur!==editor.origText && !confirm('切換來源會以新來源文字取代編輯區，確定？')){renderEditor(cur); return}
+      if(cur!==editor.origText && !confirm('切換來源會以新來源文字取代編輯區，確定？')){renderEditor(cur); computeEditor(); return}
       openEditor(key);
     },
-    teView(v){editor.view=v; document.getElementById('teOrig').classList.toggle('hidden',v!=='orig'); document.getElementById('teDiff').classList.toggle('hidden',v!=='diff'); document.getElementById('teVOrig').classList.toggle('on',v==='orig'); document.getElementById('teVDiff').classList.toggle('on',v==='diff'); if(v==='diff') renderDiffView()},
+    teView(v){editor.view=v; applyLayout()},
+    tePane(p){editor.pane=p; if(p==='diff') editor.view='diff'; else if(p==='orig') editor.view='orig'; applyLayout(); document.querySelector('.te-body').scrollTop=0},
+    teMode(m){editor.mode=m; try{localStorage.setItem('vehiclePlanner_teMode',m)}catch{} applyLayout()},
+    teDiffOnly(){editor.diffOnly=!editor.diffOnly; document.getElementById('teDiffOnly').classList.toggle('on',editor.diffOnly); renderDiffView()},
+    teTap(ev,which){
+      const row=ev.target.closest('.tl'); if(!row) return;
+      const i=+row.dataset.i, sel=editor.sel[which];
+      if(which==='edit' && editor.fresh && !editor.range && !ev.shiftKey){sel.clear()} if(which==='edit') editor.fresh=false;
+      if((editor.range || ev.shiftKey) && editor.anchor[which]!=null){
+        const a=editor.anchor[which]; for(let x=Math.min(a,i);x<=Math.max(a,i);x++) sel.add(x);
+        editor.range=false;
+      } else { sel.has(i)?sel.delete(i):sel.add(i); }
+      editor.anchor[which]=i; renderLineList(which);
+    },
+    teDbl(ev){const row=ev.target.closest('.tl'); if(!row) return; editor.sel.edit=new Set([+row.dataset.i]); renderLineList('edit'); this.teEditLines()},
+    teSelAll(which){const n=(which==='edit'?editLines():origLines()).length; editor.sel[which]=new Set([...Array(n).keys()]); renderLineList(which)},
+    teSelNone(which){editor.sel[which].clear(); editor.range=false; renderLineList(which)},
+    teRange(){
+      const which=(isMobile()?editor.pane==='orig':false)?'orig':'edit';
+      if(editor.anchor.edit==null && editor.anchor.orig==null){toast('請先點選範圍的第一行，再按「範圍」並點最後一行','warn'); return}
+      editor.range=!editor.range; updateActBar('edit'); updateActBar('orig');
+      if(editor.range) toast('請點選範圍的最後一行','ok');
+    },
+    teSection(which){ // 選取所在整段（從【標題】到下一個【標題】前）
+      const L=which==='edit'?editLines():origLines(); const s=sortedSel(which); if(!s.length) return;
+      const isHd=t=>/^\s*[【\[]/.test(t)||/^\s*={5,}/.test(t);
+      s.forEach(i=>{let a=i; while(a>0 && !isHd(L[a])) a--; let b=a+1; while(b<L.length && !isHd(L[b])) b++; while(b-1>a && !L[b-1].trim()) b--; for(let x=a;x<b;x++) editor.sel[which].add(x)});
+      renderLineList(which); toast(`已選取整段 ${editor.sel[which].size} 行`,'ok');
+    },
+    async teCopyLines(which){
+      const L=which==='edit'?editLines():origLines(); const t=sortedSel(which).map(i=>L[i]);
+      editor.clip=t; await writeClip(t.join('\n')); updateActBar('edit'); toast(`已複製 ${t.length} 行（可到編輯區「貼上」）`,'ok');
+    },
+    teCut(){
+      const s=sortedSel('edit'); const L=editLines(); editor.clip=s.map(i=>L[i]); writeClip(editor.clip.join('\n'));
+      const set=new Set(s); setEditLines(L.filter((_,i)=>!set.has(i)),[]); toast(`已剪下 ${s.length} 行，選一行後按「貼上」放到該行下方`,'ok');
+    },
+    async tePaste(){
+      let lines=editor.clip;
+      if(!lines.length){try{const t=await navigator.clipboard.readText(); lines=t.replace(/\r/g,'').replace(/\n$/,'').split('\n')}catch{}}
+      if(!lines.length || (lines.length===1 && !lines[0])) return toast('剪貼簿沒有內容：請先「複製」或「剪下」','warn');
+      insertLines(lines, insertAt()); toast(`已貼上 ${lines.length} 行`,'ok');
+    },
+    teDup(){const s=sortedSel('edit'); const L=editLines(); insertLines(s.map(i=>L[i]), s[s.length-1]+1)},
+    teShift(d){
+      const L=editLines(); const s=sortedSel('edit'); if(!s.length) return;
+      const set=new Set(s); const order=d<0?s:[...s].reverse();
+      for(const i of order){const j=i+d; if(j<0||j>=L.length||set.has(j)) continue; [L[i],L[j]]=[L[j],L[i]]; set.delete(i); set.add(j)}
+      setEditLines(L,[...set]); scrollToLine('edit',Math.min(...set));
+    },
+    teDelLines(){const s=sortedSel('edit'); if(!s.length) return; const set=new Set(s); setEditLines(editLines().filter((_,i)=>!set.has(i)),[]); toast(`已刪除 ${s.length} 行（可按「復原」）`,'ok')},
+    teUndo(){if(!editor.undo.length) return; const prev=editor.undo.pop(); document.getElementById('teEdit').value=prev; editor.sel.edit.clear(); renderLineList('edit'); computeEditor(); toast('已復原','ok')},
+    teEditLines(){
+      const s=sortedSel('edit'); const L=editLines(); if(!s.length) return;
+      showModal(`修改 ${s.length} 行`,`<textarea id="teLineBox" class="te-modal-ta">${h(s.map(i=>L[i]).join('\n'))}</textarea><div class="sub mt">可改字、加行、刪行；儲存後會放回第 ${s[0]+1} 行的位置。</div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn blue" onclick="app.teSaveLines()">儲存</button>`);
+      setTimeout(()=>document.getElementById('teLineBox')?.focus(),50);
+    },
+    teSaveLines(){
+      const s=sortedSel('edit'); const L=editLines(); const nl=document.getElementById('teLineBox').value.replace(/\r/g,'').split('\n');
+      const set=new Set(s); const at=s[0]; const before=L.slice(0,at).filter((_,i)=>!set.has(i)).length;
+      const rest=L.filter((_,i)=>!set.has(i)); rest.splice(before,0,...nl);
+      this.closeModal(); setEditLines(rest, nl.map((_,k)=>before+k));
+    },
+    teAddLines(){
+      showModal('新增行',`<textarea id="teLineBox" class="te-modal-ta" placeholder="每行一筆，例如：\n陳先生｜暈車\n林小姐、王小妹\n【車】黃大哥｜7｜7人座"></textarea><div class="sub mt">會加在目前選取行的下方（未選取則加在最後）。</div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn blue" onclick="app.teSaveAdd()">加入</button>`);
+      setTimeout(()=>document.getElementById('teLineBox')?.focus(),50);
+    },
+    teSaveAdd(){const nl=document.getElementById('teLineBox').value.replace(/\r/g,'').replace(/\n+$/,'').split('\n'); this.closeModal(); if(nl.length===1&&!nl[0]) return; insertLines(nl, insertAt())},
+    teMoveTo(){
+      const L=editLines(); const set=new Set(sortedSel('edit'));
+      const heads=[]; L.forEach((t,i)=>{if(set.has(i)) return; if(/^\s*[【\[]\s*(車|車輛|自行|自理|未安排|未分配|待安排|候補|注意|備註)/.test(t) || /^\s*第\s*\d+\s*車/.test(t)) heads.push({i,t:t.trim()})});
+      let blk=1; const blockOf={}; L.forEach((t,i)=>{if(/^\s*={5,}/.test(t)) blk++; blockOf[i]=blk});
+      showModal(`🚚 把 ${set.size} 行移到…`,`<div class="stack">${heads.map(x=>`<button class="btn light te-move-btn" onclick="app.teDoMove(${x.i})">${blk>1?`<span class="pill">#${blockOf[x.i]}</span>`:''}${h(x.t)}</button>`).join('')||'<div class="empty">找不到區塊標題</div>'}
+        <div class="row"><button class="btn gray grow" onclick="app.teDoMove('top')">⤒ 最上方</button><button class="btn gray grow" onclick="app.teDoMove('end')">⤓ 最下方</button></div></div>`,`<button class="btn light" onclick="app.closeModal()">取消</button>`);
+    },
+    teDoMove(target){
+      const L=editLines(); const s=sortedSel('edit'); const set=new Set(s); const moving=s.map(i=>L[i]);
+      const rest=[]; let tIdx=-1; L.forEach((t,i)=>{if(set.has(i)) return; if(i===target) tIdx=rest.length; rest.push(t)});
+      let at;
+      if(target==='top') at=0; else if(target==='end') at=rest.length;
+      else { let e=tIdx+1; while(e<rest.length && !/^\s*[【\[]/.test(rest[e]) && !/^\s*={5,}/.test(rest[e]) && !/^\s*第\s*\d+\s*車/.test(rest[e])) e++; while(e-1>tIdx && !rest[e-1].trim()) e--; at=e; }
+      rest.splice(at,0,...moving); this.closeModal();
+      setEditLines(rest, moving.map((_,k)=>at+k)); scrollToLine('edit',at);
+      toast(`已移動 ${moving.length} 行`,'ok');
+    },
+    teOrigToEdit(){
+      const L=origLines(); const t=sortedSel('orig').map(i=>L[i]); if(!t.length) return;
+      editor.sel.orig.clear(); renderLineList('orig');
+      if(editor.mode!=='lines') this.teMode('lines');
+      if(isMobile()) this.tePane('edit');
+      insertLines(t, insertAt()); toast(`已加入 ${t.length} 行到編輯區`,'ok');
+    },
     teOpt(k,v){editor.opts[k]=v; try{localStorage.setItem(TE_OPT_KEY,JSON.stringify(editor.opts))}catch{} computeEditor()},
     tePick(i){editor.pick=+i},
-    async teCopy(which){const t=which==='orig'?editor.origText:document.getElementById('teEdit').value; try{await navigator.clipboard.writeText(t); toast(which==='orig'?'已複製原文':'已複製編輯後文字','ok')}catch{const ta=document.getElementById(which==='orig'?'teOrig':'teEdit'); ta.classList.remove('hidden'); ta.select(); document.execCommand('copy'); toast('已複製','ok')}},
-    teReset(){if(!confirm('還原為原始文字？目前編輯內容會消失。'))return; document.getElementById('teEdit').value=editor.origText; computeEditor()},
-    teFormat(){if(!editor.results.length) return toast('沒有可整理的內容','warn'); document.getElementById('teEdit').value=snapsToText(editor.results.map(resultToSnap)); computeEditor(); toast('已整理成標準格式（含優化結果），可再比對確認','ok')},
+    async teCopy(which){const t=which==='orig'?editor.origText:document.getElementById('teEdit').value; toast((await writeClip(t))?(which==='orig'?'已複製全部原文':'已複製全部編輯後文字'):'複製失敗，請改用文字模式手動選取', 'ok')},
+    teReset(){if(!confirm('還原為原始文字？（可按「復原」取消）'))return; setEditLines(editor.origText.replace(/\n$/,'').split('\n'),[])},
+    teFormat(){if(!editor.results.length) return toast('沒有可整理的內容','warn'); setEditLines(snapsToText(editor.results.map(resultToSnap)).replace(/\n$/,'').split('\n'),[]); toast('已整理成標準格式（含優化結果），可再比對確認','ok')},
     teHelp(){showModal('文字格式說明',`<div class="copybox">${h(`【活動】週末登山活動
 【日期】2026-11-21        ← 也接受 2026/11/21、115.11.21（民國）
 【集合】集合點 A
@@ -768,14 +1030,14 @@
 可多行，直到下一個【區塊】為止
 
 ==============================   ← 多筆活動以 5 個以上「=」分隔
-# 開頭為 # 的行是註解，不會轉換`)}</div><div class="sub mt">也可直接貼上本系統「複製通知」產生的 LINE 文字（第1車｜駕駛（7人座，3/7）、乘客：甲、乙…），會自動辨識轉換。</div>`,`<button class="btn blue" onclick="app.closeModal()">知道了</button>`)},
+# 開頭為 # 的行是註解，不會轉換`)}</div><div class="title mt" style="font-size:16px">📱 手機逐行操作</div><div class="sub" style="line-height:1.8">• 點一下行＝選取／取消，可連續點多行<br>• 「↔ 範圍」：先點第一行 → 按範圍 → 點最後一行，中間全選<br>• 「▤ 整段」：選某車任一行，一鍵選整台車（含標題與乘客）<br>• 「🚚 移到…」：把選取的行搬到指定車／自行前往／未安排的最後<br>• 「📋 複製」「✂️ 剪下」後，點目標行再按「📥 貼上」貼在該行下方<br>• 「原文」分頁也能多選後「➕ 加入編輯區」<br>• 「比對」分頁可切「只看差異」；任何操作都能「↶ 復原」<br>• 操作完成後再點其他行，會自動重新選取</div><div class="sub mt">也可直接貼上本系統「複製通知」產生的 LINE 文字（第1車｜駕駛（7人座，3/7）、乘客：甲、乙…），會自動辨識轉換。</div>`,`<button class="btn blue" onclick="app.closeModal()">知道了</button>`)},
     teApply(){
       const r=editor.results[editor.results.length>1?editor.pick:0]; if(!r) return toast('沒有可套用的內容','warn');
       const s=snapStats(r); if(!confirm(`套用為目前活動？\n${r.name||'未命名'}｜${s.people} 人｜${s.cars} 車｜未安排 ${s.un}｜超載 ${s.over}${editor.opts.backup?'\n（會先把目前活動備份到歷史）':''}`)) return;
       if(editor.opts.backup) this.archive();
       const n=resultToSnap(r);
       state.eventName=n.name; state.eventDate=n.eventDate||state.eventDate; state.meetPoint=n.meetPoint; state.notice=n.notice; state.people=n.people; state.vehicles=n.vehicles;
-      editor=null; document.getElementById('editorHost').innerHTML=''; activeTab='dashboard'; touch(); toast('已轉成新資料並套用為目前活動','ok');
+      editor=null; document.getElementById('editorHost').innerHTML=''; document.body.classList.remove('te-open'); activeTab='dashboard'; touch(); toast('已轉成新資料並套用為目前活動','ok');
     },
     teSaveHistory(){
       const R=editor.results; if(!R.length) return toast('沒有可存的內容','warn');
