@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>圖片 PDF OCR</title>
+<!-- 優先載入本機引擎；找不到時自動改用線上 CDN -->
+<script src="./assets/tesseract.min.js"></script>
+<script src="./assets/pdf.min.js"></script>
+<script>
+window.__OCR_LOCAL__ = !!window.Tesseract;
+window.__PDF_LOCAL__ = !!window.pdfjsLib;
+if (!window.Tesseract) document.write('<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"><\/script>');
+if (!window.pdfjsLib) document.write('<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"><\/script>');
+</script>
+<style>
+:root{
+  --bg:#0b1220;--panel:#111b2e;--panel2:#17243b;--line:#2a3c58;
+  --text:#edf4ff;--muted:#9fb2cc;--accent:#36bffa;--accent2:#78e5b0;
+  --danger:#ff6b7a;--warn:#ffd166;--shadow:0 18px 50px rgba(0,0,0,.3)
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:radial-gradient(circle at 15% 0,#17345a 0,transparent 35%),var(--bg);color:var(--text);font-family:"Microsoft JhengHei UI","Noto Sans TC",system-ui,sans-serif;min-height:100vh}
+button,input,select,textarea{font:inherit}
+button{border:1px solid var(--line);background:linear-gradient(180deg,#213451,#172741);color:var(--text);padding:.72rem 1rem;border-radius:12px;cursor:pointer;font-weight:700;transition:.18s}
+button:hover:not(:disabled){transform:translateY(-1px);border-color:#4b6f9d;background:linear-gradient(180deg,#2b456b,#1c3150)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:linear-gradient(135deg,#0087c8,#12a9d8);border-color:#34c5f2}
+button.primary.busy{background:linear-gradient(135deg,#9a5b12,#c9861f);border-color:#ffd166}
+button.success{background:linear-gradient(135deg,#178d62,#24b47e);border-color:#53ddb0}
+button.danger{background:linear-gradient(135deg,#883545,#b9485a);border-color:#e76b7b}
+button.small{padding:.45rem .7rem;font-size:.85rem;border-radius:9px}
+button.on{border-color:#ffcf4a;color:#ffe39a}
+.app{max-width:1640px;margin:auto;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+h1{font-size:clamp(1.35rem,2.4vw,2.15rem);margin:0;letter-spacing:.02em}
+.subtitle{color:var(--muted);margin-top:5px;font-size:.95rem}
+.badge{padding:.55rem .9rem;border:1px solid #2b745e;background:#12392f;color:#8ff0c9;border-radius:999px;font-weight:800;white-space:nowrap}
+.badge.online{border-color:#7a6a2b;background:#3a3312;color:#ffe08a}
+.toolbar,.settings,.exports{display:flex;gap:9px;flex-wrap:wrap;align-items:center;background:rgba(17,27,46,.94);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:var(--shadow);margin-bottom:12px}
+.toolbar .divider{width:1px;height:34px;background:var(--line);margin:0 3px}
+.file-label{display:inline-flex;align-items:center;border:1px solid var(--line);background:linear-gradient(180deg,#213451,#172741);padding:.72rem 1rem;border-radius:12px;cursor:pointer;font-weight:700}
+.file-label:hover{border-color:#4b6f9d}
+input[type=file]{display:none}
+.pdfnav{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 8px;border:1px dashed #4b6f9d;border-radius:12px;color:var(--muted)}
+.pdfnav input[type=number]{width:4.2em;text-align:center}
+.copy-big{background:linear-gradient(135deg,#178d62,#24b47e);border-color:#53ddb0;padding:.55rem 1.1rem;font-size:1rem}
+.title-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.main{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr);gap:14px;min-height:590px}
+.panel{background:rgba(17,27,46,.95);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.panel-title{padding:13px 15px;background:linear-gradient(180deg,#1c2c48,#16243c);border-bottom:1px solid var(--line);font-weight:900;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.panel-title small{color:var(--muted);font-weight:500}
+.preview-wrap{position:relative;flex:1;min-height:450px;background:#070b12;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none}
+.preview-wrap.drag{outline:3px dashed #36bffa;outline-offset:-10px}
+#preview{display:block;max-width:100%;max-height:100%;cursor:crosshair}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);padding:30px;pointer-events:none}
+.empty strong{display:block;color:#d8e6f8;font-size:1.15rem;margin-bottom:8px}
+.crop-tip{padding:9px 13px;color:var(--muted);border-top:1px solid var(--line);font-size:.9rem}
+#result{width:100%;height:100%;min-height:470px;resize:none;border:0;outline:0;background:#0d1626;color:#f4f8ff;padding:16px;line-height:1.75;font-size:1.06rem}
+.settings label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.92rem}
+select,input[type=number]{background:#0d1728;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:.5rem .62rem}
+input[type=checkbox]{width:18px;height:18px;accent-color:#23a9dc}
+.range-group{display:flex;align-items:center;gap:7px}
+.range-group span{min-width:2.2em;text-align:right;color:#cfe0f5}
+input[type=range]{width:105px;accent-color:#2fc0ef}
+.statusbar{margin-top:12px;background:#0d1728;border:1px solid var(--line);border-radius:14px;padding:10px 13px;display:grid;grid-template-columns:1fr minmax(160px,340px);gap:12px;align-items:center}
+.status{color:#cddbee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress{height:12px;border-radius:999px;background:#23324a;overflow:hidden}
+.progress>div{height:100%;width:0;background:linear-gradient(90deg,#22a9da,#55e0af);transition:width .2s}
+.notice{margin-top:12px;color:var(--muted);font-size:.88rem;line-height:1.6}
+kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-radius:6px;padding:1px 6px;color:#fff}
+.toast{position:fixed;right:22px;bottom:22px;max-width:min(430px,calc(100vw - 44px));background:#182a45;border:1px solid #4b6f9d;border-radius:14px;padding:13px 16px;box-shadow:var(--shadow);opacity:0;transform:translateY(15px);pointer-events:none;transition:.25s;z-index:50}
+.toast.show{opacity:1;transform:none}
+@media(max-width:1000px){.main{grid-template-columns:1fr}.preview-wrap{min-height:390px}#result{min-height:390px}.statusbar{grid-template-columns:1fr}header{align-items:flex-start}.badge{font-size:.82rem}}
+@media(max-width:600px){.app{padding:10px}.toolbar,.settings,.exports{padding:9px;gap:7px}button,.file-label{padding:.66rem .78rem;font-size:.9rem}.toolbar .divider{display:none}.panel-title{align-items:flex-start;flex-direction:column}.preview-wrap{min-height:330px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div><h1>📷 圖片／PDF 轉文字 OCR｜繁中＋英文數字</h1><div class="subtitle">圖片與 PDF 不需上傳雲端；辨識在本機瀏覽器內完成，一鍵複製結果</div></div>
+  <div class="badge" id="modeBadge">🔒 離線單機模式</div>
+</header>
+
+<section class="toolbar">
+  <label class="file-label">① 開啟圖片／PDF<input id="fileInput" type="file" accept="image/*,application/pdf,.pdf" multiple></label>
+  <button id="pasteBtn">② 貼上截圖</button>
+  <button id="screenBtn">③ 擷取螢幕</button>
+  <span class="divider"></span>
+  <button id="cropBtn" disabled>套用框選</button>
+  <button id="restoreBtn" disabled>還原原圖</button>
+  <button id="previewBtn" disabled>預覽影像處理</button>
+  <span class="pdfnav" id="pdfNav" hidden>📄
+    <button id="prevPage" class="small">◀</button>
+    <input id="pageNum" type="number" min="1" value="1"><span id="pageTotal">/ 0 頁</span>
+    <button id="nextPage" class="small">▶</button>
+    <select id="pdfScope"><option value="all">辨識全部頁</option><option value="page">只辨識目前頁</option></select>
+  </span>
+  <button id="ocrBtn" class="primary" disabled>④ 開始辨識</button>
+</section>
+
+<section class="settings">
+  <label>語言
+    <select id="lang"><option value="chi_tra+eng">繁中＋英文</option><option value="chi_tra">繁體中文</option><option value="chi_tra+chi_sim+eng">繁中＋簡中＋英文</option><option value="eng">英文</option></select>
+  </label>
+  <label>版面
+    <select id="psm"><option value="6">一般文字／名單</option><option value="3">自動整頁</option><option value="4">多欄文字</option><option value="7">單行文字</option><option value="11">散佈文字</option><option value="12">稀疏文字＋方向</option><option value="5">直書文字</option></select>
+  </label>
+  <label>放大
+    <select id="scale"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option></select>
+  </label>
+  <label><input id="gray" type="checkbox" checked>灰階</label>
+  <label><input id="invert" type="checkbox">反白（深色底）</label>
+  <label><input id="contrastOn" type="checkbox" checked>加強對比</label>
+  <label class="range-group">對比 <input id="contrast" type="range" min="0" max="100" value="32"><span id="contrastValue">32</span></label>
+  <label><input id="thresholdOn" type="checkbox">黑白二值化</label>
+  <label class="range-group">門檻 <input id="threshold" type="range" min="40" max="230" value="165"><span id="thresholdValue">165</span></label>
+  <button id="otsuBtn" class="small" disabled>自動門檻</button>
+  <label><input id="cjkSpace" type="checkbox" checked>移除中文字間空白</label>
+  <label><input id="appendOn" type="checkbox">累加結果</label>
+  <label><input id="pdfTextOn" type="checkbox" checked>PDF 優先取內嵌文字</label>
+  <label><input id="halfOn" type="checkbox" checked>全形英數轉半形</label>
+  <label><input id="autoCopy" type="checkbox" checked>辨識完自動複製</label>
+</section>
+
+<main class="main">
+  <section class="panel">
+    <div class="panel-title"><span>圖片預覽／框選辨識區域</span><small id="imageInfo">尚未載入圖片</small></div>
+    <div class="preview-wrap" id="previewWrap">
+      <canvas id="preview"></canvas>
+      <div class="empty" id="empty"><div><strong>拖入圖片／PDF、貼上截圖或擷取螢幕</strong>載入後可用滑鼠拖曳框選需要辨識的區域</div></div>
+    </div>
+    <div class="crop-tip">拖曳框選後直接按辨識，只辨識框選區；沒框選則辨識整張。<kbd>Ctrl</kbd>＋<kbd>V</kbd> 貼上、<kbd>Ctrl</kbd>＋<kbd>Enter</kbd> 辨識、<kbd>Ctrl</kbd>＋<kbd>Shift</kbd>＋<kbd>C</kbd> 一鍵複製、<kbd>Esc</kbd> 取消框選。</div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title"><span>文字辨識結果</span><span class="title-actions"><small id="lineInfo">0 行／0 字</small><button id="copyTopBtn" class="copy-big">📋 一鍵複製</button></span></div>
+    <textarea id="result" spellcheck="false" placeholder="辨識後的繁體中文、英文與數字會顯示在這裡，可直接修改。"></textarea>
+  </section>
+</main>
+
+<section class="exports">
+  <button id="cleanBtn">清理文字</button>
+  <button id="rosterBtn">轉成名單分欄</button>
+  <button id="copyBtn" class="success">📋 一鍵複製</button>
+  <button id="txtBtn">匯出 TXT</button>
+  <button id="csvBtn">匯出 CSV</button>
+  <button id="clearBtn" class="danger">全部清除</button>
+</section>
+
+<div class="statusbar"><div class="status" id="status">程式已就緒，請載入截圖或圖片。</div><div class="progress"><div id="progressBar"></div></div></div>
+<div class="notice">建議：文字先放大至 150%～200% 再截圖；表格或名單使用「一般文字／名單」；單行內容使用「單行文字」；深色背景請勾「反白」。一次選多張圖片／PDF 會依序辨識並累加結果。PDF 若本身含文字（非掃描檔）會直接讀取內嵌文字，最快也最準；掃描版 PDF 則逐頁轉成影像後 OCR。若 PDF 讀出亂碼，請取消「PDF 優先取內嵌文字」改用 OCR。第一次辨識需載入 OCR 資料，之後可重複使用。</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const els = {
+ file:$('fileInput'),paste:$('pasteBtn'),screen:$('screenBtn'),crop:$('cropBtn'),restore:$('restoreBtn'),previewBtn:$('previewBtn'),ocr:$('ocrBtn'),
+ canvas:$('preview'),wrap:$('previewWrap'),empty:$('empty'),imageInfo:$('imageInfo'),result:$('result'),lineInfo:$('lineInfo'),
+ lang:$('lang'),psm:$('psm'),scale:$('scale'),gray:$('gray'),invert:$('invert'),contrastOn:$('contrastOn'),contrast:$('contrast'),contrastValue:$('contrastValue'),
+ thresholdOn:$('thresholdOn'),threshold:$('threshold'),thresholdValue:$('thresholdValue'),otsu:$('otsuBtn'),cjkSpace:$('cjkSpace'),appendOn:$('appendOn'),
+ status:$('status'),progress:$('progressBar'),badge:$('modeBadge'),
+ clean:$('cleanBtn'),roster:$('rosterBtn'),copy:$('copyBtn'),copyTop:$('copyTopBtn'),txt:$('txtBtn'),csv:$('csvBtn'),clear:$('clearBtn'),toast:$('toast'),
+ pdfNav:$('pdfNav'),prevPage:$('prevPage'),nextPage:$('nextPage'),pageNum:$('pageNum'),pageTotal:$('pageTotal'),pdfScope:$('pdfScope'),
+ pdfTextOn:$('pdfTextOn'),halfOn:$('halfOn'),autoCopy:$('autoCopy')
+};
+const ctx = els.canvas.getContext('2d');
+const original = document.createElement('canvas');
+const originalCtx = original.getContext('2d',{willReadFrequently:true});
+const source = document.createElement('canvas');
+const sourceCtx = source.getContext('2d',{willReadFrequently:true});
+let hasImage=false, selection=null, dragStart=null, drawMap=null, worker=null, workerLang='', busy=false, cancelled=false, showProcessed=false, toastTimer;
+let useLocal = !!window.__OCR_LOCAL__ && location.protocol !== 'file:';
+let pdfDoc=null, pdfName='', pdfPage=1, progressPrefix='';
+const PDF_RENDER_SCALE=2.5; // 約 180 dpi，再搭配「放大」設定
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = window.__PDF_LOCAL__
+    ? new URL('./assets/pdf.worker.min.js',location.href).href
+    : 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
+
+/* ---------- 狀態 ---------- */
+function updateBadge(){
+  if(!window.Tesseract){els.badge.textContent='⚠️ OCR 引擎未載入';els.badge.classList.add('online');return}
+  els.badge.textContent=useLocal?'🔒 離線單機模式':'🌐 線上引擎模式（圖片仍不上傳）';
+  els.badge.classList.toggle('online',!useLocal);
+}
+function toast(msg){clearTimeout(toastTimer);els.toast.textContent=msg;els.toast.classList.add('show');toastTimer=setTimeout(()=>els.toast.classList.remove('show'),2600)}
+function setStatus(msg,pct){els.status.textContent=msg;if(Number.isFinite(pct))els.progress.style.width=Math.max(0,Math.min(100,pct))+'%'}
+function updateTextInfo(){const t=els.result.value.trim();const lines=t?t.split(/\r?\n/).filter(x=>x.trim()).length:0;els.lineInfo.textContent=`${lines} 行／${t.replace(/\s/g,'').length} 字`}
+function setButtons(enabled){
+  [els.crop,els.restore,els.previewBtn,els.otsu].forEach(b=>b.disabled=!enabled||busy);
+  els.ocr.disabled=!enabled && !busy;
+  els.ocr.textContent=busy?'■ 取消辨識':'④ 開始辨識';
+  els.pdfNav.hidden=!pdfDoc;
+  if(pdfDoc){
+    els.prevPage.disabled=busy||pdfPage<=1;els.nextPage.disabled=busy||pdfPage>=pdfDoc.numPages;
+    els.pageNum.disabled=els.pdfScope.disabled=busy;els.pageNum.max=pdfDoc.numPages;els.pageNum.value=pdfPage;els.pageTotal.textContent=`/ ${pdfDoc.numPages} 頁`;
+  }
+  els.ocr.classList.toggle('busy',busy);
+  els.previewBtn.classList.toggle('on',showProcessed);
+  els.previewBtn.textContent=showProcessed?'顯示原圖':'預覽影像處理';
+}
+
+/* ---------- 載入圖片 ---------- */
+async function imageFromBlob(blob){
+  if(!blob || !blob.type.startsWith('image/')) throw new Error('不是可辨識的圖片格式');
+  return await createImageBitmap(blob);
+}
+function loadBitmap(bitmap,label='圖片'){
+  const maxSide=5200;let w=bitmap.width,h=bitmap.height;const ratio=Math.min(1,maxSide/Math.max(w,h));w=Math.max(1,Math.round(w*ratio));h=Math.max(1,Math.round(h*ratio));
+  original.width=source.width=w;original.height=source.height=h;
+  originalCtx.clearRect(0,0,w,h);originalCtx.drawImage(bitmap,0,0,w,h);
+  sourceCtx.clearRect(0,0,w,h);sourceCtx.drawImage(original,0,0);
+  hasImage=true;selection=null;showProcessed=false;els.empty.style.display='none';els.imageInfo.textContent=`${label}｜${w} × ${h} px`;
+  setButtons(true);drawPreview();setStatus(pdfDoc?'PDF 已載入，可切換頁面、框選區域或直接開始辨識。':'圖片已載入，可框選區域或直接開始辨識。',0);
+  if(bitmap.close) bitmap.close();
+}
+async function loadBlob(blob,label){try{closePdf();loadBitmap(await imageFromBlob(blob),label);return true}catch(err){toast(err.message||String(err));return false}}
+
+/* ---------- PDF ---------- */
+const isPdf=f=>f && (f.type==='application/pdf' || /\.pdf$/i.test(f.name||''));
+function closePdf(){if(pdfDoc){try{pdfDoc.destroy()}catch{}}pdfDoc=null;pdfName='';pdfPage=1}
+async function openPdf(file){
+  if(!window.pdfjsLib) throw new Error('PDF 引擎未載入：請確認 assets/pdf.min.js 存在，或連上網路後重新整理');
+  closePdf();setStatus('正在開啟 PDF…',2);
+  pdfDoc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  pdfName=file.name||'PDF';
+  await showPdfPage(1);
+}
+async function showPdfPage(n){
+  if(!pdfDoc)return;
+  n=Math.max(1,Math.min(pdfDoc.numPages,n|0||1));
+  const page=await pdfDoc.getPage(n);
+  const vp=page.getViewport({scale:PDF_RENDER_SCALE});
+  const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);
+  const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
+  await page.render({canvasContext:cx,viewport:vp}).promise;
+  pdfPage=n;loadBitmap(c,`${pdfName}｜第 ${n}/${pdfDoc.numPages} 頁`);
+  page.cleanup();
+}
+// 讀取 PDF 內嵌文字，依座標重組成行；欄位間大間距保留兩格空白（方便轉名單分欄）
+async function pdfPageText(n){
+  const page=await pdfDoc.getPage(n);const tc=await page.getTextContent();page.cleanup();
+  const items=tc.items.filter(i=>i.str && i.str.trim()).map(i=>({s:i.str,x:i.transform[4],y:i.transform[5],w:i.width||0,h:Math.abs(i.transform[3])||i.height||10}));
+  items.sort((a,b)=>b.y-a.y||a.x-b.x);
+  const lines=[];
+  for(const it of items){const ln=lines.find(l=>Math.abs(l.y-it.y)<Math.min(l.h,it.h)*.55);if(ln){ln.items.push(it);ln.h=Math.max(ln.h,it.h)}else lines.push({y:it.y,h:it.h,items:[it]})}
+  lines.sort((a,b)=>b.y-a.y);
+  const cjk=new RegExp(`[${CJK}]`);
+  const text=lines.map(l=>{l.items.sort((a,b)=>a.x-b.x);let out='',prev=null;
+    for(const it of l.items){
+      if(prev){const gap=it.x-(prev.x+prev.w);
+        if(gap>it.h*1.6) out+='  ';
+        else if(gap>it.h*.18 && !(cjk.test(out.slice(-1))&&cjk.test(it.s[0])) && !/\s$/.test(out) && !/^\s/.test(it.s)) out+=' ';}
+      out+=it.s;prev=it}
+    return out}).join('\n');
+  return normalizeText(text);
+}
+function usableText(t){const core=t.replace(/\s/g,'');return core.length>=8 && (core.match(/[\uFFFD\u0000-\u001F]/g)||[]).length<core.length*.05}
+async function pdfRecognize(scope){
+  const total=pdfDoc.numPages,cur=pdfPage;
+  const pages=scope==='all'?Array.from({length:total},(_,i)=>i+1):[cur];
+  const keepSel=pages.length===1 && selection;
+  const parts=[];let ocrPages=0,textPages=0,confSum=0;
+  for(const n of pages){
+    if(cancelled)break;
+    progressPrefix=pages.length>1?`第 ${n}/${total} 頁｜`:'';
+    if(els.pdfTextOn.checked && !keepSel){
+      setStatus(progressPrefix+'讀取內嵌文字…',Math.round((n-1)/total*100));
+      const t=await pdfPageText(n);
+      if(usableText(t)){parts.push({n,text:t});textPages++;continue}
+    }
+    if(n!==pdfPage) await showPdfPage(n);
+    busy=true;setButtons(true);
+    const {text,conf}=await runOcrOnSource(keepSel?undefined:null);
+    if(cancelled)break;
+    parts.push({n,text});ocrPages++;confSum+=conf;
+  }
+  progressPrefix='';
+  const text=parts.length>1?parts.map(p=>`【第 ${p.n} 頁】\n${p.text}`).join('\n\n'):(parts[0]?.text||'');
+  return {text,pages:parts.length,ocrPages,textPages,conf:ocrPages?Math.round(confSum/ocrPages):null};
+}
+
+/* ---------- 預覽與框選 ---------- */
+function drawPreview(){
+  const rect=els.wrap.getBoundingClientRect();const dpr=Math.min(window.devicePixelRatio||1,2);
+  els.canvas.width=Math.max(1,Math.floor(rect.width*dpr));els.canvas.height=Math.max(1,Math.floor(rect.height*dpr));
+  els.canvas.style.width=rect.width+'px';els.canvas.style.height=rect.height+'px';
+  if(!hasImage){ctx.clearRect(0,0,els.canvas.width,els.canvas.height);drawMap=null;return}
+  const img=showProcessed?buildOcrCanvas(1,null):source;const pad=18*dpr;const s=Math.min((els.canvas.width-pad*2)/img.width,(els.canvas.height-pad*2)/img.height);
+  const dw=img.width*s,dh=img.height*s,dx=(els.canvas.width-dw)/2,dy=(els.canvas.height-dh)/2;
+  ctx.fillStyle='#070b12';ctx.fillRect(0,0,els.canvas.width,els.canvas.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,dx,dy,dw,dh);
+  drawMap={dx,dy,dw,dh,s,dpr};
+  if(selection){
+    const r=sourceRectToCanvas(selection);ctx.save();
+    ctx.fillStyle='rgba(0,0,0,.45)';ctx.beginPath();ctx.rect(dx,dy,dw,dh);ctx.rect(r.x,r.y,r.w,r.h);ctx.fill('evenodd');
+    ctx.strokeStyle='#ffcf4a';ctx.lineWidth=2*dpr;ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.restore();
+  }
+}
+function sourceRectToCanvas(r){return{x:drawMap.dx+r.x*drawMap.s,y:drawMap.dy+r.y*drawMap.s,w:r.w*drawMap.s,h:r.h*drawMap.s}}
+function pointToSource(ev,clamp=false){
+  if(!drawMap)return null;const b=els.canvas.getBoundingClientRect();let x=(ev.clientX-b.left)*(els.canvas.width/b.width),y=(ev.clientY-b.top)*(els.canvas.height/b.height);
+  if(!clamp && (x<drawMap.dx||y<drawMap.dy||x>drawMap.dx+drawMap.dw||y>drawMap.dy+drawMap.dh))return null;
+  return{x:Math.max(0,Math.min(source.width,(x-drawMap.dx)/drawMap.s)),y:Math.max(0,Math.min(source.height,(y-drawMap.dy)/drawMap.s))};
+}
+els.canvas.addEventListener('pointerdown',e=>{if(!hasImage||busy)return;const p=pointToSource(e);if(!p)return;dragStart=p;selection={x:p.x,y:p.y,w:0,h:0};els.canvas.setPointerCapture(e.pointerId);drawPreview()});
+els.canvas.addEventListener('pointermove',e=>{if(!dragStart)return;const p=pointToSource(e,true);selection={x:Math.min(dragStart.x,p.x),y:Math.min(dragStart.y,p.y),w:Math.abs(p.x-dragStart.x),h:Math.abs(p.y-dragStart.y)};drawPreview()});
+const endDrag=()=>{if(!dragStart)return;dragStart=null;if(selection && (selection.w<8||selection.h<8))selection=null;drawPreview();if(selection)setStatus(`已框選 ${Math.round(selection.w)} × ${Math.round(selection.h)} px，按辨識只處理此區域。`)};
+els.canvas.addEventListener('pointerup',endDrag);els.canvas.addEventListener('pointercancel',endDrag);
+
+function selRect(){if(!selection)return null;const x=Math.round(selection.x),y=Math.round(selection.y);return{x,y,w:Math.max(1,Math.min(source.width-x,Math.round(selection.w))),h:Math.max(1,Math.min(source.height-y,Math.round(selection.h)))}}
+function applyCrop(){
+  const r=selRect();if(!r){toast('尚未框選區域');return}
+  const tmp=document.createElement('canvas');tmp.width=r.w;tmp.height=r.h;tmp.getContext('2d').drawImage(source,r.x,r.y,r.w,r.h,0,0,r.w,r.h);
+  source.width=r.w;source.height=r.h;sourceCtx.drawImage(tmp,0,0);selection=null;els.imageInfo.textContent=`已裁切｜${r.w} × ${r.h} px`;drawPreview();toast('已套用框選區域');
+}
+function restoreOriginal(){source.width=original.width;source.height=original.height;sourceCtx.drawImage(original,0,0);selection=null;els.imageInfo.textContent=`原始圖片｜${source.width} × ${source.height} px`;drawPreview();toast('已還原原圖')}
+
+/* ---------- 影像前處理 ---------- */
+function buildOcrCanvas(forceScale=null,rect=selRect()){
+  const r=rect||{x:0,y:0,w:source.width,h:source.height};
+  let scale=forceScale??Number(els.scale.value);
+  const maxPx=forceScale?Infinity:5000;scale=Math.min(scale,maxPx/Math.max(r.w,r.h));scale=Math.max(scale,Math.min(1,scale));
+  const pad=forceScale?0:Math.round(12*scale); // 留白邊，邊緣文字較易辨識
+  const out=document.createElement('canvas');const ow=Math.max(1,Math.round(r.w*scale)),oh=Math.max(1,Math.round(r.h*scale));
+  out.width=ow+pad*2;out.height=oh+pad*2;
+  const c=out.getContext('2d',{willReadFrequently:true});c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
+  c.drawImage(source,r.x,r.y,r.w,r.h,pad,pad,ow,oh);
+  const img=c.getImageData(0,0,out.width,out.height),d=img.data;
+  const contrast=Number(els.contrast.value),factor=(259*(contrast+255))/(255*(259-contrast)),threshold=Number(els.threshold.value);
+  const gray=els.gray.checked,inv=els.invert.checked,con=els.contrastOn.checked,thr=els.thresholdOn.checked;
+  // 邊框區先用背景色填滿：反白時填黑，處理後成白
+  const padVal=inv?0:255;
+  for(let y=0;y<out.height;y++)for(let x=0;x<out.width;x++){
+    const i=(y*out.width+x)*4;
+    let r0,g0,b0;
+    if(x<pad||y<pad||x>=pad+ow||y>=pad+oh){r0=g0=b0=padVal}else{r0=d[i];g0=d[i+1];b0=d[i+2]}
+    if(d[i+3]<255 && !(x<pad||y<pad||x>=pad+ow||y>=pad+oh)){const a=d[i+3]/255;r0=r0*a+255*(1-a);g0=g0*a+255*(1-a);b0=b0*a+255*(1-a)}
+    let rr=r0,gg=g0,bb=b0;
+    if(inv){rr=255-rr;gg=255-gg;bb=255-bb}
+    if(gray||thr){const yv=.299*rr+.587*gg+.114*bb;rr=gg=bb=yv}
+    if(con){rr=factor*(rr-128)+128;gg=factor*(gg-128)+128;bb=factor*(bb-128)+128}
+    if(thr){const v=rr>=threshold?255:0;rr=gg=bb=v}
+    d[i]=rr<0?0:rr>255?255:rr;d[i+1]=gg<0?0:gg>255?255:gg;d[i+2]=bb<0?0:bb>255?255:bb;d[i+3]=255;
+  }
+  c.putImageData(img,0,0);return out;
+}
+function otsuThreshold(){
+  const r=selRect()||{x:0,y:0,w:source.width,h:source.height};
+  const d=sourceCtx.getImageData(r.x,r.y,r.w,r.h).data;const hist=new Array(256).fill(0);let n=0;
+  for(let i=0;i<d.length;i+=16){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];if(els.invert.checked)y=255-y;hist[y|0]++;n++}
+  let sum=0;for(let t=0;t<256;t++)sum+=t*hist[t];
+  let sumB=0,wB=0,best=0,th=128;
+  for(let t=0;t<256;t++){wB+=hist[t];if(!wB)continue;const wF=n-wB;if(!wF)break;sumB+=t*hist[t];const mB=sumB/wB,mF=(sum-sumB)/wF;const v=wB*wF*(mB-mF)**2;if(v>best){best=v;th=t}}
+  th=Math.max(40,Math.min(230,th+1));els.threshold.value=th;els.thresholdValue.textContent=th;els.thresholdOn.checked=true;
+  if(showProcessed)drawPreview();toast(`自動門檻：${th}（已開啟二值化）`);
+}
+
+/* ---------- OCR 引擎 ---------- */
+function workerOptions(){
+  const logger=m=>{const p=Number.isFinite(m.progress)?Math.round(m.progress*100):0;const map={loading:'載入中',"loading tesseract core":'載入 OCR 核心',"initializing tesseract":'初始化 OCR',"loading language traineddata":'載入語言資料（第一次較久）',"loaded language traineddata":'語言資料已載入',"initializing api":'建立辨識引擎',"recognizing text":'辨識文字中'};setStatus(progressPrefix+(map[m.status]||m.status||'處理中…')+(p?` ${p}%`:''),p)};
+  if(!useLocal) return {logger};
+  const abs=p=>new URL(p,location.href).href;
+  return {workerPath:abs('./assets/worker.min.js'),corePath:abs('./assets/core'),langPath:abs('./assets/lang'),logger};
+}
+async function ensureWorker(){
+  if(!window.Tesseract) throw new Error('OCR 引擎未載入：請確認 assets 資料夾存在，或連上網路後重新整理');
+  const lang=els.lang.value;if(worker && workerLang===lang)return worker;
+  if(worker){try{await worker.terminate()}catch{}worker=null}
+  setStatus('正在啟動 OCR 引擎…',3);
+  try{
+    worker=await Tesseract.createWorker(lang,1,workerOptions());
+  }catch(err){
+    if(!useLocal) throw err;
+    console.warn('本機引擎啟動失敗，改用線上引擎',err);
+    useLocal=false;updateBadge();toast('本機 OCR 資料無法使用，已自動改用線上引擎');
+    worker=await Tesseract.createWorker(lang,1,workerOptions());
+  }
+  workerLang=lang;return worker;
+}
+async function runOcrOnSource(rect){
+  const w=await ensureWorker();
+  await w.setParameters({tessedit_pageseg_mode:els.psm.value,preserve_interword_spaces:'1',user_defined_dpi:'300'});
+  const ret=await w.recognize(rect===undefined?buildOcrCanvas():buildOcrCanvas(null,rect));
+  return {text:normalizeText(ret.data.text||''),conf:Math.round(ret.data.confidence||0)};
+}
+function putResult(text){
+  if(els.appendOn.checked && els.result.value.trim()) els.result.value=els.result.value.replace(/\s+$/,'')+'\n\n'+text;
+  else els.result.value=text;
+  updateTextInfo();els.result.scrollTop=els.result.scrollHeight;
+  if(els.autoCopy.checked && text.trim()) copyText(true);
+}
+async function cancelOcr(){
+  cancelled=true;
+  if(worker){try{await worker.terminate()}catch{}worker=null;workerLang=''}
+  setStatus('已取消辨識。',0);
+}
+async function recognize(){
+  if(busy){cancelOcr();return}
+  if(!hasImage)return;
+  busy=true;cancelled=false;setButtons(true);
+  try{
+    if(pdfDoc){
+      const r=await pdfRecognize(els.pdfScope.value);
+      if(cancelled)return;
+      putResult(r.text);
+      const how=[r.textPages?`內嵌文字 ${r.textPages} 頁`:'',r.ocrPages?`OCR ${r.ocrPages} 頁（信心值 ${r.conf}%）`:''].filter(Boolean).join('、');
+      setStatus(`PDF 辨識完成｜共 ${r.pages} 頁｜${how}`,100);
+      toast(r.text?'PDF 辨識完成':'沒有辨識到文字，請調整影像處理或取消「PDF 優先取內嵌文字」');
+      return;
+    }
+    const {text,conf}=await runOcrOnSource();
+    if(cancelled)return;
+    putResult(text);
+    setStatus(`辨識完成｜信心值 ${conf}%${selection?'（框選區域）':''}${conf<60?'｜信心偏低，可試試放大 3× 或二值化':''}`,100);
+    toast(text?'辨識完成':'沒有辨識到文字，請調整框選或影像處理');
+  }catch(err){
+    if(cancelled)return;
+    console.error(err);worker=null;workerLang='';progressPrefix='';
+    setStatus('辨識失敗：'+(err.message||err),0);toast('辨識失敗：'+(err.message||err));
+  }finally{busy=false;setButtons(hasImage)}
+}
+async function batchRecognize(files){
+  if(busy)return;
+  const imgs=files.filter(f=>f.type.startsWith('image/')||isPdf(f));
+  if(!imgs.length){if(files.length)toast('只支援圖片（PNG/JPG/WebP…）與 PDF 檔');return}
+  if(imgs.length===1){
+    const f=imgs[0];
+    if(isPdf(f)){try{await openPdf(f);toast(`PDF 已開啟：共 ${pdfDoc.numPages} 頁，按「④ 開始辨識」`)}catch(err){console.error(err);closePdf();setButtons(hasImage);setStatus('PDF 開啟失敗：'+(err.message||err),0);toast('PDF 開啟失敗：'+(err.message||err))}}
+    else await loadBlob(f,f.name);
+    return;
+  }
+  busy=true;cancelled=false;setButtons(true);const parts=[];
+  try{
+    for(let i=0;i<imgs.length;i++){
+      if(cancelled)break;
+      const f=imgs[i];
+      if(isPdf(f)){
+        await openPdf(f);busy=true;setButtons(true);
+        const r=await pdfRecognize('all');if(cancelled)break;
+        parts.push(`【${f.name}】\n${r.text}`);
+      }else{
+        closePdf();loadBitmap(await imageFromBlob(f),`${f.name}（${i+1}/${imgs.length}）`);busy=true;setButtons(true);
+        const {text}=await runOcrOnSource();if(cancelled)break;
+        parts.push(`【${f.name}】\n${text}`);
+      }
+    }
+    if(parts.length){const old=els.appendOn.checked;els.appendOn.checked=true;putResult(parts.join('\n\n'));els.appendOn.checked=old}
+    if(!cancelled){setStatus(`批次辨識完成：${parts.length} 張圖片`,100);toast('批次辨識完成')}
+  }catch(err){if(!cancelled){console.error(err);worker=null;workerLang='';progressPrefix='';setStatus('批次辨識中斷：'+(err.message||err),0)}}
+  finally{busy=false;setButtons(hasImage)}
+}
+
+/* ---------- 文字整理 ---------- */
+const CJK='\\u2E80-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF\\u3000-\\u303F';
+const cjkGap=new RegExp(`([${CJK}]) (?=[${CJK}])`,'g');
+function normalizeText(t){
+  t=t.replace(/\r\n?/g,'\n').replace(/　/g,' ').replace(/[ \t]+$/gm,'').replace(/^[ \t]*[|｜¦]+|[|｜¦]+[ \t]*$/gm,'');
+  if(els.halfOn.checked){t=t.replace(/[０-９Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/(\d)[．](?=\d)/g,'$1.')}
+  if(els.cjkSpace.checked){t=t.replace(cjkGap,'$1').replace(cjkGap,'$1')} // 只移除單一空白，保留 2 格以上的欄位分隔
+  return t.replace(/\n{3,}/g,'\n\n').trim();
+}
+function rosterText(t){return normalizeText(t).split('\n').filter(x=>x.trim()).map(line=>line.trim().split(/[\t,，、;；|｜]+| {2,}/).map(x=>x.trim()).filter(Boolean).join('\t')).join('\n')}
+function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`}
+function download(name,data,type){if(!data.trim()){toast('沒有可匯出的文字');return}const blob=new Blob(['﻿',data],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+function toCsv(t){return rosterText(t).split('\n').map(row=>row.split('\t').map(v=>'"'+v.replace(/"/g,'""')+'"').join(',')).join('\r\n')}
+
+/* ---------- 事件 ---------- */
+els.file.addEventListener('change',async e=>{const fs=[...e.target.files];e.target.value='';await batchRecognize(fs)});
+async function pasteImage(){
+  try{if(!navigator.clipboard?.read)throw new Error('請直接按 Ctrl+V 貼上截圖');const items=await navigator.clipboard.read();for(const item of items){const type=item.types.find(x=>x.startsWith('image/'));if(type){await loadBlob(await item.getType(type),'剪貼簿截圖');return}}throw new Error('剪貼簿內沒有圖片')}
+  catch(err){toast(err.name==='NotAllowedError'?'瀏覽器未允許讀取剪貼簿，請改按 Ctrl+V':(err.message||String(err)))}
+}
+els.paste.addEventListener('click',pasteImage);
+window.addEventListener('paste',async e=>{for(const item of e.clipboardData?.items||[]){if(item.type.startsWith('image/')){e.preventDefault();await loadBlob(item.getAsFile(),'剪貼簿截圖');return}}});
+let dragDepth=0;
+window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;els.wrap.classList.add('drag')});
+window.addEventListener('dragleave',()=>{if(--dragDepth<=0){dragDepth=0;els.wrap.classList.remove('drag')}});
+window.addEventListener('dragover',e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy'});
+window.addEventListener('drop',async e=>{e.preventDefault();dragDepth=0;els.wrap.classList.remove('drag');await batchRecognize([...(e.dataTransfer?.files||[])])});
+
+els.screen.addEventListener('click',async()=>{
+  let stream;
+  try{
+    if(!navigator.mediaDevices?.getDisplayMedia)throw new Error('此瀏覽器不支援螢幕擷取（手機請改用截圖後貼上）');
+    stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:5},audio:false});
+    const video=document.createElement('video');video.srcObject=stream;video.muted=true;video.playsInline=true;await video.play();
+    await new Promise(r=>setTimeout(r,400));
+    const c=document.createElement('canvas');c.width=video.videoWidth;c.height=video.videoHeight;c.getContext('2d').drawImage(video,0,0);
+    const blob=await new Promise(r=>c.toBlob(r,'image/png'));await loadBlob(blob,'螢幕擷取');
+  }catch(err){if(err.name!=='NotAllowedError')toast(err.message||String(err))}
+  finally{stream?.getTracks().forEach(t=>t.stop())}
+});
+
+els.crop.addEventListener('click',applyCrop);
+els.restore.addEventListener('click',restoreOriginal);
+els.previewBtn.addEventListener('click',()=>{showProcessed=!showProcessed;setButtons(true);drawPreview();toast(showProcessed?'目前顯示影像處理後效果（調整設定會即時更新）':'已切回原圖')});
+els.otsu.addEventListener('click',otsuThreshold);
+els.ocr.addEventListener('click',recognize);
+els.clean.addEventListener('click',()=>{els.result.value=normalizeText(els.result.value);updateTextInfo();toast('文字已清理')});
+els.roster.addEventListener('click',()=>{els.result.value=rosterText(els.result.value);updateTextInfo();toast('已轉成 Tab 分欄，可直接貼入 Excel')});
+async function copyText(auto=false){
+  const v=els.result.value;if(!v.trim()){if(!auto)toast('沒有可複製的文字');return false}
+  let ok=false;
+  try{await navigator.clipboard.writeText(v);ok=true}catch{}
+  if(!ok){try{const ta=document.createElement('textarea');ta.value=v;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove()}catch{}}
+  const n=v.replace(/\s/g,'').length;
+  if(ok)toast(`✅ 已${auto?'自動':''}複製 ${n} 字到剪貼簿，可直接貼上`);
+  else toast(auto?'辨識完成，請按「📋 一鍵複製」':'瀏覽器不允許複製，請在文字框按 Ctrl+A、Ctrl+C');
+  return ok;
+}
+els.copy.addEventListener('click',()=>copyText());
+els.copyTop.addEventListener('click',()=>copyText());
+els.prevPage.addEventListener('click',()=>showPdfPage(pdfPage-1));
+els.nextPage.addEventListener('click',()=>showPdfPage(pdfPage+1));
+els.pageNum.addEventListener('change',()=>showPdfPage(Number(els.pageNum.value)));
+els.txt.addEventListener('click',()=>download(`OCR辨識結果_${stamp()}.txt`,els.result.value.replace(/\n/g,'\r\n'),'text/plain;charset=utf-8'));
+els.csv.addEventListener('click',()=>download(`OCR名單資料_${stamp()}.csv`,toCsv(els.result.value),'text/csv;charset=utf-8'));
+els.clear.addEventListener('click',()=>{if(busy)cancelOcr();closePdf();hasImage=false;selection=null;showProcessed=false;source.width=source.height=original.width=original.height=1;els.result.value='';els.empty.style.display='grid';els.imageInfo.textContent='尚未載入圖片';updateTextInfo();busy=false;setButtons(false);drawPreview();setStatus('已清除，請重新載入圖片。',0)});
+els.result.addEventListener('input',updateTextInfo);
+
+// 影像設定變動時，若正在預覽處理效果就即時重繪
+let redrawTimer;const liveRedraw=()=>{if(!showProcessed)return;clearTimeout(redrawTimer);redrawTimer=setTimeout(drawPreview,60)};
+els.contrast.addEventListener('input',()=>{els.contrastValue.textContent=els.contrast.value;liveRedraw()});
+els.threshold.addEventListener('input',()=>{els.thresholdValue.textContent=els.threshold.value;liveRedraw()});
+[els.gray,els.invert,els.contrastOn,els.thresholdOn].forEach(x=>x.addEventListener('change',liveRedraw));
+
+window.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();if(hasImage)recognize()}
+  else if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='C'||e.key==='c')){e.preventDefault();copyText()}
+  else if(e.key==='Escape'&&selection&&document.activeElement!==els.result){selection=null;drawPreview();setStatus('已取消框選，將辨識整張圖片。')}
+});
+let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(drawPreview,80)});
+window.addEventListener('beforeunload',()=>{if(worker)worker.terminate()});
+
+updateBadge();setButtons(false);updateTextInfo();
+if(!window.Tesseract)setStatus('⚠️ OCR 引擎未載入：請確認 assets 資料夾或網路連線。',0);
+else if(!window.pdfjsLib)setStatus('⚠️ PDF 引擎未載入：圖片仍可辨識；PDF 需 assets/pdf.min.js 或網路連線。',0);
+else if(!useLocal)setStatus('程式已就緒（線上引擎模式）。直接以檔案開啟時會自動使用線上引擎，圖片仍只在本機處理。',0);
+})();
+</script>
+</body>
+</html>
