@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>活動車輛安排系統｜網站填寫共編版</title>
+  <style>
+    :root{
+      --bg:#eef4ff;--bg2:#f8fafc;--card:#ffffff;--card2:#f1f5f9;--text:#0f172a;--muted:#64748b;--line:#dbe4f0;
+      --brand:#2563eb;--brand2:#1d4ed8;--green:#16a34a;--orange:#f97316;--red:#dc2626;--purple:#7c3aed;--cyan:#0891b2;
+      --shadow:0 16px 40px rgba(15,23,42,.10);--r:20px;
+    }
+    [data-theme="dark"]{--bg:#07111f;--bg2:#0f172a;--card:#111827;--card2:#172033;--text:#e5e7eb;--muted:#94a3b8;--line:#29364d;--brand:#60a5fa;--brand2:#3b82f6;--green:#22c55e;--orange:#fb923c;--red:#f87171;--purple:#a78bfa;--cyan:#22d3ee;--shadow:0 16px 46px rgba(0,0,0,.35)}
+    *{box-sizing:border-box} html,body{height:100%} body{margin:0;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(135deg,var(--bg),var(--bg2));color:var(--text)}
+    [data-theme="dark"] body{background:radial-gradient(circle at 0 0,#172554 0,#0f172a 38%,#020617 100%)}
+    button,input,select,textarea{font:inherit} button{border:0;cursor:pointer;transition:.15s transform,.15s filter,.15s opacity}button:active{transform:scale(.97);filter:brightness(.93)}
+    input,select,textarea{width:100%;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:14px;padding:10px 12px;outline:none}textarea{min-height:110px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.14)}
+    .app{max-width:1320px;margin:auto;min-height:100%;padding:14px 14px 92px}.top{position:sticky;top:0;z-index:30;margin:-14px -14px 14px;background:linear-gradient(120deg,#0f172a,#1e3a8a);color:#fff;padding:14px;border-radius:0 0 26px 26px;box-shadow:var(--shadow);backdrop-filter:blur(12px)}
+    .top-inner{max-width:1320px;margin:auto;display:grid;grid-template-columns:1.35fr .7fr .8fr auto;gap:10px;align-items:end}.top input{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.18);color:#fff;font-weight:900}.top input::placeholder{color:#cbd5e1}.label{font-size:12px;font-weight:900;letter-spacing:.06em;color:#a8c1e8;margin:0 0 6px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border-radius:13px;background:var(--brand);color:#fff;font-weight:950;box-shadow:0 8px 18px rgba(37,99,235,.18);white-space:nowrap}.btn.small{font-size:13px;padding:7px 9px;border-radius:10px}.btn.ghost{background:rgba(255,255,255,.12);box-shadow:none;border:1px solid rgba(255,255,255,.18)}.btn.blue{background:#2563eb}.btn.green{background:#16a34a}.btn.orange{background:#f97316}.btn.red{background:#dc2626}.btn.purple{background:#7c3aed}.btn.cyan{background:#0891b2}.btn.gray{background:#475569}.btn.light{background:var(--card2);color:var(--text);box-shadow:none;border:1px solid var(--line)}
+    .status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:900;padding:9px 11px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16)}.dot{width:10px;height:10px;border-radius:999px;background:#94a3b8;box-shadow:0 0 0 4px rgba(148,163,184,.15)}.dot.ok{background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.18)}.dot.warn{background:#f97316;box-shadow:0 0 0 4px rgba(249,115,22,.18)}.dot.bad{background:#ef4444;box-shadow:0 0 0 4px rgba(239,68,68,.18)}
+    .tabs{position:sticky;top:102px;z-index:25;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;background:rgba(239,246,255,.82);border:1px solid var(--line);border-radius:20px;padding:8px;backdrop-filter:blur(14px);box-shadow:0 8px 24px rgba(15,23,42,.06)}[data-theme="dark"] .tabs{background:rgba(2,6,23,.72)}.tab{background:transparent;color:var(--muted);font-weight:950;border-radius:14px;padding:11px 8px}.tab.active{background:var(--card);color:var(--brand);box-shadow:0 8px 18px rgba(15,23,42,.08)}
+    .stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}.stat{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;box-shadow:0 8px 24px rgba(15,23,42,.06);overflow:hidden;position:relative}.stat:after{content:"";position:absolute;right:-30px;top:-30px;width:82px;height:82px;border-radius:50%;background:rgba(37,99,235,.1)}.stat .n{font-size:30px;font-weight:1000;line-height:1}.stat .t{font-size:13px;color:var(--muted);font-weight:900;margin-top:5px}.stat.green:after{background:rgba(22,163,74,.14)}.stat.orange:after{background:rgba(249,115,22,.15)}.stat.red:after{background:rgba(220,38,38,.13)}.stat.purple:after{background:rgba(124,58,237,.14)}.stat.cyan:after{background:rgba(8,145,178,.14)}
+    .grid{display:grid;gap:14px}.grid.main{grid-template-columns:360px 1fr}.grid.cols2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.cols3{grid-template-columns:repeat(3,minmax(0,1fr))}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;overflow:hidden}.soft{background:var(--card2);box-shadow:none}.title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:19px;font-weight:1000;margin:0 0 12px}.sub{font-size:13px;color:var(--muted);line-height:1.55}.row{display:flex;align-items:center;gap:8px}.row.wrap{flex-wrap:wrap}.row.between{justify-content:space-between}.row.end{justify-content:flex-end}.stack{display:flex;flex-direction:column;gap:10px}.mt{margin-top:12px}.mb{margin-bottom:12px}.hr{height:1px;background:var(--line);margin:12px 0}.hidden{display:none!important}.grow{flex:1}.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:5px 9px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:12px;font-weight:900}.pill.ok{background:#dcfce7;color:#15803d;border-color:#bbf7d0}.pill.warn{background:#ffedd5;color:#c2410c;border-color:#fed7aa}.pill.bad{background:#fee2e2;color:#b91c1c;border-color:#fecaca}.pill.info{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}.pill.purple{background:#ede9fe;color:#6d28d9;border-color:#ddd6fe}.pill.cyan{background:#cffafe;color:#0e7490;border-color:#a5f3fc}[data-theme="dark"] .pill.ok{background:rgba(34,197,94,.14);color:#86efac;border-color:rgba(34,197,94,.25)}[data-theme="dark"] .pill.warn{background:rgba(249,115,22,.15);color:#fdba74;border-color:rgba(249,115,22,.26)}[data-theme="dark"] .pill.bad{background:rgba(220,38,38,.15);color:#fca5a5;border-color:rgba(220,38,38,.26)}[data-theme="dark"] .pill.info{background:rgba(37,99,235,.16);color:#93c5fd;border-color:rgba(37,99,235,.3)}
+    .vehicle-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(275px,1fr));gap:14px}.vehicle{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:22px;padding:14px;box-shadow:0 8px 22px rgba(15,23,42,.06);min-height:220px}.vehicle.full{border-color:#fed7aa}.vehicle.over{border-color:#fecaca;background:linear-gradient(180deg,rgba(254,226,226,.92),var(--card))}.vehicle-head{display:flex;justify-content:space-between;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}.driver{font-size:20px;font-weight:1000}.note{font-size:12px;color:var(--muted);margin-top:3px}.seatbar{height:10px;background:var(--line);border-radius:999px;overflow:hidden;margin:10px 0}.seatbar span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--brand));width:0}.seatbar.warn span{background:linear-gradient(90deg,var(--orange),#f59e0b)}.seatbar.bad span{background:linear-gradient(90deg,var(--red),#ef4444)}.passenger{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 10px;margin:7px 0}.pname{font-weight:950}.mini{font-size:11px;color:var(--muted);margin-top:2px}.iconbtn{width:32px;height:32px;border-radius:10px;background:var(--card2);border:1px solid var(--line);color:var(--text);display:inline-flex;align-items:center;justify-content:center}.iconbtn:hover{background:#fee2e2;color:#991b1b}.list{display:flex;flex-direction:column;gap:8px;max-height:62vh;overflow:auto}.person{border:1px solid var(--line);background:var(--card);border-radius:17px;padding:10px;box-shadow:0 4px 14px rgba(15,23,42,.04)}.person.warn{border-left:7px solid var(--orange)}.person-grid{display:grid;grid-template-columns:1fr 142px auto;gap:8px;align-items:center}.empty{border:1px dashed var(--line);border-radius:18px;background:var(--card2);padding:24px;text-align:center;color:var(--muted);font-weight:850}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:18px}.table{width:100%;border-collapse:collapse;background:var(--card)}.table th,.table td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}.table th{font-size:12px;color:var(--muted);background:var(--card2);position:sticky;top:0}.table tr:last-child td{border-bottom:0}.copybox{white-space:pre-wrap;line-height:1.7;font-family:"Microsoft JhengHei",monospace;background:var(--card2);border:1px solid var(--line);border-radius:18px;padding:14px;max-height:55vh;overflow:auto}.modal{position:fixed;inset:0;z-index:100;background:rgba(2,6,23,.62);display:flex;align-items:center;justify-content:center;padding:14px}.modal-panel{width:min(820px,100%);max-height:92vh;background:var(--card);border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}.modal-head{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;border-bottom:1px solid var(--line);font-size:18px;font-weight:1000}.modal-body{padding:17px;overflow:auto}.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:15px 17px;border-top:1px solid var(--line);background:var(--card2)}.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0f172a;color:#fff;z-index:120;border-radius:999px;padding:11px 18px;font-weight:950;box-shadow:0 16px 44px rgba(15,23,42,.28);opacity:0;pointer-events:none;transition:.22s}.toast.show{opacity:1;bottom:34px}.toast.ok{background:#166534}.toast.warn{background:#c2410c}.toast.bad{background:#991b1b}.fab{display:none;position:fixed;left:0;right:0;bottom:0;z-index:35;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -12px 30px rgba(15,23,42,.1);padding:8px env(safe-area-inset-right) calc(8px + env(safe-area-inset-bottom)) env(safe-area-inset-left);gap:8px}.fab .btn{flex:1;padding:12px 8px;font-size:13px}.code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:2px 6px;font-size:12px}.room-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:8px 10px;font-weight:900}.pulse{animation:pulse 1.6s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+    @media (max-width:1060px){.top-inner{grid-template-columns:1fr 1fr}.toolbar{grid-column:1/-1;justify-content:flex-start}.grid.main{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}.tabs{top:138px}}
+    @media (max-width:720px){.app{padding:10px 10px 92px}.top{margin:-10px -10px 10px;padding:12px;border-radius:0 0 18px 18px}.top-inner{grid-template-columns:1fr}.toolbar .desktop-only{display:none}.tabs{top:226px;grid-template-columns:repeat(5,92px);overflow:auto;gap:5px;padding:5px;border-radius:16px}.tab{font-size:12px;padding:9px 4px}.stats{grid-template-columns:repeat(2,1fr);gap:8px}.stat{padding:11px}.stat .n{font-size:25px}.grid.cols2,.grid.cols3{grid-template-columns:1fr}.person-grid{grid-template-columns:1fr}.vehicle-grid{grid-template-columns:1fr}.card{padding:13px;border-radius:18px}.fab{display:flex}.list{max-height:none}.driver{font-size:18px}}
+    @media print{body{background:#fff;color:#000}.top,.tabs,.fab,.no-print,.toast,.modal{display:none!important}.app{padding:0;max-width:none}.card,.vehicle,.stat{box-shadow:none;border-color:#ccc}.stats{grid-template-columns:repeat(6,1fr)}.vehicle-grid{grid-template-columns:repeat(2,1fr)}.print-title{display:block!important;font-size:26px;font-weight:1000;margin:0 0 14px}.app{min-height:auto}}
+  
+    /* PWA 安裝提示 */
+    .pwa-install-tip{position:fixed;left:14px;right:14px;bottom:86px;z-index:80;background:rgba(15,23,42,.94);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:12px 14px;box-shadow:0 16px 40px rgba(0,0,0,.25);display:none;gap:10px;align-items:center;justify-content:space-between;backdrop-filter:blur(10px)}
+    .pwa-install-tip.show{display:flex}.pwa-install-tip b{font-size:14px}.pwa-install-tip small{display:block;color:#cbd5e1;margin-top:2px;line-height:1.35}.pwa-install-tip button{border:0;border-radius:12px;padding:9px 12px;font-weight:900;white-space:nowrap}.pwa-install-tip .install{background:#22c55e;color:#052e16}.pwa-install-tip .close{background:#334155;color:#fff}
+    @media(min-width:800px){.pwa-install-tip{left:auto;right:24px;bottom:24px;width:410px}}
+
+    /* 文字整頁編輯器 */
+    .te{position:fixed;inset:0;z-index:110;background:rgba(2,6,23,.66);display:flex;padding:12px}
+    .te-panel{flex:1;background:var(--card);color:var(--text);border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden;min-width:0}
+    .te-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:18px;font-weight:1000}
+    .te-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--card2)}
+    .te-bar select{width:auto;max-width:320px;padding:8px 10px}
+    .te-body{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 380px;gap:0}
+    .te-col{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line)}
+    .te-col:last-child{border-right:0}
+    .te-col-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;font-size:13px;font-weight:950;color:var(--muted);border-bottom:1px solid var(--line)}
+    .te-seg{display:inline-flex;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:2px}
+    .te-seg button{background:transparent;color:var(--muted);font-weight:900;font-size:12px;padding:5px 9px;border-radius:8px}
+    .te-seg button.on{background:var(--card);color:var(--brand);box-shadow:0 2px 6px rgba(15,23,42,.08)}
+    .te-text{flex:1;min-height:0;margin:0;border:0;border-radius:0;resize:none;font-family:ui-monospace,SFMono-Regular,Consolas,"Microsoft JhengHei",monospace;font-size:14px;line-height:1.75;padding:12px 14px;white-space:pre;overflow:auto;tab-size:2}
+    .te-text[readonly]{background:var(--card2)}
+    .te-text:focus{box-shadow:none}
+    .te-diff{flex:1;min-height:0;overflow:auto;font-family:ui-monospace,SFMono-Regular,Consolas,"Microsoft JhengHei",monospace;font-size:13px;line-height:1.7;padding:6px 0}
+    .te-diff div{white-space:pre-wrap;padding:0 12px 0 0;display:flex}
+    .te-diff i{font-style:normal;display:inline-block;min-width:44px;text-align:right;padding-right:10px;color:var(--muted);user-select:none;flex:none}
+    .te-diff .add{background:rgba(22,163,74,.14)}.te-diff .add i:after{content:" +";color:var(--green)}
+    .te-diff .del{background:rgba(220,38,38,.12);text-decoration:line-through;text-decoration-color:rgba(220,38,38,.5)}.te-diff .del i:after{content:" −";color:var(--red)}
+    .te-diff .eq i:after{content:"  "}
+    .te-side{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .te-box{border:1px solid var(--line);border-radius:14px;padding:10px;background:var(--card)}
+    .te-box h4{margin:0 0 8px;font-size:14px;font-weight:1000;display:flex;justify-content:space-between;align-items:center}
+    .te-kv{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+    .te-kv div{background:var(--card2);border-radius:10px;padding:6px 8px;font-size:11px;color:var(--muted);font-weight:900}
+    .te-kv b{display:block;font-size:18px;color:var(--text)}
+    .te-chg{font-size:13px;line-height:1.6;margin:3px 0;display:flex;gap:6px;align-items:flex-start}
+    .te-chg .pill{flex:none;padding:2px 7px;font-size:11px}
+    .te-opt{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.45;margin:5px 0;cursor:pointer}
+    .te-opt input{width:auto;margin-top:3px}
+    .te-foot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:var(--card2)}
+    .te-help{font-size:12px;color:var(--muted);line-height:1.6}
+    .te-help code{font-family:ui-monospace,Consolas,monospace;background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:0 4px}
+    @media (max-width:1180px){.te-body{grid-template-columns:1fr 1fr}.te-col.te-side-col{grid-column:1/-1;border-top:1px solid var(--line);max-height:42vh}}
+    @media (max-width:720px){.te{padding:0}.te-panel{border-radius:0}.te-body{grid-template-columns:1fr;overflow:auto}.te-col{border-right:0;border-bottom:1px solid var(--line)}.te-col.te-orig-col{max-height:34vh}.te-text{min-height:46vh}.te-col.te-orig-col .te-text{min-height:0}.te-col.te-side-col{max-height:none}.te-foot .btn{flex:1}}
+    @media print{.te{display:none!important}}
+
+  </style>
+
+  <!-- PWA：手機桌面啟動設定 -->
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="application-name" content="車輛安排" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="車輛安排" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <script src="firebase-config.js"></script>
+</head>
+<body>
+  <div id="pwaInstallTip" class="pwa-install-tip" role="status" aria-live="polite">
+    <div><b>可加入手機桌面</b><small id="pwaInstallText">下次可像 App 一樣直接開啟車輛安排系統。</small></div>
+    <div style="display:flex;gap:8px"><button class="close" onclick="window.hidePwaInstallTip&&window.hidePwaInstallTip()">稍後</button><button id="pwaInstallBtn" class="install">加入</button></div>
+  </div>
+
+<div id="app"></div>
+<div id="editorHost"></div>
+<div id="toast" class="toast"></div>
+<input id="importFile" type="file" accept="application/json" class="hidden" />
+
+<script type="module">
+  import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import { getDatabase, ref, get, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+  import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+  const LOCAL_KEY = 'vehiclePlanner_collab_local_v1';
+  const CONFIG_KEY = 'vehiclePlanner_firebase_config_v1';
+  const ROOM_KEY = 'vehiclePlanner_room_v1';
+  const THEME_KEY = 'vehiclePlanner_theme_v1';
+  const CLIENT_ID = localStorage.getItem('vehiclePlanner_client_id') || ('u' + Math.random().toString(36).slice(2,8));
+  localStorage.setItem('vehiclePlanner_client_id', CLIENT_ID);
+
+  let state = loadLocal();
+  let activeTab = 'dashboard';
+  let cloud = { ready:false, mode:'local', message:'本機模式', db:null, ref:null, room:'', unsub:null, auth:false, saving:false, lastRemote:'' };
+  let saveTimer = null;
+  let remoteApplying = false;
+
+  function defaultState(){
+    return {
+      eventName:'週末登山活動', eventDate:new Date().toISOString().slice(0,10), meetPoint:'集合點 A', notice:'請準時集合，若臨時改變請即時回報。',
+      people:[
+        {id:id(),name:'王小明',needsRide:true,assignedCarId:'v1',note:'會暈車'},
+        {id:id(),name:'李大華',needsRide:true,assignedCarId:'v1',note:''},
+        {id:id(),name:'張美美',needsRide:true,assignedCarId:'v2',note:''},
+        {id:id(),name:'趙先生',needsRide:false,assignedCarId:'self',note:'自行前往'},
+        {id:id(),name:'孫小美',needsRide:true,assignedCarId:null,note:'新朋友'}
+      ],
+      vehicles:[
+        {id:'v1',driver:'陳大哥',capacity:4,type:'4人座',plate:'',note:'藍色休旅'},
+        {id:'v2',driver:'林經理',capacity:7,type:'7人座',plate:'',note:'集合點A'}
+      ],
+      historyEvents:[], updatedAt:new Date().toISOString(), updatedBy:CLIENT_ID
+    }
+  }
+  function id(){return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,7)}
+  function loadLocal(){try{return {...defaultState(), ...(JSON.parse(localStorage.getItem(LOCAL_KEY)||'{}'))}}catch{return defaultState()}}
+  function saveLocal(){state.updatedAt=new Date().toISOString(); state.updatedBy=CLIENT_ID; localStorage.setItem(LOCAL_KEY, JSON.stringify(state));}
+  function h(v){return String(v??'').replace(/[&<>'"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[s]))}
+  function pct(a,b){return Math.min(100, b? Math.round(a/b*100):0)}
+  function hasFirebaseConfig(){
+    const cfg = window.VEHICLE_FIREBASE_CONFIG;
+    return !!(cfg && cfg.apiKey && cfg.databaseURL && !String(cfg.apiKey).includes('YOUR_') && !String(cfg.apiKey).includes('請填'));
+  }
+  function stats(){
+    const need=state.people.filter(p=>p.needsRide && p.assignedCarId!=='self');
+    const assigned=need.filter(p=>p.assignedCarId);
+    const self=state.people.filter(p=>!p.needsRide || p.assignedCarId==='self');
+    const cap=state.vehicles.reduce((s,v)=>s+(Number(v.capacity)||0),0);
+    const used=state.people.filter(p=>p.assignedCarId && p.assignedCarId!=='self').length;
+    const over=state.vehicles.filter(v=>state.people.filter(p=>p.assignedCarId===v.id).length>(Number(v.capacity)||0)).length;
+    return {total:state.people.length, need:need.length, assigned:assigned.length, unassigned:need.length-assigned.length, self:self.length, cap, used, left:cap-used, over};
+  }
+  function statusText(){
+    if(cloud.ready) return {dot:'ok', txt:`雲端同步｜房間 ${cloud.room}`};
+    if(cloud.mode==='connecting') return {dot:'warn pulse', txt:'正在連線雲端'};
+    if(cloud.mode==='error') return {dot:'bad', txt:'雲端未連線'};
+    return {dot:'warn', txt:hasFirebaseConfig()?'本機模式':'網站尚未設定雲端'};
+  }
+  function render(){
+    const s=stats(), st=statusText();
+    document.documentElement.setAttribute('data-theme', localStorage.getItem(THEME_KEY)||'light');
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        <div class="print-title hidden">${h(state.eventName)}｜車輛安排表</div>
+        <header class="top no-print">
+          <div class="top-inner">
+            <div><div class="label">活動名稱</div><input value="${h(state.eventName)}" onchange="app.updateField('eventName',this.value)" /></div>
+            <div><div class="label">活動日期</div><input type="date" value="${h(state.eventDate)}" onchange="app.updateField('eventDate',this.value)" /></div>
+            <div><div class="label">集合地點</div><input value="${h(state.meetPoint)}" placeholder="例：集合點 A" onchange="app.updateField('meetPoint',this.value)" /></div>
+            <div class="toolbar">
+              <span class="status"><i class="dot ${st.dot}"></i>${h(st.txt)}</span>
+              <button class="btn ghost desktop-only" onclick="app.openRoomModal()">🔗 共同編輯</button>
+              <button class="btn green" onclick="app.openCopy()">📣 複製通知</button>
+              <button class="btn blue desktop-only" onclick="app.archive()">🗂️ 存歷史</button>
+              <button class="btn ghost desktop-only" onclick="app.exportJSON()">⬇️ 備份</button>
+            </div>
+          </div>
+        </header>
+
+        <nav class="tabs no-print">
+          ${tab('dashboard','📊 總覽')}${tab('people','👥 人員')}${tab('vehicles','🚗 車輛')}${tab('history','🕓 歷史')}${tab('tools','⚙️ 工具')}
+        </nav>
+
+        ${activeTab==='dashboard'?renderDashboard(s):''}
+        ${activeTab==='people'?renderPeople(s):''}
+        ${activeTab==='vehicles'?renderVehicles(s):''}
+        ${activeTab==='history'?renderHistory():''}
+        ${activeTab==='tools'?renderTools(s):''}
+
+        <div class="fab no-print">
+          <button class="btn green" onclick="app.openCopy()">📣 通知</button>
+          <button class="btn blue" onclick="app.openRoomModal()">🔗 共編</button>
+          <button class="btn orange" onclick="app.autoAssign()">⚡ 自排</button>
+        </div>
+      </div>
+      <div id="modalHost"></div>`;
+  }
+  function tab(id,label){return `<button class="tab ${activeTab===id?'active':''}" onclick="app.setTab('${id}')">${label}</button>`}
+  function renderStats(s){return `<section class="stats">
+    <div class="stat"><div class="n">${s.total}</div><div class="t">總人數</div></div>
+    <div class="stat cyan"><div class="n">${s.need}</div><div class="t">需搭車</div></div>
+    <div class="stat green"><div class="n">${s.assigned}</div><div class="t">已安排</div></div>
+    <div class="stat orange"><div class="n">${s.unassigned}</div><div class="t">未安排</div></div>
+    <div class="stat purple"><div class="n">${s.used}/${s.cap}</div><div class="t">座位使用</div></div>
+    <div class="stat red"><div class="n">${s.over}</div><div class="t">超載車輛</div></div>
+  </section>`}
+  function renderDashboard(s){return `${renderStats(s)}
+    <div class="grid main">
+      <section class="card">
+        <div class="title"><span>⚠️ 待處理提醒</span><button class="btn small orange" onclick="app.autoAssign()">⚡ 自動安排</button></div>
+        <div class="stack">
+          ${s.unassigned?`<div class="pill warn">尚有 ${s.unassigned} 人未安排車輛</div>`:`<div class="pill ok">所有需搭車人員已安排</div>`}
+          ${s.over?`<div class="pill bad">有 ${s.over} 台車超過座位上限</div>`:`<div class="pill ok">沒有車輛超載</div>`}
+          ${s.left<0?`<div class="pill bad">座位不足 ${Math.abs(s.left)} 位，請加車</div>`:`<div class="pill info">剩餘座位 ${s.left} 位</div>`}
+        </div>
+        <div class="hr"></div>
+        <div class="title"><span>📝 行前備註</span></div>
+        <textarea onchange="app.updateField('notice',this.value)" placeholder="輸入行前注意事項...">${h(state.notice)}</textarea>
+        <div class="row wrap mt">
+          <button class="btn green" onclick="app.openCopy()">📣 產生通知</button>
+          <button class="btn blue" onclick="app.printPage()">🖨️ 列印分車表</button>
+          <button class="btn purple" onclick="app.archive()">🗂️ 存入歷史</button>
+          <button class="btn cyan" onclick="app.openTextEditor('current')">📝 文字整頁編輯</button>
+        </div>
+      </section>
+      <section class="card">
+        <div class="title"><span>🚗 即時車輛安排</span><span class="pill ${cloud.ready?'ok':'warn'}">${cloud.ready?'多人同步中':'本機編輯'}</span></div>
+        ${renderVehicleCards()}
+      </section>
+    </div>`}
+  function renderPeople(s){
+    return `${renderStats(s)}<div class="grid main">
+      <section class="card">
+        <div class="title"><span>➕ 新增人員</span></div>
+        <div class="stack">
+          <input id="newPersonName" placeholder="姓名，例如：林小姐" onkeydown="if(event.key==='Enter') app.addPerson()" />
+          <input id="newPersonNote" placeholder="備註，例如：暈車、晚到、素食" onkeydown="if(event.key==='Enter') app.addPerson()" />
+          <div class="row"><button class="btn blue grow" onclick="app.addPerson()">➕ 加入名單</button><button class="btn light" onclick="app.batchAddPeople()">批次</button></div>
+          <div class="sub">批次可貼上多個姓名，每行一位；多人共同編輯時，加入後會自動同步。</div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="title"><span>👥 人員名單</span><input style="max-width:260px" id="searchPeople" placeholder="搜尋姓名 / 備註" oninput="app.filterPeople(this.value)" /></div>
+        <div id="peopleList">${peopleListHTML('')}</div>
+      </section>
+    </div>`
+  }
+  function peopleListHTML(q){
+    const query=(q||'').trim().toLowerCase();
+    const rows=state.people.filter(p=>!query || `${p.name} ${p.note}`.toLowerCase().includes(query));
+    if(!rows.length) return `<div class="empty">沒有符合的人員</div>`;
+    return `<div class="list">${rows.map(p=>{
+      const un=p.needsRide && !p.assignedCarId;
+      return `<div class="person ${un?'warn':''}">
+        <div class="person-grid">
+          <div><div class="pname">${h(p.name)} ${un?'<span class="pill warn">未安排</span>':''}</div><div class="mini">${p.note?h(p.note):'無備註'}｜${p.needsRide?'需搭車':'自行處理'}</div></div>
+          <select onchange="app.assign('${p.id}',this.value)">
+            <option value="" ${!p.assignedCarId && p.needsRide?'selected':''}>未分配</option>
+            ${state.vehicles.map(v=>`<option value="${v.id}" ${p.assignedCarId===v.id?'selected':''}>${h(v.driver)}</option>`).join('')}
+            <option value="self" ${p.assignedCarId==='self'||!p.needsRide?'selected':''}>自行前往</option>
+          </select>
+          <div class="row"><button class="iconbtn" title="編輯" onclick="app.editPerson('${p.id}')">✏️</button><button class="iconbtn" title="刪除" onclick="app.deletePerson('${p.id}')">🗑️</button></div>
+        </div>
+      </div>`}).join('')}</div>`
+  }
+  function renderVehicles(s){return `${renderStats(s)}<div class="grid main">
+    <section class="card">
+      <div class="title"><span>➕ 新增車輛</span></div>
+      <div class="stack">
+        <input id="newDriver" placeholder="駕駛 / 車主" />
+        <div class="row"><input id="newCapacity" type="number" min="1" value="4" /><select id="newType"><option>4人座</option><option>5人座</option><option>7人座</option><option>9人座</option><option>遊覽車</option></select></div>
+        <input id="newPlate" placeholder="車牌，可空白" />
+        <input id="newVehicleNote" placeholder="備註，例如：集合點B、白色休旅" />
+        <button class="btn blue" onclick="app.addVehicle()">➕ 新增車輛</button>
+      </div>
+      <div class="hr"></div>
+      <div class="row wrap"><button class="btn orange" onclick="app.autoAssign()">⚡ 自動安排</button><button class="btn purple" onclick="app.balanceAssign()">⚖️ 平均分配</button><button class="btn red" onclick="app.clearAssign()">🧹 清空安排</button></div>
+    </section>
+    <section class="card"><div class="title"><span>🚗 車輛列表</span></div>${renderVehicleCards()}</section>
+  </div>`}
+  function renderVehicleCards(){
+    if(!state.vehicles.length) return `<div class="empty">尚未新增車輛</div>`;
+    return `<div class="vehicle-grid">${state.vehicles.map(v=>{
+      const ps=state.people.filter(p=>p.assignedCarId===v.id); const cap=Number(v.capacity)||0; const over=ps.length>cap; const full=ps.length===cap;
+      return `<div class="vehicle ${over?'over':full?'full':''}">
+        <div class="vehicle-head"><div><div class="driver">${h(v.driver)}</div><div class="note">${h(v.type||'車輛')} ${v.plate?'｜'+h(v.plate):''} ${v.note?'｜'+h(v.note):''}</div></div><span class="pill ${over?'bad':full?'warn':'ok'}">${ps.length}/${cap}</span></div>
+        <div class="seatbar ${over?'bad':full?'warn':''}"><span style="width:${pct(ps.length,cap)}%"></span></div>
+        <div>${ps.length?ps.map(p=>`<div class="passenger"><div><div class="pname">${h(p.name)}</div>${p.note?`<div class="mini">${h(p.note)}</div>`:''}</div><button class="iconbtn" onclick="app.assign('${p.id}','')">⛔</button></div>`).join(''):`<div class="empty" style="padding:18px">目前空車</div>`}</div>
+        <div class="row end mt"><button class="btn small light" onclick="app.editVehicle('${v.id}')">✏️ 編輯</button><button class="btn small red" onclick="app.deleteVehicle('${v.id}')">刪車</button></div>
+      </div>`}).join('')}</div>`
+  }
+  function renderHistory(){
+    const textBar = `<section class="card soft mb"><div class="row between wrap"><div><div class="title" style="margin:0">📝 文字整頁編輯</div><div class="sub">歷史／目前活動一鍵轉成文字 → 整頁修改並與原文逐行比對 → 轉成新資料（可自動優化）。也可直接貼上 LINE 通知文字轉換。</div></div><div class="row wrap"><button class="btn cyan" onclick="app.copyAllHistoryText()">📋 一鍵複製全部歷史</button><button class="btn purple" onclick="app.openTextEditor('all')">📝 整批文字編輯</button><button class="btn blue" onclick="app.openTextEditor('current')">✏️ 編輯目前活動</button><button class="btn light" onclick="app.openTextEditor('blank')">📥 貼上文字轉換</button></div></div></section>`;
+    if(!state.historyEvents.length) return `${textBar}<section class="card"><div class="title"><span>🕓 歷史紀錄</span><button class="btn blue" onclick="app.archive()">🗂️ 存入目前活動</button></div><div class="empty">尚無歷史紀錄。可先完成一次安排後按「存歷史」。</div></section>`;
+    return `${textBar}<div class="grid main"><section class="card"><div class="title"><span>🕓 歷史活動</span><button class="btn small blue" onclick="app.archive()">新增快照</button></div><div class="list">${state.historyEvents.map(his=>`<div class="person"><div class="row between"><div><div class="pname">${h(his.name)}</div><div class="mini">${h(his.date)}｜${his.people?.length||0}人｜${his.vehicles?.length||0}車</div></div><div class="row"><button class="btn small light" onclick="app.viewHistory('${his.id}')">查看</button><button class="btn small purple" onclick="app.openTextEditor('${his.id}')">📝文字</button><button class="btn small red" onclick="app.deleteHistory('${his.id}')">刪</button></div></div></div>`).join('')}</div></section><section class="card"><div class="title"><span>🔎 防遺漏比對</span></div><div id="historyView"><div class="empty">請選擇左側歷史活動查看。</div></div></section></div>`
+  }
+  function renderTools(s){
+    const cfg = localStorage.getItem(CONFIG_KEY)||'';
+    const embedded = hasFirebaseConfig();
+    return `<div class="grid cols2">
+      <section class="card">
+        <div class="title"><span>🔗 共同編輯設定</span><span class="pill ${cloud.ready?'ok':'warn'}">${cloud.ready?'已連線':'未連線'}</span></div>
+        <div class="stack">
+          <div class="sub">網站版已設計成：分享同一個網址即可進入同一個活動房間。若網址有 <span class="code">?room=活動碼</span>，所有人會自動同步人員、車輛、歷史紀錄。</div><span class="pill ${embedded?'ok':'warn'}">${embedded?'網站雲端設定已內建':'尚未在 firebase-config.js 設定雲端'}</span>
+          <label class="sub">房間碼</label><div class="row"><input id="roomInput" value="${h(cloud.room||localStorage.getItem(ROOM_KEY)||'main')}" /><button class="btn blue" onclick="app.joinRoomFromInput()">加入</button><button class="btn light" onclick="app.randomRoom()">產生</button></div>
+          <button class="btn green" onclick="app.copyShareLink()">📋 複製共編連結</button>
+          <div class="hr"></div>
+          <label class="sub">進階：Firebase Web App config JSON 覆寫</label>
+          <textarea id="firebaseConfigInput" placeholder='網站正式上線時，建議改 firebase-config.js；這裡只供臨時測試覆寫。' >${h(cfg)}</textarea>
+          <div class="row wrap"><button class="btn blue" onclick="app.saveFirebaseConfig()">💾 儲存並連線</button><button class="btn red" onclick="app.clearFirebaseConfig()">移除雲端設定</button></div>
+          <div class="sub">提醒：正式分享網址前，請先把 Firebase 設定寫入 firebase-config.js，訪客就不需要自己貼設定。</div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="title"><span>🧰 資料工具</span></div>
+        <div class="grid cols2">
+          <button class="btn blue" onclick="app.exportJSON()">⬇️ 匯出 JSON 備份</button>
+          <button class="btn orange" onclick="document.getElementById('importFile').click()">⬆️ 匯入 JSON 備份</button>
+          <button class="btn purple" onclick="app.exportCSV()">📄 匯出 CSV 名單</button>
+          <button class="btn green" onclick="app.printPage()">🖨️ 列印分車表</button>
+          <button class="btn light" onclick="app.toggleTheme()">🌙 切換深色模式</button>
+          <button class="btn red" onclick="app.resetDemo()">♻️ 還原範例資料</button>
+        </div>
+        <div class="hr"></div>
+        <div class="title"><span>📌 目前狀態</span></div>
+        <div class="stack">
+          <span class="pill info">使用者代碼：${CLIENT_ID}</span>
+          <span class="pill ${cloud.ready?'ok':'warn'}">同步模式：${cloud.ready?'雲端共同編輯':'本機單機'}</span>
+          <span class="pill cyan">活動房間：${h(cloud.room || localStorage.getItem(ROOM_KEY) || '未加入')}</span>
+          <span class="pill purple">最後更新：${h(new Date(state.updatedAt||Date.now()).toLocaleString())}</span>
+        </div>
+      </section>
+      <section class="card">
+        <div class="title"><span>🔐 建議 Firebase 規則</span></div>
+        <div class="copybox">${h(`{
+  "rules": {
+    "vehiclePlannerRooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}`)}</div>
+        <div class="sub mt">此版本會嘗試匿名登入。若只做臨時測試，可先用 Firebase 測試模式；正式活動資料請使用上方規則或再加入登入權限。</div>
+      </section>
+      <section class="card">
+        <div class="title"><span>🚀 上線方式</span></div>
+        <ol class="sub" style="line-height:1.8;margin-top:0">
+          <li>建立 Firebase 專案，啟用 Realtime Database。</li>
+          <li>啟用 Authentication 的 Anonymous 匿名登入。</li>
+          <li>複製 Web App config，貼到本網站包的 firebase-config.js。</li>
+          <li>將整個網站資料夾上傳到 Firebase Hosting、Netlify、GitHub Pages 或公司 HTTPS 網站。</li>
+          <li>第一次進入後按「產生」房間碼，再按「複製共編連結」。之後只要分享該網址即可填寫與共同編輯。</li>
+        </ol>
+      </section>
+    </div>`
+  }
+
+  function touch(){ saveLocal(); render(); scheduleCloudSave(); }
+  function scheduleCloudSave(){
+    if(remoteApplying) return;
+    saveLocal();
+    if(!cloud.ready || !cloud.ref) return;
+    clearTimeout(saveTimer);
+    cloud.saving=true;
+    saveTimer=setTimeout(async()=>{ try{ state.updatedAt=new Date().toISOString(); state.updatedBy=CLIENT_ID; await set(cloud.ref, {state, meta:{updatedAt:state.updatedAt, updatedBy:CLIENT_ID}}); cloud.saving=false; }catch(e){ cloud.mode='error'; cloud.message=e.message; toast('雲端儲存失敗：'+e.message,'bad'); render(); } }, 450);
+  }
+  async function initFirebase(){
+    let cfg = hasFirebaseConfig() ? window.VEHICLE_FIREBASE_CONFIG : null;
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if(!cfg && raw){ try{cfg=JSON.parse(raw)}catch(e){cloud.mode='error'; cloud.ready=false; toast('Firebase config JSON 格式錯誤','bad'); render(); return false;} }
+    if(!cfg){cloud.mode='local'; cloud.ready=false; render(); return false;}
+    if(!cfg.databaseURL){cloud.mode='error'; cloud.ready=false; toast('Firebase config 缺少 databaseURL','bad'); render(); return false;}
+    try{
+      cloud.mode='connecting'; render();
+      const app=getApps().length?getApps()[0]:initializeApp(cfg);
+      cloud.db=getDatabase(app);
+      try{const auth=getAuth(app); await signInAnonymously(auth); cloud.auth=true;}catch(authErr){cloud.auth=false; console.warn('匿名登入失敗，若資料庫規則要求 auth 會無法同步', authErr);}
+      const urlRoom = new URL(location.href).searchParams.get('room');
+      await joinRoom(urlRoom || localStorage.getItem(ROOM_KEY) || 'main');
+      return true;
+    }catch(e){cloud.mode='error'; cloud.ready=false; cloud.message=e.message; toast('Firebase 連線失敗：'+e.message,'bad'); render(); return false;}
+  }
+  async function joinRoom(room){
+    room=(room||'main').trim().replace(/[^\w\-\u4e00-\u9fa5]/g,'-').slice(0,40) || 'main';
+    if(!cloud.db){ localStorage.setItem(ROOM_KEY,room); cloud.room=room; render(); return; }
+    if(cloud.unsub){ cloud.unsub(); cloud.unsub=null; }
+    cloud.room=room; localStorage.setItem(ROOM_KEY,room);
+    try{ const url=new URL(location.href); url.searchParams.set('room',room); history.replaceState(null,'',url.toString()); }catch{}
+    cloud.ref=ref(cloud.db, `vehiclePlannerRooms/${room}`);
+    const snap=await get(cloud.ref);
+    if(snap.exists() && snap.val().state){ state={...defaultState(), ...snap.val().state}; saveLocal(); }
+    else { state.updatedAt=new Date().toISOString(); state.updatedBy=CLIENT_ID; await set(cloud.ref, {state, meta:{updatedAt:state.updatedAt, updatedBy:CLIENT_ID}}); }
+    cloud.ready=true; cloud.mode='cloud'; cloud.message='已連線';
+    cloud.unsub=onValue(cloud.ref, snap=>{
+      if(!snap.exists() || !snap.val().state) return;
+      const incoming=snap.val();
+      if(incoming.meta?.updatedBy===CLIENT_ID) return;
+      remoteApplying=true;
+      state={...defaultState(), ...incoming.state};
+      saveLocal();
+      cloud.lastRemote=incoming.meta?.updatedAt || new Date().toISOString();
+      remoteApplying=false;
+      render(); toast('已接收其他人的更新','ok');
+    });
+    render(); toast('已加入共同編輯房間：'+room,'ok');
+  }
+
+  function generateNotice(){
+    const un=state.people.filter(p=>p.needsRide && !p.assignedCarId);
+    const self=state.people.filter(p=>!p.needsRide || p.assignedCarId==='self');
+    let txt=`【${state.eventName}】行前車輛通知\n日期：${state.eventDate||'未設定'}\n集合地點：${state.meetPoint||'未設定'}\n\n`;
+    state.vehicles.forEach((v,i)=>{
+      const ps=state.people.filter(p=>p.assignedCarId===v.id);
+      txt+=`第${i+1}車｜${v.driver}（${v.type||''}，${ps.length}/${v.capacity}）\n`;
+      if(v.plate) txt+=`車牌：${v.plate}\n`; if(v.note) txt+=`備註：${v.note}\n`;
+      txt+=ps.length?`乘客：${ps.map(p=>p.name+(p.note?`(${p.note})`:``)).join('、')}\n\n`:`乘客：目前空車\n\n`;
+    });
+    if(self.length) txt+=`自行前往：${self.map(p=>p.name).join('、')}\n\n`;
+    if(un.length) txt+=`⚠️ 尚未安排：${un.map(p=>p.name).join('、')}\n\n`;
+    if(state.notice) txt+=`注意事項：\n${state.notice}\n`;
+    return txt;
+  }
+  function download(filename, content, type='text/plain;charset=utf-8'){
+    const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),500);
+  }
+  function csvEscape(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
+  function showModal(title, body, foot=''){
+    document.getElementById('modalHost').innerHTML=`<div class="modal"><div class="modal-panel"><div class="modal-head"><span>${title}</span><button class="iconbtn" onclick="app.closeModal()">✕</button></div><div class="modal-body">${body}</div>${foot?`<div class="modal-foot">${foot}</div>`:''}</div></div>`
+  }
+  function toast(msg,type='ok'){const el=document.getElementById('toast'); el.textContent=msg; el.className=`toast ${type} show`; clearTimeout(toast.t); toast.t=setTimeout(()=>el.className=`toast ${type}`,2200)}
+
+  /* ================= 文字整頁編輯：資料 ⇄ 文字 ================= */
+  const BLOCK_SEP = '==============================';
+  const TE_OPT_KEY = 'vehiclePlanner_textEditOpts_v1';
+  let editor = null; // {sources, key, origText, results, view, opts, timer}
+
+  function snapOf(src){ // 統一成 {name,eventDate,meetPoint,notice,people,vehicles}
+    return {name:src.name??src.eventName??'', eventDate:src.eventDate||'', meetPoint:src.meetPoint||'', notice:src.notice||'',
+      people:JSON.parse(JSON.stringify(src.people||[])), vehicles:JSON.parse(JSON.stringify(src.vehicles||[]))};
+  }
+  function currentSnap(){return {...snapOf({...state,name:state.eventName}), id:'current', label:'目前活動'}}
+  function isSelf(p){return !p.needsRide || p.assignedCarId==='self'}
+  function joinFields(arr){while(arr.length>1 && !String(arr[arr.length-1]??'').trim()) arr.pop(); return arr.map(x=>String(x??'').trim()).join('｜')}
+  function snapToText(s){
+    const L=[], vids=new Set((s.vehicles||[]).map(v=>v.id));
+    L.push(`【活動】${s.name||''}`, `【日期】${s.eventDate||''}`, `【集合】${s.meetPoint||''}`, '');
+    (s.vehicles||[]).forEach(v=>{
+      L.push(`【車】${joinFields([v.driver, v.capacity, v.type, v.plate, v.note])}`);
+      (s.people||[]).filter(p=>p.assignedCarId===v.id).forEach(p=>L.push(joinFields([p.name,p.note])));
+      L.push('');
+    });
+    const self=(s.people||[]).filter(isSelf);
+    const un=(s.people||[]).filter(p=>!isSelf(p) && (!p.assignedCarId || !vids.has(p.assignedCarId)));
+    L.push('【自行前往】'); self.forEach(p=>L.push(joinFields([p.name,p.note]))); L.push('');
+    L.push('【未安排】'); un.forEach(p=>L.push(joinFields([p.name,p.note]))); L.push('');
+    L.push('【注意】'); if(s.notice) L.push(...String(s.notice).split('\n'));
+    return L.join('\n').replace(/\n+$/,'')+'\n';
+  }
+  function snapsToText(list){return list.map(snapToText).join(`\n${BLOCK_SEP}\n\n`)}
+
+  function normDate(t){
+    const m=String(t||'').match(/(\d{3,4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+    if(!m) return String(t||'').trim();
+    let y=+m[1]; if(y<1911) y+=1911; // 民國年
+    return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  }
+  function cleanName(s){return String(s||'').replace(/^\s*(?:[-*•·‧●○▪◆□■✓✔☐☑]+|\d+\s*[.、)）]|[（(]\d+[)）])\s*/,'').replace(/\s+/g,' ').trim()}
+  function parsePersons(line){ // 一行可為「姓名｜備註」或「甲、乙(暈車)、丙」
+    let t=cleanName(line).replace(/^(乘客|名單|成員)\s*[:：]\s*/,'');
+    if(!t || /^目前空車$|^空車$|^無$/.test(t)) return [];
+    if(/[｜|]/.test(t)){const [n,...r]=t.split(/[｜|]/); return [{name:cleanName(n),note:r.join(' ').trim()}].filter(p=>p.name)}
+    return t.split(/[、，,;；]/).map(x=>x.trim()).filter(Boolean).map(x=>{
+      const m=x.match(/^(.+?)\s*[（(](.*)[)）]\s*$/); return m?{name:cleanName(m[1]),note:m[2].trim()}:{name:cleanName(x),note:''};
+    }).filter(p=>p.name);
+  }
+  function parseVehicleFields(f){
+    const v={driver:cleanName(f[0]||''),capacity:0,type:'',plate:'',note:''}; const rest=[];
+    f.slice(1).map(x=>x.trim()).forEach((x,i)=>{
+      if(!x) { rest.push(''); return; }
+      let m;
+      if(!v.capacity && (m=x.match(/^(?:座位|座)?\s*(\d{1,3})\s*(?:位|座)?$/))) v.capacity=+m[1];
+      else if(!v.type && /人座|遊覽車|巴士|中巴|小巴|機車|貨車/.test(x)) v.type=x;
+      else if(!v.plate && (m=x.match(/^車牌\s*[:：]?\s*(.+)$/))) v.plate=m[1].trim();
+      else if(!v.plate && /^[A-Za-z0-9]{2,4}-[A-Za-z0-9]{2,4}$/.test(x)) v.plate=x.toUpperCase();
+      else if((m=x.match(/^備註\s*[:：]\s*(.+)$/))) v.note=(v.note?v.note+' ':'')+m[1];
+      else rest.push(x);
+    });
+    const other=rest.filter(Boolean); if(other.length) v.note=(v.note?v.note+' ':'')+other.join(' ');
+    return v;
+  }
+  function parseBlock(text, blockNo){
+    const r={name:'',eventDate:'',meetPoint:'',notice:'',vehicles:[],people:[],warnings:[]};
+    const notice=[]; let sec=null, car=null, vseq=0;
+    const pushPeople=(arr,ln)=>arr.forEach(p=>r.people.push({...p, needsRide:sec!=='self', assignedCarId:sec==='car'?car.id:sec==='self'?'self':null, _line:ln}));
+    const newCar=(v)=>{car={id:'tmpv'+(++vseq),...v}; if(!car.driver){car.driver='未命名駕駛'+vseq; r.warnings.push(`第${blockNo}筆：有車輛未填駕駛`)} r.vehicles.push(car); sec='car';};
+    String(text).split('\n').forEach((raw,i)=>{
+      const ln=i+1, line=raw.replace(/\s+$/,''), t=line.trim();
+      if(!t){ if(sec==='notice') notice.push(''); return; }
+      if(/^(#|\/\/)/.test(t)) return; // 註解
+      let m=t.match(/^[【\[]\s*([^】\]]+?)\s*[】\]]\s*(.*)$/);
+      if(m && !/^行前/.test(m[2]) ){
+        const key=m[1], rest=m[2].trim();
+        if(/^(活動|名稱|活動名稱)$/.test(key)){r.name=rest; sec=null}
+        else if(/日期/.test(key)){r.eventDate=normDate(rest); sec=null}
+        else if(/集合|地點/.test(key)){r.meetPoint=rest; sec=null}
+        else if(/注意|備註|通知/.test(key)){sec='notice'; if(rest) notice.push(rest)}
+        else if(/^(車|車輛|第\s*\d+\s*車)$/.test(key)) newCar(parseVehicleFields(rest.split(/[｜|]/)));
+        else if(/自行|自理|自駕/.test(key)){sec='self'; if(rest) pushPeople(parsePersons(rest),ln)}
+        else if(/未安排|未分配|待安排|候補/.test(key)){sec='un'; if(rest) pushPeople(parsePersons(rest),ln)}
+        else r.warnings.push(`第${blockNo}筆 第${ln}行：無法辨識區塊「${key}」`);
+        return;
+      }
+      // ---- 相容「複製通知」產生的 LINE 文字 ----
+      if((m=t.match(/^【(.+?)】\s*行前.*通知/))){r.name=m[1]; sec=null; return}
+      if((m=t.match(/^日期\s*[:：]\s*(.*)$/)) && sec!=='notice'){r.eventDate=normDate(m[1]); return}
+      if((m=t.match(/^集合地點\s*[:：]\s*(.*)$/)) && sec!=='notice'){r.meetPoint=m[1].trim(); return}
+      if((m=t.match(/^第\s*\d+\s*車\s*[｜|:：]\s*(.+)$/))){
+        const body=m[1]; const mm=body.match(/^(.+?)\s*[（(](.*)[)）]\s*$/);
+        const driver=mm?mm[1]:body, inner=mm?mm[2]:'';
+        const cap=(inner.match(/\/\s*(\d+)/)||[])[1]; const type=(inner.match(/[^，,]*(?:人座|遊覽車|巴士)[^，,]*/)||[''])[0].trim();
+        newCar({driver:cleanName(driver),capacity:+cap||0,type,plate:'',note:''}); return;
+      }
+      if(sec==='car' && (m=t.match(/^車牌\s*[:：]\s*(.*)$/))){car.plate=m[1].trim(); return}
+      if(sec==='car' && (m=t.match(/^備註\s*[:：]\s*(.*)$/))){car.note=m[1].trim(); return}
+      if((m=t.match(/^自行前往\s*[:：]\s*(.*)$/))){sec='self'; pushPeople(parsePersons(m[1]),ln); return}
+      if((m=t.match(/^(?:⚠️\s*)?尚未安排\s*[:：]\s*(.*)$/))){sec='un'; pushPeople(parsePersons(m[1]),ln); return}
+      if((m=t.match(/^注意事項\s*[:：]\s*(.*)$/))){sec='notice'; if(m[1]) notice.push(m[1]); return}
+      // ---- 一般內容 ----
+      if(sec==='notice'){notice.push(line.replace(/^\s+/,'')); return}
+      if(!sec){sec='un'; r.warnings.push(`第${blockNo}筆 第${ln}行「${t.slice(0,20)}」不在任何區塊內，已列為未安排`)}
+      pushPeople(parsePersons(line),ln);
+    });
+    r.notice=notice.join('\n').replace(/^\n+|\n+$/g,'');
+    return r;
+  }
+  function parseText(text){
+    const blocks=String(text||'').replace(/\r/g,'').split(/^\s*={5,}\s*$/m).filter(b=>b.replace(/^\s*(#|\/\/).*$/gm,'').trim());
+    return blocks.map((b,i)=>parseBlock(b,i+1));
+  }
+  function nameKey(n){return String(n||'').replace(/\s+/g,'').toLowerCase()}
+
+  function optimize(r, src, opts){
+    const log=[];
+    // 1. 去除重複姓名（保留有分車的那筆，合併備註）
+    if(opts.dedupe){
+      const seen=new Map(); const keep=[];
+      r.people.forEach(p=>{
+        const k=nameKey(p.name), prev=seen.get(k);
+        if(!prev){seen.set(k,p); keep.push(p); return}
+        const rank=x=>x.assignedCarId&&x.assignedCarId!=='self'?2:x.assignedCarId==='self'?1:0;
+        if(rank(p)>rank(prev)){prev.assignedCarId=p.assignedCarId; prev.needsRide=p.needsRide}
+        if(p.note && !String(prev.note||'').includes(p.note)) prev.note=[prev.note,p.note].filter(Boolean).join(' ');
+        log.push(`重複姓名「${p.name}」已合併`);
+      });
+      r.people=keep;
+      const dv=new Map(); r.vehicles=r.vehicles.filter(v=>{const k=nameKey(v.driver); if(!dv.has(k)){dv.set(k,v); return true}
+        const keepV=dv.get(k); r.people.forEach(p=>{if(p.assignedCarId===v.id)p.assignedCarId=keepV.id}); keepV.capacity=Math.max(+keepV.capacity||0,+v.capacity||0); log.push(`重複駕駛「${v.driver}」已合併為同一台車`); return false});
+    }
+    // 2. 補齊座位數 / 車型
+    r.vehicles.forEach(v=>{
+      if(!(+v.capacity>0)){const fromType=parseInt(v.type); const old=(src?.vehicles||[]).find(o=>nameKey(o.driver)===nameKey(v.driver)); v.capacity=fromType||(+old?.capacity)||4; log.push(`「${v.driver}」未填座位數，已設為 ${v.capacity}`)}
+      v.capacity=+v.capacity;
+      if(opts.fillType && !v.type){v.type=v.capacity>=20?'遊覽車':`${v.capacity}人座`}
+    });
+    // 3. 沿用原有 ID（駕駛同名沿用車輛 ID、姓名同沿用人員 ID）
+    const oldV=new Map((src?.vehicles||[]).map(v=>[nameKey(v.driver),v.id]));
+    const usedV=new Set();
+    r.vehicles.forEach(v=>{const o=oldV.get(nameKey(v.driver)); const nid=(o && !usedV.has(o))?o:id(); usedV.add(nid); r.people.forEach(p=>{if(p.assignedCarId===v.id)p.assignedCarId='__'+nid}); v.id=nid});
+    r.people.forEach(p=>{if(String(p.assignedCarId||'').startsWith('__'))p.assignedCarId=p.assignedCarId.slice(2)});
+    const oldP=new Map((src?.people||[]).map(p=>[nameKey(p.name),p.id])); const usedP=new Set();
+    r.people.forEach(p=>{const o=oldP.get(nameKey(p.name)); p.id=(o&&!usedP.has(o))?o:id(); usedP.add(p.id); delete p._line});
+    // 4. 超載處理：超出座位的乘客移到未安排
+    if(opts.overflow){
+      r.vehicles.forEach(v=>{const ps=r.people.filter(p=>p.assignedCarId===v.id); if(ps.length>v.capacity){ps.slice(v.capacity).forEach(p=>{p.assignedCarId=null; p.needsRide=true}); log.push(`「${v.driver}」超載 ${ps.length-v.capacity} 人，已移出：${ps.slice(v.capacity).map(p=>p.name).join('、')}`)}});
+    }
+    // 5. 未安排者自動補進空位（依座位使用率最低者優先）
+    if(opts.autoFill){
+      const moved=[];
+      r.people.filter(p=>p.needsRide && !p.assignedCarId).forEach(p=>{
+        const cnt=v=>r.people.filter(x=>x.assignedCarId===v.id).length;
+        const v=[...r.vehicles].filter(v=>cnt(v)<v.capacity).sort((a,b)=>cnt(a)/a.capacity-cnt(b)/b.capacity)[0];
+        if(v){p.assignedCarId=v.id; moved.push(`${p.name}→${v.driver}`)}
+      });
+      if(moved.length) log.push(`自動補位：${moved.join('、')}`);
+    }
+    // 6. 未填活動資訊沿用原資料
+    if(opts.keepHeader && src){['name','eventDate','meetPoint'].forEach(k=>{if(!r[k] && src[k]){r[k]=src[k]}})}
+    return log;
+  }
+  function placeOf(s,p){if(isSelf(p))return '自行前往'; const v=(s.vehicles||[]).find(v=>v.id===p.assignedCarId); return v?v.driver:'未安排'}
+  function diffSnap(a,b){ // a=原始, b=新
+    const out=[]; const T=(type,txt)=>out.push({type,txt});
+    if(!a){T('info','新資料（無原始資料可比對）'); return out}
+    if((a.name||'')!==(b.name||'')) T('chg',`活動名稱：${a.name||'（空）'} → ${b.name||'（空）'}`);
+    if((a.eventDate||'')!==(b.eventDate||'')) T('chg',`日期：${a.eventDate||'（空）'} → ${b.eventDate||'（空）'}`);
+    if((a.meetPoint||'')!==(b.meetPoint||'')) T('chg',`集合地點：${a.meetPoint||'（空）'} → ${b.meetPoint||'（空）'}`);
+    if((a.notice||'').trim()!==(b.notice||'').trim()) T('chg','注意事項已修改');
+    const av=new Map((a.vehicles||[]).map(v=>[nameKey(v.driver),v])), bv=new Map((b.vehicles||[]).map(v=>[nameKey(v.driver),v]));
+    bv.forEach((v,k)=>{const o=av.get(k); if(!o) T('add',`新增車輛：${v.driver}（${v.capacity}座）`); else {
+      if(+o.capacity!==+v.capacity) T('chg',`${v.driver} 座位：${o.capacity} → ${v.capacity}`);
+      ['type','plate','note'].forEach(f=>{if((o[f]||'')!==(v[f]||'')) T('chg',`${v.driver} ${({type:'車型',plate:'車牌',note:'備註'})[f]}：${o[f]||'（空）'} → ${v[f]||'（空）'}`)})}});
+    av.forEach((v,k)=>{if(!bv.has(k)) T('del',`移除車輛：${v.driver}`)});
+    const ap=new Map((a.people||[]).map(p=>[nameKey(p.name),p])), bp=new Map((b.people||[]).map(p=>[nameKey(p.name),p]));
+    bp.forEach((p,k)=>{const o=ap.get(k); if(!o) T('add',`新增人員：${p.name}（${placeOf(b,p)}）`); else {
+      const x=placeOf(a,o), y=placeOf(b,p); if(x!==y) T('move',`${p.name}：${x} → ${y}`);
+      if((o.note||'')!==(p.note||'')) T('chg',`${p.name} 備註：${o.note||'（空）'} → ${p.note||'（空）'}`)}});
+    ap.forEach((p,k)=>{if(!bp.has(k)) T('del',`移除人員：${p.name}`)});
+    return out;
+  }
+  function snapStats(s){
+    const cap=s.vehicles.reduce((t,v)=>t+(+v.capacity||0),0); const riding=s.people.filter(p=>!isSelf(p));
+    const un=riding.filter(p=>!s.vehicles.some(v=>v.id===p.assignedCarId)).length;
+    const over=s.vehicles.filter(v=>s.people.filter(p=>p.assignedCarId===v.id).length>v.capacity).length;
+    return {people:s.people.length, cars:s.vehicles.length, cap, used:riding.length-un, un, self:s.people.length-riding.length, over};
+  }
+  function lineDiff(a,b){
+    const A=a.replace(/\n$/,'').split('\n'), B=b.replace(/\n$/,'').split('\n'), n=A.length, m=B.length;
+    if(n*m>2500000) return null;
+    const dp=Array.from({length:n+1},()=>new Uint32Array(m+1));
+    for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--) dp[i][j]=A[i]===B[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+    const ops=[]; let i=0,j=0;
+    while(i<n&&j<m){ if(A[i]===B[j]){ops.push(['eq',A[i],i+1,j+1]);i++;j++} else if(dp[i+1][j]>=dp[i][j+1]){ops.push(['del',A[i],i+1,'']);i++} else {ops.push(['add',B[j],'',j+1]);j++} }
+    while(i<n){ops.push(['del',A[i],i+1,'']);i++} while(j<m){ops.push(['add',B[j],'',j+1]);j++}
+    return ops;
+  }
+
+  function editorSources(){
+    return [currentSnap(), ...state.historyEvents.map((his,i)=>({...snapOf(his), id:his.id, label:`歷史 ${i+1}：${his.name||'未命名'}（${his.date||''}）`}))];
+  }
+  function editorOriginal(key){
+    const all=editorSources();
+    if(key==='all') return {list:state.historyEvents.map(his=>snapOf(his)), text:snapsToText(state.historyEvents.map(his=>snapOf(his)))};
+    if(key==='blank') return {list:[], text:''};
+    const s=all.find(x=>x.id===key)||all[0]; return {list:[s], text:snapToText(s)};
+  }
+  function loadOpts(){try{return {dedupe:true,overflow:true,autoFill:true,fillType:true,keepHeader:true,backup:true,...JSON.parse(localStorage.getItem(TE_OPT_KEY)||'{}')}}catch{return {dedupe:true,overflow:true,autoFill:true,fillType:true,keepHeader:true,backup:true}}}
+
+  function openEditor(key){
+    const orig=editorOriginal(key);
+    editor={key, origList:orig.list, origText:orig.text, results:[], logs:[], view:'orig', opts:loadOpts(), pick:0};
+    renderEditor(orig.text);
+    computeEditor();
+  }
+  function renderEditor(text){
+    const srcs=editorSources(), k=editor.key, o=editor.opts;
+    const opt=(id,label,desc)=>`<label class="te-opt"><input type="checkbox" ${o[id]?'checked':''} onchange="app.teOpt('${id}',this.checked)"><span><b>${label}</b>${desc?`<br><span class="te-help">${desc}</span>`:''}</span></label>`;
+    document.getElementById('editorHost').innerHTML=`<div class="te"><div class="te-panel">
+      <div class="te-head"><span>📝 文字整頁編輯｜比對｜轉成新資料</span><button class="iconbtn" onclick="app.closeTextEditor()">✕</button></div>
+      <div class="te-bar">
+        <span class="sub" style="font-weight:900">來源</span>
+        <select onchange="app.teSource(this.value)">
+          ${srcs.map(s=>`<option value="${h(s.id)}" ${k===s.id?'selected':''}>${h(s.label)}</option>`).join('')}
+          ${state.historyEvents.length?`<option value="all" ${k==='all'?'selected':''}>全部歷史（${state.historyEvents.length} 筆，整批）</option>`:''}
+          <option value="blank" ${k==='blank'?'selected':''}>空白（貼上外部文字）</option>
+        </select>
+        <button class="btn small cyan" onclick="app.teCopy('orig')">📋 複製原文</button>
+        <button class="btn small green" onclick="app.teCopy('edit')">📋 複製編輯後</button>
+        <button class="btn small light" onclick="app.teReset()">↺ 還原原文</button>
+        <button class="btn small purple" onclick="app.teFormat()" title="依解析與優化結果重新產生標準格式文字">✨ 整理成標準格式</button>
+        <button class="btn small light" onclick="app.teHelp()">❔ 格式說明</button>
+      </div>
+      <div class="te-body">
+        <div class="te-col te-orig-col">
+          <div class="te-col-head"><span>原始資料（唯讀）</span><span class="te-seg"><button id="teVOrig" class="${editor.view==='orig'?'on':''}" onclick="app.teView('orig')">原文</button><button id="teVDiff" class="${editor.view==='diff'?'on':''}" onclick="app.teView('diff')">逐行比對</button></span></div>
+          <textarea id="teOrig" class="te-text ${editor.view==='orig'?'':'hidden'}" readonly></textarea>
+          <div id="teDiff" class="te-diff ${editor.view==='diff'?'':'hidden'}"></div>
+        </div>
+        <div class="te-col">
+          <div class="te-col-head"><span>編輯區（可整頁修改／貼上）</span><span id="teLines"></span></div>
+          <textarea id="teEdit" class="te-text" spellcheck="false" oninput="app.teInput()"></textarea>
+        </div>
+        <div class="te-col te-side-col"><div class="te-side">
+          <div class="te-box"><h4><span>⚙️ 轉換優化</span></h4>
+            ${opt('dedupe','去除重複姓名／駕駛','同名合併，保留有分車那筆並合併備註')}
+            ${opt('overflow','超載自動移出','超過座位數的乘客移到「未安排」')}
+            ${opt('autoFill','未安排自動補位','依座位使用率最低的車優先補入')}
+            ${opt('fillType','自動補車型','未填車型時依座位數產生，如「7人座」')}
+            ${opt('keepHeader','空白欄位沿用原資料','活動名稱／日期／集合點未填時沿用')}
+            ${opt('backup','套用前先備份目前活動到歷史','避免覆蓋後無法還原')}
+          </div>
+          <div id="teResult"></div>
+        </div></div>
+      </div>
+      <div class="te-foot">
+        <span id="tePickWrap"></span>
+        <button class="btn light" onclick="app.closeTextEditor()">取消</button>
+        <button class="btn purple" onclick="app.teSaveHistory()">🗂️ 另存為新歷史</button>
+        <button class="btn blue" onclick="app.teApply()">✅ 轉成新資料（套用為目前活動）</button>
+      </div>
+    </div></div>`;
+    document.getElementById('teOrig').value=editor.origText || '（空白來源：請在右側貼上文字）';
+    document.getElementById('teEdit').value=text;
+  }
+  function computeEditor(){
+    if(!editor) return;
+    const text=document.getElementById('teEdit')?.value||'';
+    const parsed=parseText(text);
+    editor.logs=[]; editor.results=parsed.map((r,i)=>{
+      const src=editor.key==='all'?editor.origList[i]:editor.origList[0];
+      const log=optimize(r,src,editor.opts); editor.logs.push(log); return r;
+    });
+    const lines=text?text.split('\n').length:0; const le=document.getElementById('teLines'); if(le) le.textContent=`${lines} 行｜${parsed.length} 筆活動`;
+    if(editor.view==='diff') renderDiffView();
+    renderResult();
+  }
+  function renderDiffView(){
+    const el=document.getElementById('teDiff'); if(!el) return;
+    const ops=lineDiff(editor.origText, document.getElementById('teEdit').value);
+    if(!ops){el.innerHTML='<div class="empty" style="margin:12px">內容過長，請改用右側「變更清單」比對</div>'; return}
+    const a=ops.filter(o=>o[0]==='add').length, d=ops.filter(o=>o[0]==='del').length;
+    el.innerHTML=`<div style="padding:4px 12px 8px;display:block"><span class="pill ok">+${a} 行</span> <span class="pill bad">−${d} 行</span></div>`+
+      ops.map(o=>`<div class="${o[0]}"><i>${o[0]==='add'?o[3]:o[2]}</i><span>${h(o[1])||' '}</span></div>`).join('');
+  }
+  function renderResult(){
+    const el=document.getElementById('teResult'); if(!el) return;
+    const R=editor.results;
+    if(!R.length){el.innerHTML='<div class="empty">右側尚無可轉換的內容</div>'; document.getElementById('tePickWrap').innerHTML=''; return}
+    const icon={add:['ok','新增'],del:['bad','移除'],move:['info','換車'],chg:['warn','修改'],info:['cyan','說明']};
+    el.innerHTML=R.map((r,i)=>{
+      const s=snapStats(r); const src=editor.key==='all'?editor.origList[i]:editor.origList[0];
+      const d=diffSnap(src,r); const logs=editor.logs[i]||[];
+      return `<div class="te-box"><h4><span>${R.length>1?`#${i+1} `:''}${h(r.name||'（未命名活動）')}</span><span class="pill ${s.un||s.over?'warn':'ok'}">${h(r.eventDate||'無日期')}</span></h4>
+        <div class="te-kv"><div><b>${s.people}</b>人數</div><div><b>${s.cars}</b>車輛</div><div><b>${s.used}/${s.cap}</b>座位</div><div><b>${s.un}</b>未安排</div><div><b>${s.self}</b>自行</div><div><b style="${s.over?'color:var(--red)':''}">${s.over}</b>超載車</div></div>
+        ${r.warnings.length?`<div class="mt">${r.warnings.map(w=>`<div class="te-chg"><span class="pill bad">注意</span><span>${h(w)}</span></div>`).join('')}</div>`:''}
+        ${logs.length?`<div class="mt">${logs.map(w=>`<div class="te-chg"><span class="pill purple">優化</span><span>${h(w)}</span></div>`).join('')}</div>`:''}
+        <div class="mt"><div class="sub" style="font-weight:900">與原資料差異（${d.length} 項）</div>${d.length?d.map(x=>`<div class="te-chg"><span class="pill ${icon[x.type][0]}">${icon[x.type][1]}</span><span>${h(x.txt)}</span></div>`).join(''):'<div class="te-chg"><span class="pill ok">相同</span><span>沒有變更</span></div>'}</div>
+      </div>`}).join('');
+    const pw=document.getElementById('tePickWrap');
+    if(R.length>1){ if(editor.pick>=R.length) editor.pick=0;
+      pw.innerHTML=`<select style="width:auto" onchange="app.tePick(this.value)">${R.map((r,i)=>`<option value="${i}" ${editor.pick===i?'selected':''}>套用第 ${i+1} 筆：${h(r.name||'未命名')}</option>`).join('')}</select>`;
+    } else pw.innerHTML='';
+  }
+  function resultToSnap(r){return {name:r.name||'未命名活動', eventDate:r.eventDate||'', meetPoint:r.meetPoint||'', notice:r.notice||'', people:r.people.map(p=>({id:p.id,name:p.name,needsRide:!!p.needsRide,assignedCarId:p.assignedCarId||null,note:p.note||''})), vehicles:r.vehicles.map(v=>({id:v.id,driver:v.driver,capacity:+v.capacity||0,type:v.type||'',plate:v.plate||'',note:v.note||''}))}}
+
+  window.app={
+    openTextEditor(key){openEditor(key||'current')},
+    closeTextEditor(){
+      if(editor && document.getElementById('teEdit') && document.getElementById('teEdit').value!==editor.origText && !confirm('編輯內容尚未轉換，確定關閉？')) return;
+      clearTimeout(editor?.timer); editor=null; document.getElementById('editorHost').innerHTML='';
+    },
+    teInput(){clearTimeout(editor.timer); editor.timer=setTimeout(computeEditor,250)},
+    teSource(key){
+      const cur=document.getElementById('teEdit').value;
+      if(cur!==editor.origText && !confirm('切換來源會以新來源文字取代編輯區，確定？')){renderEditor(cur); return}
+      openEditor(key);
+    },
+    teView(v){editor.view=v; document.getElementById('teOrig').classList.toggle('hidden',v!=='orig'); document.getElementById('teDiff').classList.toggle('hidden',v!=='diff'); document.getElementById('teVOrig').classList.toggle('on',v==='orig'); document.getElementById('teVDiff').classList.toggle('on',v==='diff'); if(v==='diff') renderDiffView()},
+    teOpt(k,v){editor.opts[k]=v; try{localStorage.setItem(TE_OPT_KEY,JSON.stringify(editor.opts))}catch{} computeEditor()},
+    tePick(i){editor.pick=+i},
+    async teCopy(which){const t=which==='orig'?editor.origText:document.getElementById('teEdit').value; try{await navigator.clipboard.writeText(t); toast(which==='orig'?'已複製原文':'已複製編輯後文字','ok')}catch{const ta=document.getElementById(which==='orig'?'teOrig':'teEdit'); ta.classList.remove('hidden'); ta.select(); document.execCommand('copy'); toast('已複製','ok')}},
+    teReset(){if(!confirm('還原為原始文字？目前編輯內容會消失。'))return; document.getElementById('teEdit').value=editor.origText; computeEditor()},
+    teFormat(){if(!editor.results.length) return toast('沒有可整理的內容','warn'); document.getElementById('teEdit').value=snapsToText(editor.results.map(resultToSnap)); computeEditor(); toast('已整理成標準格式（含優化結果），可再比對確認','ok')},
+    teHelp(){showModal('文字格式說明',`<div class="copybox">${h(`【活動】週末登山活動
+【日期】2026-11-21        ← 也接受 2026/11/21、115.11.21（民國）
+【集合】集合點 A
+
+【車】駕駛｜座位數｜車型｜車牌｜備註
+王小明｜會暈車             ← 乘客：姓名｜備註
+李大華、張美美(素食)       ← 一行可多人，用「、」或「，」分隔
+
+【自行前往】
+趙先生
+
+【未安排】
+孫小美｜新朋友
+
+【注意】
+可多行，直到下一個【區塊】為止
+
+==============================   ← 多筆活動以 5 個以上「=」分隔
+# 開頭為 # 的行是註解，不會轉換`)}</div><div class="sub mt">也可直接貼上本系統「複製通知」產生的 LINE 文字（第1車｜駕駛（7人座，3/7）、乘客：甲、乙…），會自動辨識轉換。</div>`,`<button class="btn blue" onclick="app.closeModal()">知道了</button>`)},
+    teApply(){
+      const r=editor.results[editor.results.length>1?editor.pick:0]; if(!r) return toast('沒有可套用的內容','warn');
+      const s=snapStats(r); if(!confirm(`套用為目前活動？\n${r.name||'未命名'}｜${s.people} 人｜${s.cars} 車｜未安排 ${s.un}｜超載 ${s.over}${editor.opts.backup?'\n（會先把目前活動備份到歷史）':''}`)) return;
+      if(editor.opts.backup) this.archive();
+      const n=resultToSnap(r);
+      state.eventName=n.name; state.eventDate=n.eventDate||state.eventDate; state.meetPoint=n.meetPoint; state.notice=n.notice; state.people=n.people; state.vehicles=n.vehicles;
+      editor=null; document.getElementById('editorHost').innerHTML=''; activeTab='dashboard'; touch(); toast('已轉成新資料並套用為目前活動','ok');
+    },
+    teSaveHistory(){
+      const R=editor.results; if(!R.length) return toast('沒有可存的內容','warn');
+      if(!confirm(`將 ${R.length} 筆活動另存為新的歷史紀錄？（原歷史不會被修改）`)) return;
+      [...R].reverse().forEach(r=>{const n=resultToSnap(r); state.historyEvents.unshift({id:id(),date:new Date().toLocaleString()+'（文字編輯）',...n})});
+      editor.origText=document.getElementById('teEdit').value; // 已保存，關閉不再提示
+      touch(); toast(`已新增 ${R.length} 筆歷史紀錄`,'ok');
+    },
+    async copyAllHistoryText(){
+      if(!state.historyEvents.length) return toast('尚無歷史紀錄','warn');
+      const t=snapsToText(state.historyEvents.map(snapOf));
+      try{await navigator.clipboard.writeText(t); toast(`已複製 ${state.historyEvents.length} 筆歷史文字`,'ok')}catch{openEditor('all'); toast('瀏覽器不允許直接複製，已開啟編輯器','warn')}
+    },
+    setTab(t){activeTab=t; render()},
+    updateField(k,v){state[k]=v; touch()},
+    filterPeople(q){document.getElementById('peopleList').innerHTML=peopleListHTML(q)},
+    addPerson(){const name=document.getElementById('newPersonName')?.value.trim(); if(!name)return toast('請輸入姓名','warn'); const note=document.getElementById('newPersonNote')?.value.trim()||''; state.people.push({id:id(),name,needsRide:true,assignedCarId:null,note}); touch(); toast('已新增人員','ok')},
+    batchAddPeople(){showModal('批次加入人員',`<textarea id="batchNames" placeholder="每行一位，例如：\n陳先生\n黃小姐｜會暈車\n林小美｜自行"></textarea><div class="sub mt">可用「姓名｜備註」格式；備註含「自行」會自動設為自行前往。</div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn blue" onclick="app.doBatchAdd()">加入</button>`)},
+    doBatchAdd(){const raw=document.getElementById('batchNames').value; const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean); if(!lines.length)return; lines.forEach(line=>{const [name,...rest]=line.split(/[｜|,，]/); const note=rest.join(' ').trim(); const self=/自行|自理/.test(note); state.people.push({id:id(),name:name.trim(),needsRide:!self,assignedCarId:self?'self':null,note});}); this.closeModal(); touch(); toast(`已加入 ${lines.length} 位人員`,'ok')},
+    editPerson(pid){const p=state.people.find(x=>x.id===pid); if(!p)return; showModal('編輯人員',`<div class="stack"><label class="sub">姓名</label><input id="epName" value="${h(p.name)}"/><label class="sub">備註</label><input id="epNote" value="${h(p.note||'')}"/><label class="row"><input id="epNeed" type="checkbox" ${p.needsRide?'checked':''} style="width:auto"> 需要搭車</label></div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn blue" onclick="app.savePerson('${pid}')">儲存</button>`)},
+    savePerson(pid){const p=state.people.find(x=>x.id===pid); if(!p)return; p.name=document.getElementById('epName').value.trim()||p.name; p.note=document.getElementById('epNote').value.trim(); p.needsRide=document.getElementById('epNeed').checked; if(!p.needsRide)p.assignedCarId='self'; this.closeModal(); touch(); toast('已更新人員','ok')},
+    deletePerson(pid){if(!confirm('確定刪除此人員？'))return; state.people=state.people.filter(p=>p.id!==pid); touch(); toast('已刪除','ok')},
+    assign(pid,cid){const p=state.people.find(x=>x.id===pid); if(!p)return; p.assignedCarId=cid||null; p.needsRide=cid==='self'?false:true; touch()},
+    addVehicle(){const driver=document.getElementById('newDriver')?.value.trim(); if(!driver)return toast('請輸入駕駛名','warn'); state.vehicles.push({id:id(),driver,capacity:parseInt(document.getElementById('newCapacity').value)||4,type:document.getElementById('newType').value,plate:document.getElementById('newPlate').value.trim(),note:document.getElementById('newVehicleNote').value.trim()}); touch(); toast('已新增車輛','ok')},
+    editVehicle(vid){const v=state.vehicles.find(x=>x.id===vid); if(!v)return; showModal('編輯車輛',`<div class="stack"><label class="sub">駕駛</label><input id="evDriver" value="${h(v.driver)}"/><label class="sub">座位數</label><input id="evCap" type="number" min="1" value="${h(v.capacity)}"/><label class="sub">車型</label><input id="evType" value="${h(v.type||'')}"/><label class="sub">車牌</label><input id="evPlate" value="${h(v.plate||'')}"/><label class="sub">備註</label><input id="evNote" value="${h(v.note||'')}"/></div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn blue" onclick="app.saveVehicle('${vid}')">儲存</button>`)},
+    saveVehicle(vid){const v=state.vehicles.find(x=>x.id===vid); if(!v)return; v.driver=document.getElementById('evDriver').value.trim()||v.driver; v.capacity=parseInt(document.getElementById('evCap').value)||v.capacity; v.type=document.getElementById('evType').value.trim(); v.plate=document.getElementById('evPlate').value.trim(); v.note=document.getElementById('evNote').value.trim(); this.closeModal(); touch(); toast('已更新車輛','ok')},
+    deleteVehicle(vid){if(!confirm('刪除車輛？該車乘客會變成未分配。'))return; state.vehicles=state.vehicles.filter(v=>v.id!==vid); state.people.forEach(p=>{if(p.assignedCarId===vid)p.assignedCarId=null}); touch(); toast('已刪除車輛','ok')},
+    autoAssign(){const queue=state.people.filter(p=>p.needsRide && !p.assignedCarId); queue.forEach(p=>{const v=state.vehicles.find(v=>state.people.filter(x=>x.assignedCarId===v.id).length<(Number(v.capacity)||0)); if(v)p.assignedCarId=v.id;}); touch(); toast('已依空位自動安排','ok')},
+    balanceAssign(){const targets=state.people.filter(p=>p.needsRide && p.assignedCarId!=='self'); targets.forEach(p=>p.assignedCarId=null); targets.forEach(p=>{const sorted=[...state.vehicles].sort((a,b)=>state.people.filter(x=>x.assignedCarId===a.id).length/(a.capacity||1)-state.people.filter(x=>x.assignedCarId===b.id).length/(b.capacity||1)); const v=sorted.find(v=>state.people.filter(x=>x.assignedCarId===v.id).length<(Number(v.capacity)||0)); if(v)p.assignedCarId=v.id;}); touch(); toast('已平均分配','ok')},
+    clearAssign(){if(!confirm('清空所有乘車安排？'))return; state.people.forEach(p=>{if(p.assignedCarId!=='self')p.assignedCarId=null}); touch(); toast('已清空安排','ok')},
+    archive(){const snap={id:id(),date:new Date().toLocaleString(),name:state.eventName,people:JSON.parse(JSON.stringify(state.people)),vehicles:JSON.parse(JSON.stringify(state.vehicles)),notice:state.notice,eventDate:state.eventDate,meetPoint:state.meetPoint}; state.historyEvents.unshift(snap); touch(); toast('已存入歷史快照','ok')},
+    viewHistory(hid){const his=state.historyEvents.find(h=>h.id===hid); if(!his)return; const missing=(his.people||[]).filter(hp=>!state.people.some(p=>p.name===hp.name)); const html=`<div class="stack"><div class="row between"><div><div class="driver">${h(his.name)}</div><div class="sub">${h(his.date)}｜${h(his.eventDate||'')}</div></div><button class="btn blue" onclick="app.restoreHistory('${hid}')">還原成目前活動</button></div><div class="hr"></div><div class="title"><span>遺漏名單</span><span class="pill ${missing.length?'warn':'ok'}">${missing.length?missing.length+' 人':'全員到齊'}</span></div>${missing.length?missing.map(p=>`<div class="person"><div class="row between"><div><div class="pname">${h(p.name)}</div><div class="mini">${h(p.note||'')}</div></div><button class="btn small orange" onclick="app.addMissingFromHistory('${hid}','${h(p.name)}')">加入</button></div></div>`).join(''):'<div class="empty">目前名單已包含歷史活動人員。</div>'}<div class="hr"></div><div class="title"><span>當時分車</span></div>${(his.vehicles||[]).map(v=>{const ps=(his.people||[]).filter(p=>p.assignedCarId===v.id);return `<div class="person"><div class="pname">${h(v.driver)}｜${ps.length}/${h(v.capacity)}</div><div class="mini">${ps.map(p=>h(p.name)).join('、')||'空車'}</div></div>`}).join('')}</div>`; document.getElementById('historyView').innerHTML=html},
+    addMissingFromHistory(hid,name){const his=state.historyEvents.find(h=>h.id===hid); const p=his?.people?.find(x=>x.name===name); if(!p)return; state.people.push({...p,id:id(),assignedCarId:null,needsRide:true}); touch(); this.viewHistory(hid)},
+    restoreHistory(hid){const his=state.historyEvents.find(h=>h.id===hid); if(!his||!confirm('還原此歷史活動？目前畫面會被覆蓋。'))return; state.eventName=his.name; state.eventDate=his.eventDate||state.eventDate; state.meetPoint=his.meetPoint||state.meetPoint; state.notice=his.notice||state.notice; state.people=JSON.parse(JSON.stringify(his.people||[])); state.vehicles=JSON.parse(JSON.stringify(his.vehicles||[])); touch(); toast('已還原歷史活動','ok')},
+    deleteHistory(hid){if(!confirm('刪除此歷史紀錄？'))return; state.historyEvents=state.historyEvents.filter(h=>h.id!==hid); touch()},
+    openCopy(){showModal('複製行前通知',`<div class="copybox" id="copyText">${h(generateNotice())}</div>`,`<button class="btn light" onclick="app.closeModal()">取消</button><button class="btn green" onclick="app.copyNotice()">複製內容</button>`)},
+    async copyNotice(){await navigator.clipboard.writeText(generateNotice()).catch(()=>{}); this.closeModal(); toast('已複製通知內容','ok')},
+    exportJSON(){download(`${state.eventName}_共同編輯備份_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(state,null,2),'application/json;charset=utf-8'); toast('已匯出 JSON','ok')},
+    exportCSV(){let rows=[['姓名','搭車狀態','分配車輛','備註']]; state.people.forEach(p=>{const v=state.vehicles.find(v=>v.id===p.assignedCarId); rows.push([p.name,(!p.needsRide||p.assignedCarId==='self')?'自行前往':p.assignedCarId?'已安排':'未安排',v?v.driver:'',p.note||'']);}); download(`${state.eventName}_人員分車表.csv`, '\ufeff'+rows.map(r=>r.map(csvEscape).join(',')).join('\n'),'text/csv;charset=utf-8'); toast('已匯出 CSV','ok')},
+    printPage(){window.print()},
+    toggleTheme(){localStorage.setItem(THEME_KEY,(localStorage.getItem(THEME_KEY)||'light')==='light'?'dark':'light'); render()},
+    resetDemo(){if(!confirm('還原範例資料？目前資料會被覆蓋。'))return; state=defaultState(); touch()},
+    closeModal(){document.getElementById('modalHost').innerHTML=''},
+    openRoomModal(){activeTab='tools'; render(); setTimeout(()=>document.getElementById('roomInput')?.focus(),50)},
+    async saveFirebaseConfig(){const raw=document.getElementById('firebaseConfigInput').value.trim(); if(!raw)return toast('請貼上 Firebase config','warn'); try{JSON.parse(raw)}catch{return toast('JSON 格式錯誤','bad')} localStorage.setItem(CONFIG_KEY,raw); toast('已儲存 Firebase 設定，開始連線','ok'); await initFirebase()},
+    clearFirebaseConfig(){if(!confirm('移除 Firebase 設定後會回到本機模式。'))return; localStorage.removeItem(CONFIG_KEY); cloud.ready=false; cloud.mode='local'; if(cloud.unsub)cloud.unsub(); cloud.unsub=null; render(); toast('已改成本機模式','ok')},
+    joinRoomFromInput(){joinRoom(document.getElementById('roomInput').value)},
+    randomRoom(){const r='room-'+Math.random().toString(36).slice(2,8); document.getElementById('roomInput').value=r; joinRoom(r)},
+    async copyShareLink(){let link; try{const url=new URL(location.href); url.searchParams.set('room',cloud.room||document.getElementById('roomInput')?.value||'main'); link=url.toString()}catch{link=`房間碼：${cloud.room||'main'}`} await navigator.clipboard.writeText(link).catch(()=>{}); toast('已複製共編網址，分享後對方可直接進入填寫','ok')}
+  };
+
+  document.getElementById('importFile').addEventListener('change', e=>{
+    const file=e.target.files[0]; if(!file)return; const reader=new FileReader(); reader.onload=()=>{try{const data=JSON.parse(reader.result); if(confirm(`載入「${data.eventName||'備份資料'}」？目前資料會被覆蓋。`)){state={...defaultState(),...data}; touch(); toast('匯入成功','ok')}}catch{toast('備份檔格式錯誤','bad')} e.target.value='';}; reader.readAsText(file);
+  });
+
+  render();
+  initFirebase();
+</script>
+
+<script>
+  // PWA：註冊離線快取與手機桌面安裝提示
+  (function(){
+    var deferredPrompt = null;
+    var tip = null;
+    var btn = null;
+    function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+    function isStandalone(){ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone; }
+    function showTip(text, canInstall){
+      tip = tip || document.getElementById('pwaInstallTip');
+      btn = btn || document.getElementById('pwaInstallBtn');
+      var label = document.getElementById('pwaInstallText');
+      if(!tip || isStandalone()) return;
+      if(label && text) label.textContent = text;
+      if(btn) btn.style.display = canInstall ? 'inline-block' : 'none';
+      tip.classList.add('show');
+    }
+    window.hidePwaInstallTip = function(){
+      tip = tip || document.getElementById('pwaInstallTip');
+      if(tip) tip.classList.remove('show');
+      try{ localStorage.setItem('vehiclePlanner_pwaTipDismissed', Date.now().toString()); }catch(e){}
+    };
+    if('serviceWorker' in navigator && location.protocol !== 'file:'){
+      window.addEventListener('load', function(){ navigator.serviceWorker.register('./sw.js').catch(function(e){ console.warn('SW register failed', e); }); });
+    }
+    window.addEventListener('beforeinstallprompt', function(e){
+      e.preventDefault(); deferredPrompt = e;
+      setTimeout(function(){ showTip('按「加入」即可放到手機桌面，下次直接從桌面啟動。', true); }, 900);
+    });
+    window.addEventListener('load', function(){
+      btn = document.getElementById('pwaInstallBtn');
+      if(btn){ btn.addEventListener('click', async function(){
+        if(!deferredPrompt){ showTip('請用瀏覽器選單 → 加入主畫面。', false); return; }
+        deferredPrompt.prompt();
+        try{ await deferredPrompt.userChoice; }catch(e){}
+        deferredPrompt = null; window.hidePwaInstallTip();
+      }); }
+      if(isIOS() && !isStandalone()){
+        setTimeout(function(){ showTip('iPhone：點分享圖示 → 加入主畫面，即可從桌面啟動。', false); }, 1200);
+      }
+    });
+  })();
+</script>
+
+</body>
+</html>
