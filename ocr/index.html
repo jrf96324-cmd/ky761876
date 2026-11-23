@@ -213,10 +213,21 @@ let engine={mode:null,cdn:null,ocrErr:'',pdfErr:''};
 let tessCdn=null,pdfCdn=null,engineReady=null;
 const embedUrls={};
 function b64ToBytes(b64){const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
-function embedUrl(key,type='text/javascript'){
-  if(!embedUrls[key])embedUrls[key]=URL.createObjectURL(new Blob([b64ToBytes(window.__EMBED__[key])],{type}));
-  return embedUrls[key];
+// 離線版內嵌資料為 gzip＋base64，用瀏覽器內建 DecompressionStream 解壓
+async function gunzipB64(b64){
+  if(typeof DecompressionStream==='undefined')throw new Error('瀏覽器版本太舊，請改用最新版 Chrome 或 Edge');
+  const st=new Blob([b64ToBytes(b64)]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(st).arrayBuffer());
 }
+async function prepareEmbed(){
+  const E=window.__EMBED__;
+  setStatus('正在解壓內建引擎…',2);
+  if(!window.Tesseract)(0,eval)(new TextDecoder().decode(await gunzipB64(E.tess)));
+  if(!window.pdfjsLib)(0,eval)(new TextDecoder().decode(await gunzipB64(E.pdf)));
+  embedUrls.worker=URL.createObjectURL(new Blob([await gunzipB64(E.worker)],{type:'text/javascript'}));
+  embedUrls.pdfWorker=URL.createObjectURL(new Blob([await gunzipB64(E.pdfWorker)],{type:'text/javascript'}));
+}
+function embedUrl(key){return embedUrls[key]}
 function loadScript(src,timeout=12000){
   return new Promise((res,rej)=>{const s=document.createElement('script');let done=false;
     const t=setTimeout(()=>{if(!done){done=true;s.remove();rej(new Error('逾時'))}},timeout);
@@ -234,7 +245,10 @@ async function loadFromCdns(globalName,pkg,ver,file){
   throw new Error(errs.join('；'));
 }
 async function initEngines(){
-  if(window.__EMBED__){engine.mode='embed'}
+  if(window.__EMBED__){
+    engine.mode='embed';
+    try{await prepareEmbed()}catch(e){engine.ocrErr=e.message||String(e);console.error(e)}
+  }
   else if(window.__OCR_LOCAL__){engine.mode='local'}
   else{
     engine.mode='cdn';
@@ -251,7 +265,8 @@ async function initEngines(){
       (pdfCdn||CDNS[0]).u('pdfjs-dist',VER.pdf,'build/pdf.worker.min.js');
   }
   updateBadge();
-  if(!window.Tesseract) setStatus('⚠️ OCR 引擎無法載入（網路可能封鎖了 CDN）。請按右上角「重新載入引擎」，或改用「離線單檔版」。'+(engine.ocrErr?`［${engine.ocrErr}］`:''),0);
+  if(!window.Tesseract && engine.mode==='embed') setStatus('⚠️ 內建引擎無法啟動：'+engine.ocrErr,0);
+  else if(!window.Tesseract) setStatus('⚠️ OCR 引擎無法載入（網路可能封鎖了 CDN）。請按右上角「重新載入引擎」，或改用「離線單檔版」。'+(engine.ocrErr?`［${engine.ocrErr}］`:''),0);
   else if(!window.pdfjsLib) setStatus('⚠️ PDF 引擎無法載入：圖片仍可辨識；PDF 需網路或使用離線單檔版。',0);
   else if(!hasImage) setStatus(`程式已就緒（${engineLabel()}），請載入圖片或 PDF。`,0);
 }

@@ -23,7 +23,7 @@
 
 | 檔案 | 大小 | 用法 |
 |---|---|---|
-| `ocr-offline.html` | 約 13 MB | **建議**：離線單檔版，下載後直接雙擊開啟，不需網路、不需 assets 資料夾（內建繁中＋英文） |
+| `ocr-offline.html` | 約 8.3 MB | **建議**：離線單檔版，下載後直接雙擊開啟，不需網路、不需 assets 資料夾（內建繁中＋英文；需 Chrome/Edge 80 以上或 Safari 16.4 以上） |
 | `index.html` | 約 50 KB | 線上版：開啟時依序從 jsDelivr → unpkg → npmmirror 載入引擎；公司網路封鎖 CDN 時無法使用 |
 
 右上角徽章顯示目前引擎狀態；若出現「⚠️ OCR 引擎未載入」，代表網路擋住了 CDN，請改用 `ocr-offline.html`。
