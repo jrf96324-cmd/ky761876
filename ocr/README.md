@@ -19,8 +19,24 @@
 - 低信心字在預覽圖上以紅框標示，方便人工核對
 - 自訂校正字典（`錯誤=>正確`，存在本機瀏覽器，辨識後自動套用）
 
-## 離線使用（選用）
-有網路時自動從 CDN 載入引擎。若要完全離線，在 `index.html` 旁建立 `assets/`：
+## 兩個版本
+
+| 檔案 | 大小 | 用法 |
+|---|---|---|
+| `ocr-offline.html` | 約 13 MB | **建議**：離線單檔版，下載後直接雙擊開啟，不需網路、不需 assets 資料夾（內建繁中＋英文） |
+| `index.html` | 約 50 KB | 線上版：開啟時依序從 jsDelivr → unpkg → npmmirror 載入引擎；公司網路封鎖 CDN 時無法使用 |
+
+右上角徽章顯示目前引擎狀態；若出現「⚠️ OCR 引擎未載入」，代表網路擋住了 CDN，請改用 `ocr-offline.html`。
+
+## 重新產生離線單檔版
+
+```
+npm i tesseract.js@5.1.1 tesseract.js-core@5.1.1 pdfjs-dist@3.11.174 @tesseract.js-data/chi_tra@1.0.0 @tesseract.js-data/eng@1.0.0
+python3 build-offline.py ./node_modules ocr-offline.html
+```
+
+## 本機 assets 模式（選用）
+以網頁伺服器開啟 `index.html` 時，也可在旁邊放 `assets/`：
 
 ```
 assets/tesseract.min.js        tesseract.js@5.1.1  dist/
@@ -31,5 +47,3 @@ assets/lang/eng.traineddata.gz       @tesseract.js-data/eng      4.0.0_best_int/
 assets/pdf.min.js              pdfjs-dist@3.11.174 build/
 assets/pdf.worker.min.js       pdfjs-dist@3.11.174 build/
 ```
-
-離線模式需用本機網頁伺服器開啟（例如 `npx serve ocr`）；直接雙擊 html 時會改用線上引擎（圖片仍只在本機處理）。

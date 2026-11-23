@@ -4,14 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>圖片 PDF OCR</title>
-<!-- 優先載入本機引擎；找不到時自動改用線上 CDN -->
-<script src="./assets/tesseract.min.js"></script>
-<script src="./assets/pdf.min.js"></script>
+<!-- 引擎載入順序：① 離線內建（單檔離線版）② 同資料夾 assets/ ③ 線上 CDN（jsDelivr → unpkg → npmmirror 依序嘗試） -->
+<!--OFFLINE_BUNDLE-->
 <script>
-window.__OCR_LOCAL__ = !!window.Tesseract;
-window.__PDF_LOCAL__ = !!window.pdfjsLib;
-if (!window.Tesseract) document.write('<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"><\/script>');
-if (!window.pdfjsLib) document.write('<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"><\/script>');
+window.__EMBED__ = window.__EMBED__ || null;
+if (!window.__EMBED__ && location.protocol !== 'file:') {
+  document.write('<script src="./assets/tesseract.min.js" onerror="void 0"><\/script><script src="./assets/pdf.min.js" onerror="void 0"><\/script>');
+}
+</script>
+<script>
+window.__OCR_LOCAL__ = !window.__EMBED__ && !!window.Tesseract;
+window.__PDF_LOCAL__ = !window.__EMBED__ && !!window.pdfjsLib;
 </script>
 <style>
 :root{
@@ -125,7 +128,7 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
   <button id="otsuBtn" class="small" disabled>自動門檻</button>
   <label><input id="cjkSpace" type="checkbox" checked>移除中文字間空白</label>
   <label><input id="appendOn" type="checkbox">累加結果</label>
-  <label><input id="pdfTextOn" type="checkbox" checked>PDF 優先取內嵌文字</label>
+  <label title="自動：內嵌文字太少或是亂碼時改用 OCR">PDF 取字 <select id="pdfMode"><option value="auto">自動判斷</option><option value="ocr">一律 OCR（掃描檔）</option><option value="text">只用內嵌文字</option></select></label>
   <label><input id="halfOn" type="checkbox" checked>全形英數轉半形</label>
   <label><input id="autoCopy" type="checkbox" checked>辨識完自動複製</label>
   <label title="自動偵測並轉正輕微歪斜的掃描或翻拍"><input id="deskew" type="checkbox" checked>自動校正歪斜</label>
@@ -168,7 +171,7 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
 </section>
 
 <div class="statusbar"><div class="status" id="status">程式已就緒，請載入截圖或圖片。</div><div class="progress"><div id="progressBar"></div></div></div>
-<div class="notice">建議：放大選「自動」會依圖片大小自動調整；深色背景會自動反白；數字、型號較多時建議開「高精度」；紅框處請人工核對。文字先放大至 150%～200% 再截圖效果更好；表格或名單使用「一般文字／名單」；單行內容使用「單行文字」；深色背景請勾「反白」。一次選多張圖片／PDF 會依序辨識並累加結果。PDF 若本身含文字（非掃描檔）會直接讀取內嵌文字，最快也最準；掃描版 PDF 則逐頁轉成影像後 OCR。若 PDF 讀出亂碼，請取消「PDF 優先取內嵌文字」改用 OCR。第一次辨識需載入 OCR 資料，之後可重複使用。</div>
+<div class="notice">建議：放大選「自動」會依圖片大小自動調整；深色背景會自動反白；數字、型號較多時建議開「高精度」；紅框處請人工核對。文字先放大至 150%～200% 再截圖效果更好；表格或名單使用「一般文字／名單」；單行內容使用「單行文字」；深色背景請勾「反白」。一次選多張圖片／PDF 會依序辨識並累加結果。PDF 若本身含文字（非掃描檔）會直接讀取內嵌文字，最快也最準；掃描版 PDF 則逐頁轉成影像後 OCR。PDF 預設「自動判斷」：內嵌文字太少（只有頁碼、浮水印）或是亂碼時會自動改用 OCR；若結果仍不對，請將「PDF 取字」改成「一律 OCR」。辨識不到文字時會自動換參數重試。第一次辨識需載入 OCR 資料，之後可重複使用。</div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -184,7 +187,7 @@ const els = {
  status:$('status'),progress:$('progressBar'),badge:$('modeBadge'),
  clean:$('cleanBtn'),roster:$('rosterBtn'),copy:$('copyBtn'),copyTop:$('copyTopBtn'),txt:$('txtBtn'),csv:$('csvBtn'),clear:$('clearBtn'),toast:$('toast'),
  pdfNav:$('pdfNav'),prevPage:$('prevPage'),nextPage:$('nextPage'),pageNum:$('pageNum'),pageTotal:$('pageTotal'),pdfScope:$('pdfScope'),
- pdfTextOn:$('pdfTextOn'),halfOn:$('halfOn'),autoCopy:$('autoCopy'),
+ pdfMode:$('pdfMode'),halfOn:$('halfOn'),autoCopy:$('autoCopy'),
  autoInvert:$('autoInvert'),deskew:$('deskew'),hiAcc:$('hiAcc'),fixNum:$('fixNum'),tableOn:$('tableOn'),markLow:$('markLow'),
  dictText:$('dictText'),dictApply:$('dictApply'),join:$('joinBtn')
 };
@@ -195,20 +198,72 @@ const originalCtx = original.getContext('2d',{willReadFrequently:true});
 const source = document.createElement('canvas');
 const sourceCtx = source.getContext('2d',{willReadFrequently:true});
 let hasImage=false, selection=null, dragStart=null, drawMap=null, worker=null, workerLang='', busy=false, cancelled=false, showProcessed=false, toastTimer;
-let useLocal = !!window.__OCR_LOCAL__ && location.protocol !== 'file:';
 let pdfDoc=null, pdfName='', pdfPage=1, progressPrefix='';
 const PDF_RENDER_SCALE=2.5; // 約 180 dpi，再搭配「放大」設定
-if(window.pdfjsLib){
-  pdfjsLib.GlobalWorkerOptions.workerSrc = window.__PDF_LOCAL__
-    ? new URL('./assets/pdf.worker.min.js',location.href).href
-    : 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+/* ---------- 引擎來源 ---------- */
+const VER={tess:'5.1.1',core:'5.1.1',pdf:'3.11.174',lang:'1.0.0'};
+const CDNS=[
+  {name:'jsDelivr',u:(pkg,ver,file)=>`https://cdn.jsdelivr.net/npm/${pkg}@${ver}/${file}`},
+  {name:'unpkg',u:(pkg,ver,file)=>`https://unpkg.com/${pkg}@${ver}/${file}`},
+  {name:'npmmirror',u:(pkg,ver,file)=>`https://registry.npmmirror.com/${pkg}/${ver}/files/${file}`},
+];
+// mode: embed（離線內建）| local（assets/）| cdn
+let engine={mode:null,cdn:null,ocrErr:'',pdfErr:''};
+let tessCdn=null,pdfCdn=null,engineReady=null;
+const embedUrls={};
+function b64ToBytes(b64){const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
+function embedUrl(key,type='text/javascript'){
+  if(!embedUrls[key])embedUrls[key]=URL.createObjectURL(new Blob([b64ToBytes(window.__EMBED__[key])],{type}));
+  return embedUrls[key];
 }
+function loadScript(src,timeout=12000){
+  return new Promise((res,rej)=>{const s=document.createElement('script');let done=false;
+    const t=setTimeout(()=>{if(!done){done=true;s.remove();rej(new Error('逾時'))}},timeout);
+    s.src=src;s.async=true;s.onload=()=>{if(!done){done=true;clearTimeout(t);res()}};
+    s.onerror=()=>{if(!done){done=true;clearTimeout(t);s.remove();rej(new Error('無法連線'))}};
+    document.head.appendChild(s)});
+}
+async function loadFromCdns(globalName,pkg,ver,file){
+  const errs=[];
+  for(const c of CDNS){
+    if(window[globalName])return c;
+    try{setStatus(`正在從 ${c.name} 載入${globalName==='Tesseract'?' OCR':' PDF'} 引擎…`,2);await loadScript(c.u(pkg,ver,file));if(window[globalName])return c}
+    catch(e){errs.push(`${c.name}：${e.message}`)}
+  }
+  throw new Error(errs.join('；'));
+}
+async function initEngines(){
+  if(window.__EMBED__){engine.mode='embed'}
+  else if(window.__OCR_LOCAL__){engine.mode='local'}
+  else{
+    engine.mode='cdn';
+    try{tessCdn=await loadFromCdns('Tesseract','tesseract.js',VER.tess,'dist/tesseract.min.js');engine.cdn=tessCdn.name}
+    catch(e){engine.ocrErr=e.message}
+  }
+  if(!window.pdfjsLib && !window.__EMBED__){
+    try{pdfCdn=await loadFromCdns('pdfjsLib','pdfjs-dist',VER.pdf,'build/pdf.min.js')}catch(e){engine.pdfErr=e.message}
+  }
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      window.__EMBED__ ? embedUrl('pdfWorker') :
+      window.__PDF_LOCAL__ ? new URL('./assets/pdf.worker.min.js',location.href).href :
+      (pdfCdn||CDNS[0]).u('pdfjs-dist',VER.pdf,'build/pdf.worker.min.js');
+  }
+  updateBadge();
+  if(!window.Tesseract) setStatus('⚠️ OCR 引擎無法載入（網路可能封鎖了 CDN）。請按右上角「重新載入引擎」，或改用「離線單檔版」。'+(engine.ocrErr?`［${engine.ocrErr}］`:''),0);
+  else if(!window.pdfjsLib) setStatus('⚠️ PDF 引擎無法載入：圖片仍可辨識；PDF 需網路或使用離線單檔版。',0);
+  else if(!hasImage) setStatus(`程式已就緒（${engineLabel()}），請載入圖片或 PDF。`,0);
+}
+function engineLabel(){return engine.mode==='embed'?'離線內建引擎':engine.mode==='local'?'本機 assets 引擎':`線上引擎：${engine.cdn||'—'}`}
 
 /* ---------- 狀態 ---------- */
 function updateBadge(){
-  if(!window.Tesseract){els.badge.textContent='⚠️ OCR 引擎未載入';els.badge.classList.add('online');return}
-  els.badge.textContent=useLocal?'🔒 離線單機模式':'🌐 線上引擎模式（圖片仍不上傳）';
-  els.badge.classList.toggle('online',!useLocal);
+  if(!engine.mode){els.badge.textContent='⏳ 引擎載入中…';els.badge.classList.add('online');return}
+  if(!window.Tesseract){els.badge.innerHTML='⚠️ OCR 引擎未載入　<button class="small" id="reloadEngine">重新載入引擎</button>';els.badge.classList.add('online');
+    $('reloadEngine').onclick=()=>{engine={mode:null,cdn:null,ocrErr:'',pdfErr:''};updateBadge();engineReady=initEngines()};return}
+  els.badge.textContent=engine.mode==='embed'?'🔒 離線單檔版（不需網路）':engine.mode==='local'?'🔒 離線單機模式':`🌐 線上引擎（${engine.cdn}）｜圖片不上傳`;
+  els.badge.classList.toggle('online',engine.mode==='cdn');
 }
 function toast(msg){clearTimeout(toastTimer);els.toast.textContent=msg;els.toast.classList.add('show');toastTimer=setTimeout(()=>els.toast.classList.remove('show'),2600)}
 function setStatus(msg,pct){els.status.textContent=msg;if(Number.isFinite(pct))els.progress.style.width=Math.max(0,Math.min(100,pct))+'%'}
@@ -247,7 +302,8 @@ async function loadBlob(blob,label){try{closePdf();loadBitmap(await imageFromBlo
 const isPdf=f=>f && (f.type==='application/pdf' || /\.pdf$/i.test(f.name||''));
 function closePdf(){if(pdfDoc){try{pdfDoc.destroy()}catch{}}pdfDoc=null;pdfName='';pdfPage=1}
 async function openPdf(file){
-  if(!window.pdfjsLib) throw new Error('PDF 引擎未載入：請確認 assets/pdf.min.js 存在，或連上網路後重新整理');
+  if(engineReady)await engineReady;
+  if(!window.pdfjsLib) throw new Error('PDF 引擎未載入：請連上網路後按「重新載入引擎」，或改用離線單檔版');
   closePdf();setStatus('正在開啟 PDF…',2);
   pdfDoc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
   pdfName=file.name||'PDF';
@@ -282,7 +338,18 @@ async function pdfPageText(n){
     return out}).join('\n');
   return normalizeText(text);
 }
-function usableText(t){const core=t.replace(/\s/g,'');return core.length>=8 && (core.match(/[\uFFFD\u0000-\u001F]/g)||[]).length<core.length*.05}
+// 內嵌文字品質：有意義字元（中英數、常用標點）比例需夠高，私用區字元／亂碼視為不可用
+function textQuality(t){
+  const core=t.replace(/\s/g,'');if(!core.length)return {n:0,ok:0};
+  const good=(core.match(/[\u3400-\u9FFF\uF900-\uFAFFA-Za-z0-9\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A.,:;!?%#&()\-+\/$@'"\u3000-\u303F\uFF01-\uFF0F\uFF1A-\uFF20]/g)||[]).length;
+  return {n:core.length,ok:good/core.length};
+}
+const WATERMARK=/scanned\s*by|camscanner|adobe\s*scan|scan(ned)?\s*with|page\s*\d+|第\s*\d+\s*頁|^\s*-?\s*\d+\s*-?\s*$/gim;
+function usableText(t){
+  const q=textQuality(t);if(q.n<8||q.ok<.8)return false;
+  // 去掉浮水印／頁碼後仍需有足夠內容（掃描檔常只有這類文字）
+  return t.replace(WATERMARK,'').replace(/\s/g,'').length>=30;
+}
 async function pdfRecognize(scope){
   const total=pdfDoc.numPages,cur=pdfPage;
   const pages=scope==='all'?Array.from({length:total},(_,i)=>i+1):[cur];
@@ -291,15 +358,18 @@ async function pdfRecognize(scope){
   for(const n of pages){
     if(cancelled)break;
     progressPrefix=pages.length>1?`第 ${n}/${total} 頁｜`:'';
-    if(els.pdfTextOn.checked && !keepSel){
+    const mode=els.pdfMode.value;let layer='';
+    if(mode!=='ocr' && !keepSel){
       setStatus(progressPrefix+'讀取內嵌文字…',Math.round((n-1)/total*100));
-      const t=await pdfPageText(n);
-      if(usableText(t)){parts.push({n,text:t});textPages++;continue}
+      layer=await pdfPageText(n);
+      if(mode==='text' || usableText(layer)){parts.push({n,text:layer});textPages++;continue}
     }
     if(n!==pdfPage) await showPdfPage(n);
     busy=true;setButtons(true);
-    const {text,conf}=await runOcrOnSource(keepSel?undefined:null);
+    let {text,conf}=await runOcrOnSource(keepSel?undefined:null);
     if(cancelled)break;
+    // OCR 仍比內嵌文字少時，保留較完整者
+    if(layer && textQuality(layer).ok>=.8 && layer.replace(/\s/g,'').length>text.replace(/\s/g,'').length) text=layer;
     parts.push({n,text});ocrPages++;confSum+=conf;
   }
   progressPrefix='';
@@ -402,22 +472,61 @@ function otsuThreshold(){
 /* ---------- OCR 引擎 ---------- */
 function workerOptions(){
   const logger=m=>{const p=Number.isFinite(m.progress)?Math.round(m.progress*100):0;const map={loading:'載入中',"loading tesseract core":'載入 OCR 核心',"initializing tesseract":'初始化 OCR',"loading language traineddata":'載入語言資料（第一次較久）',"loaded language traineddata":'語言資料已載入',"initializing api":'建立辨識引擎',"recognizing text":'辨識文字中'};setStatus(progressPrefix+(map[m.status]||m.status||'處理中…')+(p?` ${p}%`:''),p)};
-  if(!useLocal) return {logger};
-  const abs=p=>new URL(p,location.href).href;
-  return {workerPath:abs('./assets/worker.min.js'),corePath:abs('./assets/core'),langPath:abs('./assets/lang'),logger};
+  const c=tessCdn||CDNS[0];
+  if(engine.mode==='embed'){
+    // 核心已內含在 worker 程式中；直接以 blob 建立 worker（file:// 下不能再巢狀 importScripts）
+    return {workerPath:embedUrl('worker'),workerBlobURL:false,corePath:'embedded-core.js',cacheMethod:'none',logger};
+  }
+  if(engine.mode==='local'){
+    const abs=p=>new URL(p,location.href).href;
+    return {workerPath:abs('./assets/worker.min.js'),corePath:abs('./assets/core'),langPath:abs('./assets/lang'),logger};
+  }
+  return {workerPath:c.u('tesseract.js',VER.tess,'dist/worker.min.js'),corePath:c.u('tesseract.js-core',VER.core,''),logger};
+}
+// 語言資料：離線版用內建資料；其他語言由 CDN 下載
+function langArg(lang){
+  if(engine.mode==='embed'){
+    return lang.split('+').map(code=>window.__EMBED__['lang_'+code]?{code,data:b64ToBytes(window.__EMBED__['lang_'+code])}:code);
+  }
+  return lang;
+}
+async function createOcrWorker(lang){
+  const opt=workerOptions();
+  if(engine.mode!=='cdn') return Tesseract.createWorker(langArg(lang),1,opt);
+  // 線上模式：自行下載語言資料（各 CDN 路徑不同），並修正 tesseract.js 5.1.1 以資料載入語言時的名稱 bug
+  const c=tessCdn||CDNS[0];
+  const r=await fetch(c.u('tesseract.js',VER.tess,'dist/worker.min.js'));
+  if(!r.ok)throw new Error(`OCR 工作程式下載失敗（${c.name} ${r.status}）`);
+  const bad='"string"==typeof t?t:t.data})).join("+")';let wsrc=await r.text();
+  if(!wsrc.includes(bad)) return Tesseract.createWorker(lang,1,{...opt,langPath:undefined}); // 非預期版本：改用預設 jsDelivr 路徑
+  wsrc=wsrc.replace(bad,'"string"==typeof t?t:t.code})).join("+")');
+  const arr=[];
+  for(const code of lang.split('+')){
+    setStatus(`下載語言資料 ${code}（${c.name}，第一次較久）…`,5);
+    const lr=await fetch(c.u('@tesseract.js-data/'+code,VER.lang,`4.0.0_best_int/${code}.traineddata.gz`));
+    if(!lr.ok)throw new Error(`語言資料 ${code} 下載失敗（${c.name} ${lr.status}）`);
+    arr.push({code,data:new Uint8Array(await lr.arrayBuffer())});
+  }
+  const wurl=URL.createObjectURL(new Blob([wsrc],{type:'text/javascript'}));
+  const o={...opt,workerPath:wurl,workerBlobURL:false};delete o.langPath;
+  return Tesseract.createWorker(arr,1,o);
 }
 async function ensureWorker(){
-  if(!window.Tesseract) throw new Error('OCR 引擎未載入：請確認 assets 資料夾存在，或連上網路後重新整理');
+  if(engineReady)await engineReady;
+  if(!window.Tesseract) throw new Error('OCR 引擎未載入：網路可能封鎖了 CDN，請按「重新載入引擎」或改用離線單檔版');
   const lang=els.lang.value;if(worker && workerLang===lang)return worker;
   if(worker){try{await worker.terminate()}catch{}worker=null}
   setStatus('正在啟動 OCR 引擎…',3);
+  // 引擎啟動逾時保護（網路被擋時 worker 可能卡住不回應）
+  const withTimeout=(pr,ms)=>Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>rej(new Error('引擎啟動逾時，可能是網路封鎖了 CDN；建議改用離線單檔版')),ms))]);
   try{
-    worker=await Tesseract.createWorker(lang,1,workerOptions());
+    worker=await withTimeout(createOcrWorker(lang),engine.mode==='cdn'?150000:60000);
   }catch(err){
-    if(!useLocal) throw err;
+    if(engine.mode!=='local') throw new Error('OCR 引擎啟動失敗：'+(err.message||err));
     console.warn('本機引擎啟動失敗，改用線上引擎',err);
-    useLocal=false;updateBadge();toast('本機 OCR 資料無法使用，已自動改用線上引擎');
-    worker=await Tesseract.createWorker(lang,1,workerOptions());
+    engine.mode='cdn';toast('本機 OCR 資料無法使用，改用線上引擎');
+    try{tessCdn=tessCdn||CDNS[0];engine.cdn=tessCdn.name;updateBadge();worker=await createOcrWorker(lang)}
+    catch(e2){throw new Error('OCR 引擎啟動失敗：'+(e2.message||e2))}
   }
   workerLang=lang;return worker;
 }
@@ -435,6 +544,28 @@ async function runOcrOnSource(rect){
     const ret2=await w.recognize(c2,opts);
     if((ret2.data.confidence||0)>(ret.data.confidence||0)){ret=ret2;canvas=c2;pass=useThr?'（二值化較佳）':'（原圖較佳）'}
   }
+  // 結果幾乎是空的 → 自動換參數重試（反白、二值化、散佈文字＋放大）
+  const coreLen=x=>(x.data.text||'').replace(/\s/g,'').length;
+  let retry='';
+  if(coreLen(ret)<2 && !cancelled){
+    const inv=effInvert(r);
+    const tries=[
+      {label:'反白',o:{invert:!inv}},
+      {label:'自動二值化',o:{thr:true,threshold:otsuValue(r,inv),invert:inv}},
+      {label:'散佈文字＋放大 3×',o:{invert:inv},psm:'11',scale:3},
+    ];
+    for(const tr of tries){
+      if(cancelled)break;
+      setStatus(progressPrefix+`沒有讀到文字，自動重試：${tr.label}…`);
+      if(tr.psm)await w.setParameters({tessedit_pageseg_mode:tr.psm});
+      const c=tr.scale?buildOcrCanvas(Math.min(tr.scale,5000/Math.max(r.w,r.h)),r,tr.o):buildOcrCanvas(null,r,tr.o);
+      if(tr.scale)c._meta.pad=0;
+      const rt=await w.recognize(c,opts);
+      if(tr.psm)await w.setParameters({tessedit_pageseg_mode:els.psm.value});
+      if(coreLen(rt)>coreLen(ret)){ret=rt;canvas=c;retry=`（自動重試：${tr.label}）`}
+      if(coreLen(ret)>=2)break;
+    }
+  }
   const d=ret.data;
   // 低信心字位置換算回原圖座標（有旋轉校正時座標不對應，略過）
   const rotated=Math.abs(d.rotateRadians||0)>0.002;
@@ -443,7 +574,7 @@ async function runOcrOnSource(rect){
   const low=rotated?[]:words.filter(x=>x.confidence<60 && x.text.trim()).map(x=>({x:m.r.x+(x.bbox.x0-m.pad)/m.scale,y:m.r.y+(x.bbox.y0-m.pad)/m.scale,w:(x.bbox.x1-x.bbox.x0)/m.scale,h:(x.bbox.y1-x.bbox.y0)/m.scale}));
   lowBoxes=low;drawPreview();
   const raw=els.tableOn.checked&&words.length?tableText(d):(d.text||'');
-  return {text:normalizeText(ocrFix(raw)),conf:Math.round(d.confidence||0),low:low.length,pass};
+  return {text:normalizeText(ocrFix(raw)),conf:Math.round(d.confidence||0),low:low.length,pass:pass+retry};
 }
 // 依字的 X 座標判斷欄位間距，欄位之間以 Tab 分隔
 function tableText(d){
@@ -477,14 +608,14 @@ async function recognize(){
       putResult(r.text);
       const how=[r.textPages?`內嵌文字 ${r.textPages} 頁`:'',r.ocrPages?`OCR ${r.ocrPages} 頁（信心值 ${r.conf}%）`:''].filter(Boolean).join('、');
       setStatus(`PDF 辨識完成｜共 ${r.pages} 頁｜${how}`,100);
-      toast(r.text?'PDF 辨識完成':'沒有辨識到文字，請調整影像處理或取消「PDF 優先取內嵌文字」');
+      toast(r.text?'PDF 辨識完成':'沒有辨識到文字，請將「PDF 取字」改為「一律 OCR」或開啟高精度');
       return;
     }
     const {text,conf,low,pass}=await runOcrOnSource();
     if(cancelled)return;
     putResult(text);
     setStatus(`辨識完成｜信心值 ${conf}%${pass}${selection?'（框選區域）':''}${low&&els.markLow.checked?`｜${low} 處低信心字已用紅框標示`:''}${conf<60?'｜信心偏低，可試試「高精度」或放大 3×':''}`,100);
-    toast(text?'辨識完成':'沒有辨識到文字，請調整框選或影像處理');
+    toast(text?'辨識完成':(selection?'框選區內沒有讀到文字，按 Esc 取消框選後再辨識整張':'沒有辨識到文字：請確認圖片清晰，或開啟「高精度」再試'));
   }catch(err){
     if(cancelled)return;
     console.error(err);worker=null;workerLang='';progressPrefix='';
@@ -536,10 +667,10 @@ function normalizeText(t){
 function ocrFix(t){
   if(!els.fixNum.checked)return t;
   const L='A-Za-z';
-  t=t.replace(new RegExp(`(?<![${L}])[0-9OoIl][0-9OoIl.,]*[0-9OoIl]`,'g'),tok=>{
+  t=t.replace(new RegExp(`(^|[^${L}])([0-9OoIl][0-9OoIl.,]*[0-9OoIl])`,'gm'),(all,pre,tok)=>{
     const digits=(tok.match(/[0-9]/g)||[]).length,letters=(tok.match(/[OoIl]/g)||[]).length;
-    if(!digits||letters>digits)return tok;
-    return tok.replace(/[Oo]/g,"0").replace(/[Il]/g,"1");
+    if(!digits||letters>digits)return all;
+    return pre+tok.replace(/[Oo]/g,"0").replace(/[Il]/g,"1");
   });
   t=t.replace(/(\d)\s?(Ww|wW|ww|w)(?![A-Za-z])/g,'$1W').replace(/(\d)\s?(Vv|vV)(?![A-Za-z])/g,'$1V').replace(/(\d) ?(mm|cm|kg|kW|Hz|rpm|mA|MPa|N·m|Nm)(?![A-Za-z])/g,'$1$2');
   // 中文之間的半形標點轉全形
@@ -640,9 +771,7 @@ let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);
 window.addEventListener('beforeunload',()=>{if(worker)worker.terminate()});
 
 updateBadge();setButtons(false);updateTextInfo();
-if(!window.Tesseract)setStatus('⚠️ OCR 引擎未載入：請確認 assets 資料夾或網路連線。',0);
-else if(!window.pdfjsLib)setStatus('⚠️ PDF 引擎未載入：圖片仍可辨識；PDF 需 assets/pdf.min.js 或網路連線。',0);
-else if(!useLocal)setStatus('程式已就緒（線上引擎模式）。直接以檔案開啟時會自動使用線上引擎，圖片仍只在本機處理。',0);
+engineReady=initEngines();
 })();
 </script>
 </body>
