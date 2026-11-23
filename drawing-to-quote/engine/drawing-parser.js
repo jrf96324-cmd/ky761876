@@ -251,9 +251,14 @@
     else set("公差", "一般", "low", "未見公差標註");
 
     let ra = Infinity; const raEv = [];
-    for (const m of allWithDims.matchAll(/Ra\s*(\d+(?:\.\d+)?)/gi)) { ra = Math.min(ra, +m[1]); raEv.push(m[0]); }
+    // 粗糙度圖例（標題欄上方一排 ▽ 符號＋Ra 值）是說明，不代表實際加工面：同一列 ≥3 個 Ra 視為圖例排除
+    const raItems = doc.items.filter((it) => /Ra\s*\d/i.test(it.s));
+    const legend = new Set(raItems.filter((it) => raItems.filter((o) => Math.abs(o.y - it.y) < it.h * 0.8).length >= 3 || (it.s.match(/Ra\s*\d/gi) || []).length >= 3));
+    const raText = [...raItems.filter((it) => !legend.has(it)).map((it) => it.s), ...(input.dims || []).map((d) => norm(d.text))].join("\n");
+    for (const m of raText.matchAll(/Ra\s*(\d+(?:\.\d+)?)/gi)) { ra = Math.min(ra, +m[1]); raEv.push(m[0]); }
+    if (legend.size) raEv.push(`（已排除圖例 ${legend.size} 個）`);
     const tri = allWithDims.match(/▽+/g); if (tri) { const n = Math.max(...tri.map((t) => t.length)); ra = Math.min(ra, [25, 12.5, 6.3, 1.6, 0.4][n] ?? 0.4); raEv.push("▽".repeat(n)); }
-    if (raEv.length) { const opts = [0.4, 0.8, 1.6, 3.2, 6.3]; const pick = opts.find((o) => ra <= o + 1e-9) ?? 6.3; set("粗糙度", "Ra" + pick, "mid", raEv.slice(0, 4).join("、")); }
+    if (Number.isFinite(ra)) { const opts = [0.4, 0.8, 1.6, 3.2, 6.3]; const pick = opts.find((o) => ra <= o + 1e-9) ?? 6.3; set("粗糙度", "Ra" + pick, "mid", raEv.slice(0, 4).join("、")); }
     else set("粗糙度", "Ra3.2", "low", "未標示，預設 Ra3.2");
 
     // 4) 尺寸
@@ -407,6 +412,21 @@
     const notes = all.filter((l) => /(注意|備註|技術要求|NOTE|未註|去毛邊|倒角|清洗|洩漏|氣密|同心|平行|垂直|HRC)/i.test(l) && l.length < 60).slice(0, 4);
     if (notes.length) set("備註", notes.join("；"), "mid", "圖面註記");
 
+    // 8) 圖面量測驗證（向量 PDF）：尺寸值 ÷ 比例 應等於圖上某條線長或某個圓的直徑
+    const verify = verifyByGeometry(input.geom, fields, dims, allText);
+    if (verify) {
+      ev["比例"] = verify.scaleNote;
+      for (const k of verify.ok) { conf[k] = "high"; ev[k] = (ev[k] || "") + "（圖面量測吻合 ✔）"; }
+      for (const k of verify.bad) ev[k] = (ev[k] || "") + "（圖面未量到相同長度，建議核對）"; // 只提示、不降級（線段可能以其他方式繪製）
+      if (verify.round && !["round", "frame", "sheet"].includes(fields["外形"]) && conf["外形"] !== "high") {
+        set("外形", "round", "mid", `圖上有同心圓 Ø${verify.round.od}（量測），判為圓件`);
+        set("外徑OD", verify.round.od, "high", `同心圓量測 Ø${verify.round.od}`);
+        if (verify.round.id) set("內徑ID", verify.round.id, "mid", `同心圓量測 Ø${verify.round.id}`);
+        set("長L", verify.round.len || fields["長L"], "mid", "軸向尺寸");
+        delete fields["寬W"]; delete fields["高H"];
+      }
+    }
+
     // 單位
     if (input.unitNote) ev["單位"] = input.unitNote;
     else if (input.units && input.units !== "mm" && input.units !== "未指定") ev["單位"] = `⚠ 圖檔單位為 ${input.units}，請換算為 mm`;
@@ -415,6 +435,46 @@
     let got = 0, tot = 0;
     for (const [k, w] of Object.entries(weights)) { if (k === "寬W" && shape === "round") continue; if (k === "外徑OD" && shape !== "round") continue; tot += w; got += w * ({ high: 1, mid: 0.7, low: 0.3 }[conf[k]] || 0); }
     return { fields, conf, evidence: ev, score: Math.round(got / tot * 100), lines: all };
+  }
+
+  /**
+   * 以向量幾何驗證尺寸：
+   *  比例：標題欄「比例 1/2」「SCALE 1:2」；沒有時從標準比例中選吻合數最多者
+   *  吻合：|線長(mm) × 比例 − 尺寸| ≤ max(0.6mm, 2%)；直徑另比對圓
+   */
+  function verifyByGeometry(geom, fields, dims, allText) {
+    if (!geom || (!geom.segs?.length && !geom.circles?.length)) return null;
+    const PT = 25.4 / 72, segs = geom.segs.map((l) => l * PT), circ = geom.circles.map((c) => ({ ...c, d: 2 * c.r * PT }));
+    const sm = allText.match(/(?:比\s*例|SCALE)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*[\/:：]\s*(\d+(?:\.\d+)?)/i) || allText.match(/\b(1)\s*[\/:]\s*(1|2|5|10|20|1\.5|2\.5)\b/);
+    const near = (v, pool, f) => pool.some((x) => Math.abs(x * f - v) <= Math.max(0.6, v * 0.02));
+    const vals = [...new Set(dims.filter((d) => d.v >= 5).map((d) => d.v))];
+    let f, scaleNote;
+    if (sm) { f = +sm[2] / +sm[1]; scaleNote = `比例 ${sm[1]}/${sm[2]}（標題欄）`; }
+    else {
+      let best = 0;
+      for (const c of [1, 2, 5, 10, 0.5, 1.5, 2.5, 4, 20, 0.2]) { const m = vals.filter((v) => near(v, segs, c) || near(v, circ.map((x) => x.d), c)).length; if (m > best) { best = m; f = c; } }
+      if (!f) return null;
+      scaleNote = `比例推定 1/${+f.toFixed(2)}（${best} 個尺寸吻合圖上線長）`;
+    }
+    const ok = [], bad = [];
+    for (const k of ["長L", "寬W", "高H", "板厚T"]) { const v = +fields[k]; if (!v) continue; (near(v, segs, f) ? ok : bad).push(k); }
+    for (const k of ["外徑OD", "內徑ID"]) { const v = +fields[k]; if (!v) continue; (near(v, circ.map((x) => x.d), f) || near(v, segs, f) ? ok : bad).push(k); }
+    // 同心圓（圓形視圖）：≥2 個同圓心、半徑不同的大圓
+    let round = null;
+    const bigC = circ.filter((c) => c.d * f >= 10).sort((a, b) => b.d - a.d);
+    for (const c of bigC) {
+      const group = bigC.filter((o) => Math.hypot(o.x - c.x, o.y - c.y) < c.r * 0.03 + 0.5 && o !== c && o.r < c.r * 0.95);
+      if (group.length) {
+        const od = +(c.d * f).toFixed(1), match = vals.find((v) => Math.abs(v - od) <= Math.max(0.6, od * 0.02));
+        const inner = group.map((o) => +(o.d * f).toFixed(1)).sort((a, b) => a - b)[0];
+        const innerM = vals.find((v) => Math.abs(v - inner) <= Math.max(0.6, inner * 0.02));
+        const lens = vals.filter((v) => v < (match || od) && !(innerM && v === innerM));
+        if ((match || od) < 0.6 * Math.max(0, ...vals)) continue; // 沉頭孔等小同心圓不算圓形外形
+        round = { od: match || od, id: innerM || null, len: lens.sort((a, b) => b - a).find((v) => near(v, segs, f) && v < (match || od)) || null };
+        break;
+      }
+    }
+    return { f, scaleNote, ok, bad, round };
   }
 
   /** DXF 解析結果 → 辨識器輸入（翻轉 y） */

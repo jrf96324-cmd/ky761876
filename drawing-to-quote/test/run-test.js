@@ -80,6 +80,8 @@ const q603 = DP.recognize(JSON.parse(fs.readFileSync(path.join(__dirname, "fixtu
 assert.deepStrictEqual([q603["圖號"], q603["材料"], q603["數量"], q603["外形"], q603["外徑OD"], q603["內徑ID"], q603["孔數"], q603["公差"], q603["表面處理"]],
   ["2002224-25", "S50C", "1", "round", 130, 40, 6, "中等", "染黑"]);
 assert.strictEqual(DP.norm("\u0000100"), "Ø100");
+const q603ev = DP.recognize(JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "cad_q603_pdftext.json"), "utf8"))).evidence;
+assert.ok(/吻合 ✔/.test(q603ev["外徑OD"]), "外徑應被圖面量測驗證：" + q603ev["外徑OD"]);
 console.log("CAD 匯出 PDF 直徑／疊式公差測試通過 ✔");
 
 // ── 軸類（Ø 以線條繪製、非文字）＋ 圖名 3 行規則 ＋ 代碼含空白 ──
@@ -90,4 +92,12 @@ assert.ok(!shaft["內徑ID"], "實心軸不應有內徑");
 assert.strictEqual(q603["零件名稱"], "心軸座");
 const shaftEst = E.estimatePart(shaft);
 assert.strictEqual(shaftEst.part.shape, "round");
+// ── 估價穩定性：缺尺寸仍出價（預設值＋警告），可信度隨資料品質變化 ──
+const sparse = E.estimatePart({ 圖號: "X1", 材料: "", 數量: 2, 外形: "block", 長L: 120, 辨識來源: "OCR 影像 45%" });
+assert.ok(sparse.best.price.fair > 0 && Number.isFinite(sparse.best.price.fair), "缺尺寸也必須算出價格");
+assert.ok(sparse.part.fallback.length >= 2 && sparse.reliability.level === "低");
+const good = E.estimatePart({ ...shaft, 辨識來源: "PDF 文字層 90%", 尺寸驗證: "外徑OD、長L" });
+assert.strictEqual(good.reliability.level, "高");
+assert.ok(good.reliability.low < good.best.price.fair && good.reliability.high > good.best.price.fair);
+console.log(`估價穩定性測試通過 ✔（缺尺寸件 可信度 ${sparse.reliability.level} ${sparse.reliability.score}、驗證件 ${good.reliability.level} ${good.reliability.score}）`);
 console.log(`軸類／圖名規則測試通過 ✔（傳動軸 估價 NT$${Math.round(shaftEst.best.price.fair)}/件，${shaftEst.best.name}，胚料 ${shaftEst.geometry.stockKg.toFixed(1)} kg）`);

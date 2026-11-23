@@ -418,6 +418,84 @@ return of(u,o);};})();\n`;
     });
   }
 
+  /**
+   * PDF 向量幾何（不經 OCR）：從繪圖指令取出直線與圓。
+   *  - 圓：貝茲曲線或多邊形近似的封閉路徑，半徑變異 < 6%
+   *  - 用途：辨認以線條畫出的 Ø 符號、圓形視圖、以線長驗證尺寸與比例
+   */
+  async function pdfGeometry(page, lib, pageH) {
+    const OPS = lib.OPS, ol = await page.getOperatorList();
+    const segs = [], circles = [];
+    let ctm = [1, 0, 0, 1, 0, 0]; const stack = [];
+    const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+    const P = (x, y) => ({ x: ctm[0] * x + ctm[2] * y + ctm[4], y: pageH - (ctm[1] * x + ctm[3] * y + ctm[5]) });
+    const finish = (sub) => {
+      if (sub.pts.length < 2) return;
+      const pts = sub.pts, closed = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 0.5 || sub.closed;
+      if (closed && (sub.curves >= 2 || pts.length >= 12)) {
+        let on = sub.curves ? sub.on : pts; // 貝茲曲線只用曲線上的端點（控制點不在圓上）
+        if (on.length > 2 && Math.hypot(on[0].x - on[on.length - 1].x, on[0].y - on[on.length - 1].y) < 0.5) on = on.slice(0, -1); // 起終點重複只算一次
+        const cx = on.reduce((a, p) => a + p.x, 0) / on.length, cy = on.reduce((a, p) => a + p.y, 0) / on.length;
+        const rs = on.map((p) => Math.hypot(p.x - cx, p.y - cy)), r = rs.reduce((a, b) => a + b, 0) / rs.length;
+        const sd = Math.sqrt(rs.reduce((a, b) => a + (b - r) ** 2, 0) / rs.length);
+        if (r > 0.2 && sd / r < 0.06) { circles.push({ x: cx, y: cy, r }); return; }
+      }
+      if (!sub.curves) for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], len = Math.hypot(b.x - a.x, b.y - a.y); if (len > 0.3) segs.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, len }); }
+    };
+    for (let i = 0; i < ol.fnArray.length && segs.length < 200000; i++) {
+      const fn = ol.fnArray[i], args = ol.argsArray[i];
+      if (fn === OPS.save) stack.push(ctm);
+      else if (fn === OPS.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === OPS.transform) ctm = mul(ctm, args);
+      else if (fn === OPS.paintFormXObjectBegin) { stack.push(ctm); if (args[0]) ctm = mul(ctm, args[0]); }
+      else if (fn === OPS.paintFormXObjectEnd) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === OPS.constructPath) {
+        const ops = args[0], co = args[1]; let k = 0, sub = { pts: [], on: [], curves: 0 };
+        for (const op of ops) {
+          if (op === OPS.moveTo) { finish(sub); const p0 = P(co[k], co[k + 1]); sub = { pts: [p0], on: [p0], curves: 0 }; k += 2; }
+          else if (op === OPS.lineTo) { const q = P(co[k], co[k + 1]); sub.pts.push(q); sub.on.push(q); k += 2; }
+          else if (op === OPS.curveTo) { const q = P(co[k + 4], co[k + 5]); sub.pts.push(P(co[k], co[k + 1]), P(co[k + 2], co[k + 3]), q); sub.on.push(q); sub.curves++; k += 6; }
+          else if (op === OPS.curveTo2 || op === OPS.curveTo3) { const q = P(co[k + 2], co[k + 3]); sub.pts.push(P(co[k], co[k + 1]), q); sub.on.push(q); sub.curves++; k += 4; }
+          else if (op === OPS.closePath) { sub.closed = true; }
+          else if (op === OPS.rectangle) { finish(sub); const x = co[k], y = co[k + 1], w = co[k + 2], h = co[k + 3]; sub = { pts: [P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h), P(x, y)], on: [], curves: 0 }; finish(sub); sub = { pts: [], on: [], curves: 0 }; k += 4; }
+        }
+        finish(sub);
+      }
+    }
+    // 共線且相接的水平／垂直線段合併成一段（軸的多段外形、分段畫的外框）→ 用來量測全長
+    const spans = [];
+    for (const dir of ["h", "v"]) {
+      const g = {};
+      for (const sg of segs) {
+        const hz = Math.abs(sg.y1 - sg.y2) < 0.2, vt = Math.abs(sg.x1 - sg.x2) < 0.2;
+        if ((dir === "h" && !hz) || (dir === "v" && !vt)) continue;
+        const key = Math.round((dir === "h" ? sg.y1 : sg.x1) * 2) / 2, a = dir === "h" ? Math.min(sg.x1, sg.x2) : Math.min(sg.y1, sg.y2), b = dir === "h" ? Math.max(sg.x1, sg.x2) : Math.max(sg.y1, sg.y2);
+        (g[key] = g[key] || []).push([a, b]);
+      }
+      for (const arr of Object.values(g)) {
+        arr.sort((p, q) => p[0] - q[0]); let [a, b] = arr[0];
+        for (const [c, d] of arr.slice(1)) { if (c <= b + 0.6) b = Math.max(b, d); else { if (b - a > 1) spans.push(b - a); [a, b] = [c, d]; } }
+        if (b - a > 1) spans.push(b - a);
+      }
+    }
+    return { segs, circles, spans };
+  }
+
+  /** 以線條畫出的 Ø：數字前方約半個字高處，有「小圓 + 穿過圓心的斜線」→ 在數字前補上 Ø */
+  function applyVectorDiameter(items, geom) {
+    const small = geom.circles.filter((c) => c.r < 6);
+    let n = 0;
+    for (const it of items) {
+      if (!/^\d/.test(it.s)) continue;
+      const h = it.h || 3;
+      const exp = it.vertical ? { x: it.x - 0.38 * h, y: it.y + 0.55 * h } : { x: it.x - 0.55 * h, y: it.y - 0.38 * h };
+      const c = small.find((c) => c.r > 0.15 * h && c.r < 0.75 * h && Math.hypot(c.x - exp.x, c.y - exp.y) < 0.9 * h &&
+        geom.segs.some((s) => s.len > 1.5 * c.r && s.len < 4 * c.r && Math.hypot((s.x1 + s.x2) / 2 - c.x, (s.y1 + s.y2) / 2 - c.y) < 0.5 * c.r));
+      if (c) { it.s = "Ø" + it.s; it.vecDia = true; n++; }
+    }
+    return n;
+  }
+
   /** 讀一個檔案 → 一或多張圖面（PDF 每頁一張） */
   async function readFile(file, opts = {}, onStep = () => {}) {
     const name = file.name, ext = (name.split(".").pop() || "").toLowerCase();
@@ -442,6 +520,8 @@ return of(u,o);};})();\n`;
         const vp = page.getViewport({ scale: 1 });
         const tc = await page.getTextContent();
         let items = mergePdfText(tc.items, vp.height);
+        let geom = { segs: [], circles: [] }, vecDia = 0;
+        try { geom = await pdfGeometry(page, lib, vp.height); vecDia = applyVectorDiameter(items, geom); } catch (e) { console.warn("PDF 向量解析略過", e); }
         const scale = Math.min(4.2, 4600 / Math.max(vp.width, vp.height)); // 約 300 dpi
         const c = document.createElement("canvas"); const v2 = page.getViewport({ scale }); c.width = v2.width; c.height = v2.height;
         const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
@@ -453,7 +533,7 @@ return of(u,o);};})();\n`;
           items = r.items.map((i) => ({ ...i, x: i.x / scale, y: i.y / scale, h: i.h / scale })); source = "ocr";
           view = thumb(r.view, { sx: scale * r.k, ox: 0, sy: scale * r.k, oy: 0 }); // 顯示校正後（轉正、去傾斜）的圖 note = `掃描 PDF，OCR 信心 ${Math.round(r.meanConf)}%${r.rotation ? `，已轉正 ${r.rotation}°` : ""}${Math.abs(r.skew) > 0.15 ? `，校正傾斜 ${r.skew.toFixed(1)}°` : ""}`;
         }
-        out.push({ fileName: pdf.numPages > 1 ? `${name.replace(/\.pdf$/i, "")}_p${n}.pdf` : name, page: n, source, ...view, input: { source, fileName: name, items, dims: [], circles: [] }, note });
+        out.push({ fileName: pdf.numPages > 1 ? `${name.replace(/\.pdf$/i, "")}_p${n}.pdf` : name, page: n, source, ...view, input: { source, fileName: name, items, dims: [], circles: [], geom: source === "pdf" ? { segs: [...geom.segs.map((g) => g.len), ...(geom.spans || [])], circles: geom.circles.filter((c) => c.r >= 1.2), pageW: vp.width, pageH: vp.height } : null }, note: note + (vecDia ? `；線條 Ø 符號 ${vecDia} 處` : "") });
       }
       return out;
     }

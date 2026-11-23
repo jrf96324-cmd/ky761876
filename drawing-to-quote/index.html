@@ -365,7 +365,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     const rows = parts.filter((p) => String(p["零件名稱"] || p["圖號"] || "").trim());
     try { est = E.estimateAll(rows, db); } catch (err) { console.error(err); toast("估價失敗：" + err.message, true); return; }
     const s = est.summary;
-    $("#sFair").textContent = nt(s.total); $("#sLow").textContent = nt(s.totalLow); $("#sRush").textContent = nt(s.totalRush);
+    $("#sFair").innerHTML = `${nt(s.total)}<div class="k" style="font-family:var(--f-body)">可信區間 ${n0(s.rangeLow)}–${n0(s.rangeHigh)}　可信度 高${s.relCount["高"]}／中${s.relCount["中"]}／低${s.relCount["低"]}</div>`; $("#sLow").textContent = nt(s.totalLow); $("#sRush").textContent = nt(s.totalRush);
     $("#sSave").textContent = `${nt(s.potential)}`;
     $("#sRisk").innerHTML = ["高", "中", "低"].map((k) => `<span class="pill ${k}">${k} ${s.riskCount[k]}</span>`).join(" ");
     renderRoutes(); renderCostDown(); renderStats(); $("#rfqText").value = window.Report.rfqText(est, project());
@@ -392,10 +392,12 @@ dialog form { display: flex; justify-content: space-between; align-items: center
       return `<article class="card">
         <div class="card-h"><span class="dno">${esc(p.drawingNo)}</span><span class="name">${esc(p.name)}</span>
           <span class="muted">${esc(p.material)} × ${p.qty} 件 · ${esc(r.shapeLabel)} · ${esc(r.geometry.outline)} · 胚料 ${r.geometry.stockKg.toFixed(2)} kg${p.ratio !== 1 ? ` · 本圖估價比例 ${Math.round(p.ratio * 100)}%` : ""}</span>
-          <span class="spacer"></span><span class="mono"><b>${nt(r.lineTotal)}</b></span><span class="pill ${r.risk.level}">風險 ${r.risk.level}</span></div>
+          <span class="spacer"></span><span class="mono"><b>${nt(r.lineTotal)}</b> <small class="muted">（${n0(r.reliability.low * p.qty)}–${n0(r.reliability.high * p.qty)}）</small></span>
+          <span class="pill ${{ 高: "低", 中: "中", 低: "高" }[r.reliability.level]}" title="${esc(r.reliability.why.join("；") || "資料完整")}">估價可信度 ${r.reliability.level} ${r.reliability.score}</span><span class="pill ${r.risk.level}">風險 ${r.risk.level}</span></div>
         <div class="card-b">
           <h3 style="margin:0;font-size:14px">加工步驟與金額 · ${esc(r.best.name)}</h3>
           ${stepsTable(b, p.qty)}
+          ${r.reliability.why.length ? `<p class="note">估價可信度 ${r.reliability.score} 分（區間 ±${Math.round(r.reliability.spread * 100)}%）：${esc(r.reliability.why.join("；"))}</p>` : ""}
           <details><summary>其他製程路線比較（${r.routes.length} 條）</summary>
             <div class="scroll"><table><thead><tr><th>路線</th><th>製程</th><th class="n">材料</th><th class="n">加工</th><th class="n">委外</th><th class="n">議價下限</th><th class="n">估價/件</th><th class="n">急件</th><th class="n">差異</th><th>結構</th></tr></thead><tbody>${rows}</tbody></table></div>
             ${alt}
@@ -653,6 +655,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     if (isSample) { parts = []; isSample = false; }
     const row = Object.fromEntries(E.CSV_HEADERS.map((h) => [h, r.fields[h] ?? ""]));
     row["辨識來源"] = `${srcLabel[r.source] || r.source} ${r.score}%`;
+    row["尺寸驗證"] = Object.keys(r.evidence).filter((k) => /吻合 ✔/.test(r.evidence[k] || "")).join("、");
     const i = parts.findIndex((p) => p["圖號"] && p["圖號"] === row["圖號"]);
     if (i >= 0) {
       // 同一圖號有多個來源（DXF／PDF／掃描）：逐欄位取信心較高者合併

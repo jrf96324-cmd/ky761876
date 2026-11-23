@@ -77,6 +77,7 @@
       heatInput: String(raw.heat ?? raw["熱處理"] ?? "").trim(),
       notes: String(raw.notes ?? raw["備註"] ?? "").trim(),
       source: String(raw.source ?? raw["辨識來源"] ?? "").trim(),
+      verified: String(raw.verified ?? raw["尺寸驗證"] ?? "").trim(),
       ratio: (num(raw.ratio ?? raw["估價比例%"], 100) || 100) / 100,
       warnings: [],
     };
@@ -109,6 +110,19 @@
     if (!p.solidity) p.solidity = { round: 1.0, block: 0.7, plate: 0.85, sheet: 0.9, frame: 0.25 }[shape];
     if (!p.faces) p.faces = { round: 2, block: 3, plate: 2, sheet: 1, frame: 4 }[shape];
     if (!p.L || (shape !== "round" && !p.W) || (shape === "round" && !p.OD)) { p.warnings.push("主要尺寸不足，估價可信度低"); p.dimMissing = true; }
+    // 穩定性：缺尺寸時依外形補合理預設值（並記錄），確保一定算得出價格、不會是 0
+    p.fallback = [];
+    const fb = (k, v, why) => { if (!(p[k] > 0)) { p[k] = Math.round(v * 10) / 10; p.fallback.push(`${{ L: "長L", W: "寬W", H: "高H", OD: "外徑OD", T: "板厚T" }[k]}≈${p[k]}（${why}）`); } };
+    if (shape === "round") { if (!p.OD && p.L) fb("OD", Math.max(p.W, p.H) || p.L * 0.3, "未讀到外徑"); if (!p.L && p.OD) fb("L", p.OD * 0.8, "未讀到長度"); if (!p.L && !p.OD) { fb("OD", 50, "尺寸不足"); fb("L", 50, "尺寸不足"); } }
+    else {
+      if (!p.L) fb("L", Math.max(p.W, p.H, 100), "尺寸不足");
+      if (!p.W) fb("W", p.L * 0.5, "未讀到寬度");
+      if (shape === "block" || shape === "frame") fb("H", shape === "frame" ? Math.min(p.L, p.W) : Math.min(p.L, p.W) * 0.5, "未讀到高度");
+      if ((shape === "plate" || shape === "sheet") && !p.T) fb("T", shape === "sheet" ? 2 : 10, "未讀到板厚");
+      if ((shape === "plate" || shape === "sheet") && !p.H) p.H = p.T;
+    }
+    if (p.fallback.length) p.warnings.push("以預設值估算：" + p.fallback.join("、"));
+    if (p.L > 0 && p.W > 0 && shape !== "round" && p.W > p.L) [p.L, p.W] = [p.W, p.L]; // 長 ≥ 寬
     return p;
   }
 
@@ -374,7 +388,7 @@
       if (cat === "material") material += unitCost; else if (cat === "outsource") outsource += unitCost; else machining += unitCost;
       return { ...o, step: i + 1, cat, runPer, setupPer, cost, factor, unitCost, note };
     });
-    const direct = material + machining + outsource;
+    const direct = [material, machining, outsource].every(Number.isFinite) ? material + machining + outsource : 0;
     const m = db.markup;
     const overhead = direct * (m.overhead || 0);
     const minPer = (m.minOrder || 0) / qty;
@@ -449,6 +463,26 @@
     return out.sort((a, b) => b.saving - a.saving);
   }
 
+  // ───────────────────────── 估價可信度 ─────────────────────────
+  /**
+   * 0–100 分：辨識信心、尺寸是否完整／被圖面量測驗證、材料與表處是否明確
+   * 高 ≥ 80（估價區間 ±10%）、中 ≥ 60（±20%）、低（±35%）
+   */
+  function assessReliability(p, price) {
+    let score = 100; const why = [];
+    const conf = parseInt((p.source.match(/(\d+)%/) || [])[1], 10);
+    if (Number.isFinite(conf)) { if (conf < 80) { score -= Math.round((80 - conf) * 0.6); why.push(`圖面辨識信心 ${conf}%`); } }
+    if (p.fallback.length) { score -= 22 * p.fallback.length; why.push(`${p.fallback.length} 個尺寸用預設值`); }
+    if (p.materialMissing) { score -= 15; why.push("材料未辨識"); }
+    if (p.surfaceUnknown) { score -= 8; why.push("表處規格不明"); }
+    if (p.shape === "frame" && !p.netWeightKg) { score -= 10; why.push("架構件重量為估算"); }
+    const ver = p.verified ? p.verified.split(/[、,\s]+/).filter(Boolean) : [];
+    if (ver.length) { score += 5 * ver.length; why.push(`圖面量測驗證 ${ver.join("、")}`); }
+    score = Math.max(5, Math.min(100, score));
+    const level = score >= 80 ? "高" : score >= 60 ? "中" : "低", spread = { 高: 0.1, 中: 0.2, 低: 0.35 }[level];
+    return { score, level, spread, why, low: price * (1 - spread), high: price * (1 + spread) };
+  }
+
   // ───────────────────────── 主流程 ─────────────────────────
   function estimatePart(raw, db = DB_DEFAULT, opts = {}) {
     const p = raw.__normalized ? raw : normalizePart(raw, db);
@@ -474,13 +508,16 @@
       for (const r of priced) { if (r.designChange) continue; const t = r.tiers[i]; if (!b || t.fair < b.fair) b = { ...t, route: r.name }; }
       return b;
     });
-    return { part: p, geometry: g, shapeLabel: SHAPES[p.shape], routes: priced, best, risk, suggestions, tierBest,
+    const reliability = assessReliability(p, best.price.fair);
+    return { part: p, geometry: g, shapeLabel: SHAPES[p.shape], routes: priced, best, risk, suggestions, tierBest, reliability,
       process: best.name, lineTotal: best.price.fair * p.qty };
   }
 
   function estimateAll(rows, db = DB_DEFAULT, opts) {
     const results = rows.filter((r) => Object.values(r).some((v) => String(v ?? "").trim() !== "")).map((r) => estimatePart(r, db, opts));
     const total = results.reduce((a, r) => a + r.lineTotal, 0);
+    const rangeLow = results.reduce((a, r) => a + r.reliability.low * r.part.qty, 0), rangeHigh = results.reduce((a, r) => a + r.reliability.high * r.part.qty, 0);
+    const relCount = { 高: 0, 中: 0, 低: 0 }; results.forEach((r) => relCount[r.reliability.level]++);
     const totalLow = results.reduce((a, r) => a + r.best.price.low * r.part.qty, 0);
     const totalRush = results.reduce((a, r) => a + r.best.price.rush * r.part.qty, 0);
     const potential = results.reduce((a, r) => a + (r.suggestions[0]?.saving || 0) * r.part.qty, 0);
@@ -496,13 +533,13 @@
     const bySource = group((r) => (r.part.source || "人工輸入").replace(/\s*\d+%$/, ""));
     const recog = results.map((r) => parseInt((r.part.source.match(/(\d+)%/) || [])[1], 10)).filter(Number.isFinite);
     const avgConfidence = recog.length ? recog.reduce((a, b) => a + b, 0) / recog.length : null;
-    return { results, summary: { count: results.length, total, totalLow, totalRush, potential, riskCount, byProcess, costMix, byMaterial, byShape, bySource, avgConfidence } };
+    return { results, summary: { count: results.length, total, rangeLow, rangeHigh, relCount, totalLow, totalRush, potential, riskCount, byProcess, costMix, byMaterial, byShape, bySource, avgConfidence } };
   }
 
   // ───────────────────────── CSV ─────────────────────────
   const CSV_HEADERS = ["圖號", "CAD NO", "零件名稱", "圖名說明", "材料", "數量", "外形", "長L", "寬W", "高H", "外徑OD", "內徑ID", "板厚T",
     "實體率%", "淨重kg", "孔數", "攻牙數", "PT牙數", "槽數", "口袋數", "深孔數", "交叉孔數", "內直角數", "外螺紋數", "退刀槽數",
-    "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註", "估價比例%", "辨識來源"];
+    "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註", "估價比例%", "辨識來源", "尺寸驗證"];
 
   function parseCSV(text) {
     const rows = []; let row = [], cell = "", q = false;

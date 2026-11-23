@@ -25,6 +25,7 @@
       ["交期需求", project.dueDate || "", "報價截止日", project.quoteDeadline || ""],
       [],
       [H("項目"), H("金額 NT$"), H("說明"), H("")],
+      ["可信區間", `${R0(summary.rangeLow).toLocaleString()} – ${R0(summary.rangeHigh).toLocaleString()}`, `可信度 高${summary.relCount["高"]}／中${summary.relCount["中"]}／低${summary.relCount["低"]}`],
       ["估價合計（成本價）", { v: R0(summary.total), s: "nb" }, `${db.region || ""}，管銷 ${R0((db.markup.overhead || 0) * 100)}%、利潤 ${R0(db.markup.profitFair * 100)}%`],
       ["議價下限", { v: R0(summary.totalLow), s: "n" }, `估價 ${db.markup.profitLow >= 0 ? "+" : ""}${R0(db.markup.profitLow * 100)}%`],
       ["急件參考", { v: R0(summary.totalRush), s: "n" }, `估價 +${R0(db.markup.profitRush * 100)}%`],
@@ -35,7 +36,7 @@
       ["高", { v: summary.riskCount["高"], s: "hi" }], ["中", { v: summary.riskCount["中"], s: "mid" }], ["低", { v: summary.riskCount["低"], s: "lo" }],
       [],
       ["說明", "價格為台灣南部加工成本價估算（材料+各加工步驟機時+委外，不加價），可用估價比例調整；供發包前初判與議價基準，正式價格以供應商報價為準。"],
-    ], merges: ["A1:D1", "B18:D18"] });
+    ], merges: ["A1:D1", "B19:D19"] });
 
     // 01 圖面辨識總表
     sheets.push({ name: "01_圖面辨識總表", freeze: 1, colWidths: [16, 12, 16, 24, 10, 8, 16, 22, 10, 10, 12, 12, 12, 10, 14, 30],
@@ -79,13 +80,14 @@
     sheets.push({ name: "04_降本建議表", freeze: 1, colWidths: [16, 14, 24, 50, 11, 11, 10, 10, 11, 20], rows: cd });
 
     // 05 加工估價表
-    const qh = ["圖號", "零件名稱", "數量", "推薦製程", "材料", "加工", "委外", "管銷", "議價下限", "估價/件", "急件參考", "小計", ...tiers.map((q) => `${q}件 單價`), "批量最佳路線"].map(H);
+    const qh = ["圖號", "零件名稱", "數量", "推薦製程", "材料", "加工", "委外", "管銷", "議價下限", "估價/件", "急件參考", "小計", "估價可信度", "可信區間下限", "可信區間上限", "可信度說明", ...tiers.map((q) => `${q}件 單價`), "批量最佳路線"].map(H);
     const qr = results.map((r) => { const pr = r.best.price; return [r.part.drawingNo, r.part.name, { v: r.part.qty, s: "n0" }, r.best.name,
       { v: R0(pr.material), s: "n" }, { v: R0(pr.machining), s: "n" }, { v: R0(pr.outsource), s: "n" }, { v: R0(pr.overhead), s: "n" },
       { v: R0(pr.low), s: "n" }, { v: R0(pr.fair), s: "nb" }, { v: R0(pr.rush), s: "n" }, { v: R0(r.lineTotal), s: "nb" },
+      { v: `${r.reliability.level} ${r.reliability.score}`, s: { 高: "lo", 中: "mid", 低: "hi" }[r.reliability.level] }, { v: R0(r.reliability.low * r.part.qty), s: "n" }, { v: R0(r.reliability.high * r.part.qty), s: "n" }, r.reliability.why.join("；"),
       ...r.tierBest.map((t) => ({ v: R0(t.fair), s: "n" })), r.tierBest[r.tierBest.length - 1].route]; });
     qr.push(["合計", "", "", "", "", "", "", "", { v: R0(summary.totalLow), s: "nb" }, "", { v: R0(summary.totalRush), s: "nb" }, { v: R0(summary.total), s: "nb" }]);
-    sheets.push({ name: "05_加工估價表", freeze: 1, colWidths: [16, 14, 6, 30, 9, 9, 9, 9, 10, 10, 10, 12, ...tiers.map(() => 10), 28], rows: [qh, ...qr] });
+    sheets.push({ name: "05_加工估價表", freeze: 1, colWidths: [16, 14, 6, 30, 9, 9, 9, 9, 10, 10, 10, 12, 10, 12, 12, 36, ...tiers.map(() => 10), 28], rows: [qh, ...qr] });
 
     // 06 供應商詢價單
     const rfq = [
