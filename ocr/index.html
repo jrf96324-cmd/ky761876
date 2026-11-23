@@ -118,6 +118,8 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
   <label>放大
     <select id="scale"><option value="auto" selected>自動</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select>
   </label>
+  <label title="自動估算字高並放大到最佳尺寸、局部自適應二值化（適合彩色底）、移除表格框線與底線"><input id="smartOn" type="checkbox" checked>智慧前處理（表格／小字／底線）</label>
+  <label title="偵測到表格框線時，自動切成一格一格分別辨識，輸出以 Tab 分欄（可直接貼 Excel）"><input id="cellOn" type="checkbox" checked>表格自動分格辨識</label>
   <label><input id="gray" type="checkbox" checked>灰階</label>
   <label><input id="invert" type="checkbox">反白（深色底）</label>
   <label><input id="autoInvert" type="checkbox" checked>自動判斷深色底</label>
@@ -171,7 +173,7 @@ kbd{background:#243653;border:1px solid #3f5575;border-bottom-width:2px;border-r
 </section>
 
 <div class="statusbar"><div class="status" id="status">程式已就緒，請載入截圖或圖片。</div><div class="progress"><div id="progressBar"></div></div></div>
-<div class="notice">建議：放大選「自動」會依圖片大小自動調整；深色背景會自動反白；數字、型號較多時建議開「高精度」；紅框處請人工核對。文字先放大至 150%～200% 再截圖效果更好；表格或名單使用「一般文字／名單」；單行內容使用「單行文字」；深色背景請勾「反白」。一次選多張圖片／PDF 會依序辨識並累加結果。PDF 若本身含文字（非掃描檔）會直接讀取內嵌文字，最快也最準；掃描版 PDF 則逐頁轉成影像後 OCR。PDF 預設「自動判斷」：內嵌文字太少（只有頁碼、浮水印）或是亂碼時會自動改用 OCR；若結果仍不對，請將「PDF 取字」改成「一律 OCR」。辨識不到文字時會自動換參數重試。第一次辨識需載入 OCR 資料，之後可重複使用。</div>
+<div class="notice">建議：「智慧前處理」會自動估算字高放大、移除表格框線與底線；偵測到表格時自動分格辨識（Tab 分欄可貼 Excel）。放大選「自動」會依字高自動調整；深色背景會自動反白；數字、型號較多時建議開「高精度」；紅框處請人工核對。文字先放大至 150%～200% 再截圖效果更好；表格或名單使用「一般文字／名單」；單行內容使用「單行文字」；深色背景請勾「反白」。一次選多張圖片／PDF 會依序辨識並累加結果。PDF 若本身含文字（非掃描檔）會直接讀取內嵌文字，最快也最準；掃描版 PDF 則逐頁轉成影像後 OCR。PDF 預設「自動判斷」：內嵌文字太少（只有頁碼、浮水印）或是亂碼時會自動改用 OCR；若結果仍不對，請將「PDF 取字」改成「一律 OCR」。辨識不到文字時會自動換參數重試。第一次辨識需載入 OCR 資料，之後可重複使用。</div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -188,7 +190,7 @@ const els = {
  clean:$('cleanBtn'),roster:$('rosterBtn'),copy:$('copyBtn'),copyTop:$('copyTopBtn'),txt:$('txtBtn'),csv:$('csvBtn'),clear:$('clearBtn'),toast:$('toast'),
  pdfNav:$('pdfNav'),prevPage:$('prevPage'),nextPage:$('nextPage'),pageNum:$('pageNum'),pageTotal:$('pageTotal'),pdfScope:$('pdfScope'),
  pdfMode:$('pdfMode'),halfOn:$('halfOn'),autoCopy:$('autoCopy'),
- autoInvert:$('autoInvert'),deskew:$('deskew'),hiAcc:$('hiAcc'),fixNum:$('fixNum'),tableOn:$('tableOn'),markLow:$('markLow'),
+ autoInvert:$('autoInvert'),smartOn:$('smartOn'),cellOn:$('cellOn'),deskew:$('deskew'),hiAcc:$('hiAcc'),fixNum:$('fixNum'),tableOn:$('tableOn'),markLow:$('markLow'),
  dictText:$('dictText'),dictApply:$('dictApply'),join:$('joinBtn')
 };
 let lowBoxes=[]; // 低信心字的位置（source 座標）
@@ -442,8 +444,92 @@ function isDarkBg(r){
   return n>0 && sum/n<110;
 }
 function effInvert(r){return els.invert.checked || (els.autoInvert.checked && isDarkBg(r))}
+/* ---------- 智慧前處理 ---------- */
+function toGray(id,inv){const d=id.data,n=d.length/4,g=new Uint8ClampedArray(n);
+  for(let i=0,j=0;j<n;i+=4,j++){let r=d[i],gg=d[i+1],b=d[i+2];const a=d[i+3]/255;if(a<1){r=r*a+255*(1-a);gg=gg*a+255*(1-a);b=b*a+255*(1-a)}
+    let y=.299*r+.587*gg+.114*b;g[j]=inv?255-y:y}return g}
+// Bradley 局部自適應二值化：每點與周圍平均亮度比較，彩色底、光線不均也穩定
+function bradley(g,w,h,win,t){
+  const W=w+1,I=new Float64Array(W*(h+1));
+  for(let y=0;y<h;y++){let row=0;for(let x=0;x<w;x++){row+=g[y*w+x];I[(y+1)*W+x+1]=I[y*W+x+1]+row}}
+  const s=win>>1,out=new Uint8Array(w*h);
+  for(let y=0;y<h;y++){const y0=Math.max(0,y-s),y1=Math.min(h,y+s+1);
+    for(let x=0;x<w;x++){const x0=Math.max(0,x-s),x1=Math.min(w,x+s+1);
+      const sum=I[y1*W+x1]-I[y0*W+x1]-I[y1*W+x0]+I[y0*W+x0],cnt=(x1-x0)*(y1-y0),v=g[y*w+x];
+      out[y*w+x]=(v*cnt<sum*(1-t) && v<215)?1:0}}
+  return out;
+}
+// 移除長水平／垂直線（表格框線、超連結底線）：連續墨點長度 ≥ L 視為線條
+function removeLines(b,w,h,Lh,Lv){
+  const m=new Uint8Array(w*h);
+  for(let y=0;y<h;y++){let st=-1;for(let x=0;x<=w;x++){const on=x<w&&b[y*w+x];if(on&&st<0)st=x;else if(!on&&st>=0){if(x-st>=Lh)for(let k=st;k<x;k++)m[y*w+k]=1;st=-1}}}
+  for(let x=0;x<w;x++){let st=-1;for(let y=0;y<=h;y++){const on=y<h&&b[y*w+x];if(on&&st<0)st=y;else if(!on&&st>=0){if(y-st>=Lv)for(let k=st;k<y;k++)m[k*w+x]=1;st=-1}}}
+  for(let i=0;i<m.length;i++)if(m[i])b[i]=0;return m;
+}
+// 由線條遮罩判斷是否為表格：至少 2 條長水平線與 2 條長垂直線
+function detectGrid(m,w,h){
+  const lines=(n,len,get)=>{let c=0,prev=false;for(let i=0;i<n;i++){let k=0;for(let j=0;j<len;j++)k+=get(i,j);const on=k>=len*.3;if(on&&!prev)c++;prev=on}return c};
+  const hl=lines(h,w,(y,x)=>m[y*w+x]),vl=lines(w,h,(x,y)=>m[y*w+x]);
+  return hl>=2&&vl>=2;
+}
+function dilate(m,w,h,r){const o=new Uint8Array(w*h);for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(m[y*w+x])for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const yy=y+dy,xx=x+dx;if(yy>=0&&yy<h&&xx>=0&&xx<w)o[yy*w+xx]=1}return o}
+// 連通元件：回傳各元件外框與面積
+function components(b,w,h){
+  const lab=new Int32Array(w*h),par=[0];const find=x=>{while(par[x]!==x){par[x]=par[par[x]];x=par[x]}return x};
+  let next=1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(!b[i])continue;
+    const a=x>0?lab[i-1]:0,c=y>0?lab[i-w]:0;
+    if(!a&&!c){lab[i]=next;par.push(next);next++}
+    else if(a&&c){const ra=find(a),rc=find(c);lab[i]=Math.min(ra,rc);if(ra!==rc)par[Math.max(ra,rc)]=Math.min(ra,rc)}
+    else lab[i]=a||c}
+  const box=new Map();
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(!lab[i])continue;const r=find(lab[i]);lab[i]=r;let bx=box.get(r);
+    if(!bx){bx={x0:x,x1:x,y0:y,y1:y,n:0};box.set(r,bx)}if(x<bx.x0)bx.x0=x;if(x>bx.x1)bx.x1=x;if(y<bx.y0)bx.y0=y;if(y>bx.y1)bx.y1=y;bx.n++}
+  return {lab,boxes:box};
+}
+// 估算字高（像素）：以連通元件高度的 70 百分位估計
+function estimateTextHeight(r,inv){
+  const id=sourceCtx.getImageData(r.x,r.y,r.w,r.h),g=toGray(id,inv);
+  const b=bradley(g,r.w,r.h,Math.max(15,(Math.round(Math.min(r.w,r.h)/20))|1),.15);
+  removeLines(b,r.w,r.h,Math.max(20,r.w*.2),Math.max(20,r.h*.2));
+  const {boxes}=components(b,r.w,r.h);const hs=[];
+  for(const bx of boxes.values()){const bh=bx.y1-bx.y0+1,bw=bx.x1-bx.x0+1;if(bx.n>=6&&bh>=4&&bh<r.h/3&&bw<r.w/3&&bw/bh<6)hs.push(bh)}
+  if(hs.length<3)return null;hs.sort((a,b)=>a-b);return hs[Math.floor(hs.length*.7)];
+}
+function smartCanvas(r,inv,forceScale){
+  const h0=estimateTextHeight(r,inv);
+  let scale=forceScale??(els.scale.value==='auto'?(h0?Math.min(4,Math.max(1,42/h0)):autoScale(r)):Number(els.scale.value));
+  scale=Math.min(scale,5000/Math.max(r.w,r.h));
+  const ow=Math.max(1,Math.round(r.w*scale)),oh=Math.max(1,Math.round(r.h*scale)),pad=Math.round(16*Math.max(1,scale/2));
+  const tmp=document.createElement('canvas');tmp.width=ow;tmp.height=oh;const tc=tmp.getContext('2d',{willReadFrequently:true});
+  tc.fillStyle='#fff';tc.fillRect(0,0,ow,oh);tc.imageSmoothingEnabled=true;tc.imageSmoothingQuality='high';
+  // 大倍率分兩段放大，邊緣較平滑
+  if(scale>2.2){const mid=document.createElement('canvas');mid.width=Math.round(r.w*scale/2);mid.height=Math.round(r.h*scale/2);const mc=mid.getContext('2d');mc.imageSmoothingEnabled=true;mc.imageSmoothingQuality='high';mc.drawImage(source,r.x,r.y,r.w,r.h,0,0,mid.width,mid.height);tc.drawImage(mid,0,0,ow,oh)}
+  else tc.drawImage(source,r.x,r.y,r.w,r.h,0,0,ow,oh);
+  const g=toGray(tc.getImageData(0,0,ow,oh),inv);
+  const hS=(h0||20)*scale;
+  const b=bradley(g,ow,oh,Math.max(15,Math.round(hS*2))|1,.14);
+  const L=Math.max(24,Math.round(hS*2.2));const lineMask=removeLines(b,ow,oh,L,L);
+  // 去除細小雜點
+  const {lab,boxes}=components(b,ow,oh);const minA=Math.max(4,Math.round(hS*hS*.004));
+  const kill=new Set();for(const [k,bx] of boxes)if(bx.n<minA)kill.add(k);
+  const out=document.createElement('canvas');out.width=ow+pad*2;out.height=oh+pad*2;const oc=out.getContext('2d');
+  const img=oc.createImageData(out.width,out.height),d=img.data;d.fill(255);
+  // 輸出灰階（LSTM 對灰階邊緣辨識較好）：線條與雜點處塗白，背景依局部二值化結果拉白
+  const near=dilate(b,ow,oh,Math.max(1,Math.round(hS*.06)));
+  for(let y=0;y<oh;y++)for(let x=0;x<ow;x++){const i=y*ow+x;const o=((y+pad)*out.width+x+pad)*4;
+    const v=(lineMask[i]||(lab[i]&&kill.has(lab[i]))||!near[i])?255:Math.min(255,g[i]*1.15);
+    d[o]=d[o+1]=d[o+2]=v}
+  oc.putImageData(img,0,0);out._meta={r,scale,pad,h0};
+  if(detectGrid(lineMask,ow,oh)){
+    for(const k of kill)for(let i=0;i<b.length;i++)if(lab[i]===k)b[i]=0;
+    out._meta.grid={walls:dilate(lineMask,ow,oh,2),ink:b,gray:g,near,lineMask,w:ow,h:oh,hS};
+  }
+  return out;
+}
 function buildOcrCanvas(forceScale=null,rect=selRect(),opt={}){
   const r=rect||{x:0,y:0,w:source.width,h:source.height};
+  if((opt.smart??els.smartOn.checked) && opt.thr===undefined && opt.invert===undefined) return smartCanvas(r,effInvert(r),forceScale===1?null:forceScale);
   let scale=forceScale??(els.scale.value==='auto'?autoScale(r):Number(els.scale.value));
   const maxPx=forceScale?Infinity:5000;scale=Math.min(scale,maxPx/Math.max(r.w,r.h));scale=Math.max(scale,Math.min(1,scale));
   const pad=forceScale?0:Math.round(12*scale); // 留白邊，邊緣文字較易辨識
@@ -551,6 +637,10 @@ async function runOcrOnSource(rect){
   const r=(rect===undefined?selRect():rect)||{x:0,y:0,w:source.width,h:source.height};
   const opts={rotateAuto:els.deskew.checked};
   const c1=buildOcrCanvas(null,r);
+  if(c1._meta.grid && els.cellOn.checked){
+    const res=await recognizeCells(w,c1);
+    if(res && res.text.replace(/\s/g,'').length) return {text:normalizeText(ocrFix(res.text)),conf:res.conf,low:res.low,pass:`（表格分格辨識 ${res.cells} 格）`};
+  }
   let ret=await w.recognize(c1,opts),canvas=c1,pass='';
   if(els.hiAcc.checked && !cancelled){
     // 第二次：切換二值化（原本沒開就用自動門檻開啟，原本有開就關閉），取信心值高者
@@ -590,6 +680,55 @@ async function runOcrOnSource(rect){
   lowBoxes=low;drawPreview();
   const raw=els.tableOn.checked&&words.length?tableText(d):(d.text||'');
   return {text:normalizeText(ocrFix(raw)),conf:Math.round(d.confidence||0),low:low.length,pass:pass+retry};
+}
+// 表格分格：以框線為牆，把非框線區域做連通標記，每個區域即一格（合併儲存格自動處理）
+async function recognizeCells(w,canvas){
+  const {r,scale,pad,grid:{walls,ink,gray,near,lineMask,w:W,h:H,hS}}=canvas._meta;
+  const open=new Uint8Array(W*H);for(let i=0;i<open.length;i++)open[i]=walls[i]?0:1;
+  const {lab,boxes}=components(open,W,H);
+  const inkCount=new Map(),inkBox=new Map();
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!ink[i]||!lab[i])continue;const k=lab[i];inkCount.set(k,(inkCount.get(k)||0)+1);
+    let bx=inkBox.get(k);if(!bx){bx={x0:x,x1:x,y0:y,y1:y};inkBox.set(k,bx)}if(x<bx.x0)bx.x0=x;if(x>bx.x1)bx.x1=x;if(y<bx.y0)bx.y0=y;if(y>bx.y1)bx.y1=y}
+  const minInk=Math.max(8,hS*hS*.05);
+  const cells=[...inkBox.entries()].filter(([k])=>inkCount.get(k)>=minInk).map(([k,b])=>({k,...b,cb:boxes.get(k)}));
+  if(cells.length<2)return null;
+  const total=cells.length;let confSum=0,confN=0;const low=[];
+  for(let ci=0;ci<cells.length;ci++){
+    if(cancelled)return null;
+    const c=cells[ci];setStatus(progressPrefix+`表格分格辨識 ${ci+1}/${total}…`,Math.round(ci/total*100));
+    const p2=Math.round(hS*.5),cw=c.x1-c.x0+1+p2*2,ch=c.y1-c.y0+1+p2*2;
+    const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const cx=cv.getContext('2d');const id=cx.createImageData(cw,ch),d=id.data;d.fill(255);
+    for(let y=c.y0;y<=c.y1;y++)for(let x=c.x0;x<=c.x1;x++){const i=y*W+x;if(lab[i]!==c.k||lineMask[i])continue;const o=((y-c.y0+p2)*cw+(x-c.x0+p2))*4;
+      const v=near[i]?Math.min(255,gray[i]*1.15):255;d[o]=d[o+1]=d[o+2]=v}
+    // 每格各自拉伸對比：最深的字 → 黑
+    {let mn=255;for(let o=0;o<d.length;o+=4)if(d[o]<mn)mn=d[o];if(mn<200&&mn>0){const k=255/(255-mn);for(let o=0;o<d.length;o+=4){const v=Math.max(0,(d[o]-mn)*k);d[o]=d[o+1]=d[o+2]=v}}}
+    cx.putImageData(id,0,0);
+    const multi=(c.y1-c.y0+1)>hS*1.8;
+    await w.setParameters({tessedit_pageseg_mode:multi?'6':'7'});
+    let rt=await w.recognize(cv);
+    if(els.hiAcc.checked && (rt.data.confidence||0)<90){
+      // 高精度：同一格再以黑白版本辨識，取信心值高者
+      const cv2=document.createElement('canvas');cv2.width=cw;cv2.height=ch;const c2=cv2.getContext('2d');const id2=c2.createImageData(cw,ch),d2=id2.data;d2.fill(255);
+      for(let y=c.y0;y<=c.y1;y++)for(let x=c.x0;x<=c.x1;x++){const i=y*W+x;if(lab[i]===c.k&&ink[i]&&!lineMask[i]){const o=((y-c.y0+p2)*cw+(x-c.x0+p2))*4;d2[o]=d2[o+1]=d2[o+2]=0}}
+      c2.putImageData(id2,0,0);
+      const rt2=await w.recognize(cv2);if((rt2.data.confidence||0)>(rt.data.confidence||0))rt=rt2;
+    }
+    let t=(rt.data.text||'').trim();
+    // 多行（含直書）合併成一格文字
+    if(multi){const parts=t.split(/\n+/).map(x=>x.trim()).filter(Boolean);t=parts.reduce((a,x)=>a+(a&&/[A-Za-z0-9]$/.test(a)&&/^[A-Za-z0-9]/.test(x)?' ':'')+x,'')}
+    t=t.replace(/^[|｜_—\-–、，,.:;'"`~]+|[|｜_—\-–、，,.:;'"`~]+$/g,'').replace(/\s*[|｜]\s*/g,' ').trim();
+    c.text=t;c.conf=rt.data.confidence||0;
+    if(t){confSum+=c.conf*t.length;confN+=t.length}
+    if(t&&c.conf<60)low.push({x:r.x+(c.x0-p2*0)/scale,y:r.y+c.y0/scale,w:(c.x1-c.x0+1)/scale,h:(c.y1-c.y0+1)/scale});
+  }
+  await w.setParameters({tessedit_pageseg_mode:els.psm.value});
+  const used=cells.filter(c=>c.text);
+  // 依位置排成列：上緣相近（< 0.6 字高）視為同一列
+  used.sort((a,b)=>a.y0-b.y0);const rows=[];
+  for(const c of used){const row=rows.find(rw=>Math.abs(rw.y-c.y0)<hS*.6);if(row)row.cells.push(c);else rows.push({y:c.y0,cells:[c]})}
+  const text=rows.map(rw=>rw.cells.sort((a,b)=>a.x0-b.x0).map(c=>c.text).join('\t')).join('\n');
+  lowBoxes=low;drawPreview();
+  return {text,conf:confN?Math.round(confSum/confN):0,low:low.length,cells:used.length};
 }
 // 依字的 X 座標判斷欄位間距，欄位之間以 Tab 分隔
 function tableText(d){
