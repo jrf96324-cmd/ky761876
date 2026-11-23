@@ -81,3 +81,13 @@ assert.deepStrictEqual([q603["圖號"], q603["材料"], q603["數量"], q603["�
   ["2002224-25", "S50C", "1", "round", 130, 40, 6, "中等", "染黑"]);
 assert.strictEqual(DP.norm("\u0000100"), "Ø100");
 console.log("CAD 匯出 PDF 直徑／疊式公差測試通過 ✔");
+
+// ── 軸類（Ø 以線條繪製、非文字）＋ 圖名 3 行規則 ＋ 代碼含空白 ──
+const shaft = DP.recognize(JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "shaft_r854_pdftext.json"), "utf8"))).fields;
+assert.deepStrictEqual([shaft["圖號"], shaft["CAD NO"], shaft["零件名稱"], shaft["圖名說明"], shaft["材料"], shaft["外形"], shaft["外徑OD"], shaft["長L"], shaft["公差"], shaft["外螺紋數"]],
+  ["2002507-A02", "R854-A02", "傳動軸", "E23 DYNO 傳動軸 動力測試機", "SCM440", "round", 46, 561, "嚴", 1]);
+assert.ok(!shaft["內徑ID"], "實心軸不應有內徑");
+assert.strictEqual(q603["零件名稱"], "心軸座");
+const shaftEst = E.estimatePart(shaft);
+assert.strictEqual(shaftEst.part.shape, "round");
+console.log(`軸類／圖名規則測試通過 ✔（傳動軸 估價 NT$${Math.round(shaftEst.best.price.fair)}/件，${shaftEst.best.name}，胚料 ${shaftEst.geometry.stockKg.toFixed(1)} kg）`);

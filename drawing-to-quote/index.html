@@ -313,7 +313,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   // ── column definitions for input grid ──
   const opt = (arr) => ["", ...arr];
   const COLS = [
-    { h: "圖號", g: "基本", w: "w-l", sticky: true }, { h: "CAD NO", g: "基本", w: "w-m" }, { h: "零件名稱", g: "基本", w: "w-m" },
+    { h: "圖號", g: "基本", w: "w-l", sticky: true }, { h: "CAD NO", g: "基本", w: "w-m" }, { h: "零件名稱", g: "基本", w: "w-m" }, { h: "圖名說明", g: "基本", w: "w-l" },
     { h: "材料", g: "基本", sel: () => opt(Object.keys(db.materials)), w: "w-m", free: true }, { h: "數量", g: "基本" }, { h: "估價比例%", g: "基本" },
     { h: "外形", g: "基本", sel: () => opt(Object.keys(E.SHAPES)), label: (k) => k ? E.SHAPES[k] : "自動判斷", w: "w-l" },
     { h: "長L", g: "尺寸 mm" }, { h: "寬W", g: "尺寸 mm" }, { h: "高H", g: "尺寸 mm" }, { h: "外徑OD", g: "尺寸 mm" }, { h: "內徑ID", g: "尺寸 mm" }, { h: "板厚T", g: "尺寸 mm" },
@@ -524,7 +524,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   function deepMerge(a, b) { for (const k of Object.keys(b || {})) a[k] = b[k] && typeof b[k] === "object" && !Array.isArray(b[k]) ? deepMerge(a[k] || {}, b[k]) : b[k]; return a; }
 
   // ── 2D 圖面辨識 ──
-  const RFIELDS = [["圖號"], ["零件名稱"], ["材料", "mat"], ["數量"], ["外形", "shape"], ["長L"], ["寬W"], ["高H"], ["外徑OD"], ["內徑ID"], ["板厚T"], ["孔數"], ["攻牙數"], ["PT牙數"],
+  const RFIELDS = [["圖號"], ["零件名稱"], ["圖名說明"], ["材料", "mat"], ["數量"], ["外形", "shape"], ["長L"], ["寬W"], ["高H"], ["外徑OD"], ["內徑ID"], ["板厚T"], ["孔數"], ["攻牙數"], ["PT牙數"],
     ["深孔數"], ["交叉孔數"], ["折彎數"], ["外螺紋數"], ["加工面數"], ["公差", "tol"], ["粗糙度", "ra"], ["表面處理", "surf"], ["熱處理", "heat"], ["CAD NO"]];
   let recogs = []; let rid = 0; let busy = false; const jobs = [];
   if (window.DrawingReader && DrawingReader.isFileProtocol()) $("#fileBanner").hidden = false;

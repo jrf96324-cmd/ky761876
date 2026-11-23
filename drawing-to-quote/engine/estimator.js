@@ -56,6 +56,7 @@
       drawingNo: String(raw.drawingNo ?? raw["圖號"] ?? "").trim(),
       cadNo: String(raw.cadNo ?? raw["CAD NO"] ?? raw["CAD"] ?? "").trim(),
       name: String(raw.name ?? raw["零件名稱"] ?? raw["品名"] ?? "").trim(),
+      desc: String(raw.desc ?? raw["圖名說明"] ?? "").trim(),
       materialInput: String(raw.material ?? raw["材料"] ?? "").trim(),
       qtyInput: raw.qty ?? raw["數量"] ?? 1,
       shapeInput: String(raw.shape ?? raw["外形"] ?? "").trim(),
@@ -499,7 +500,7 @@
   }
 
   // ───────────────────────── CSV ─────────────────────────
-  const CSV_HEADERS = ["圖號", "CAD NO", "零件名稱", "材料", "數量", "外形", "長L", "寬W", "高H", "外徑OD", "內徑ID", "板厚T",
+  const CSV_HEADERS = ["圖號", "CAD NO", "零件名稱", "圖名說明", "材料", "數量", "外形", "長L", "寬W", "高H", "外徑OD", "內徑ID", "板厚T",
     "實體率%", "淨重kg", "孔數", "攻牙數", "PT牙數", "槽數", "口袋數", "深孔數", "交叉孔數", "內直角數", "外螺紋數", "退刀槽數",
     "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註", "估價比例%", "辨識來源"];
 

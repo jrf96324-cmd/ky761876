@@ -56,6 +56,33 @@
   }
 
   /** 找標籤旁的值：同字串冒號後 → 右方最近 → 下方最近 */
+  /** 圖號 / CAD NO：去掉「-」兩側空白，取含數字的代碼詞（避免讀成「圖」或只取前半段） */
+  function pickCode(v) {
+    const t = String(v).replace(/\s*([-_])\s*/g, "$1").split(/\s+/).filter(Boolean);
+    return t.find((x) => /\d/.test(x) && /^[A-Z0-9][A-Z0-9\-_.\/]*$/i.test(x)) || t.find((x) => /^[A-Z0-9][A-Z0-9\-_.\/]+$/i.test(x)) || t[0] || "";
+  }
+
+  /**
+   * 圖名欄（3 行）：第 1 行＝品名（零件名稱），第 2、3 行合併＝圖名說明（機種／組立名稱）
+   */
+  function nameBlock(doc) {
+    const lab = doc.items.find((it) => /^(圖\s*名|品\s*名|零件名稱|名\s*稱|PART\s*NAME|TITLE)\s*[:：]?$/i.test(it.s.trim()) || /^(圖\s*名|品\s*名)/.test(it.s));
+    if (!lab) return null;
+    const h = lab.h || 3, x0 = lab.x + Math.max(estW(lab), h * 1.5) - h * 0.5;
+    const isLabel = (s) => Object.values(LABELS).some((re) => re.test(s)) || /^(Title|Scale|Pieces|Material|DWG|比例|個\s*\/\s*台|材料)$/i.test(s.trim()) || /^[\d.\s:\/]+$/.test(s);
+    const rest = lab.s.replace(/^(圖\s*名|品\s*名|零件名稱|名\s*稱|PART\s*NAME|TITLE)\s*[:：]?/i, "").trim();
+    // 同欄：標籤右側、上下約 4 行高範圍內，x 與第一行對齊
+    let cand = doc.items.filter((o) => o !== lab && o.x >= x0 && o.x < x0 + h * 30 && o.y >= lab.y - h * 1.3 && o.y <= lab.y + h * 4.2 && !isLabel(o.s) && !matchMaterial(o.s) && o.s.length <= 30);
+    if (!cand.length && !rest) return null;
+    const first = rest ? { s: rest, x: lab.x, y: lab.y, h } : cand.sort((a, b) => a.y - b.y || a.x - b.x)[0];
+    cand = cand.filter((o) => Math.abs(o.x - first.x) < h * 12 || (o.x < first.x + h * 14 && o.x + estW(o) > first.x)); // 同一欄
+    const lines = [];
+    for (const o of cand.sort((a, b) => a.y - b.y || a.x - b.x)) { const l = lines.find((L) => Math.abs(L.y - o.y) < Math.max(L.h, o.h) * 0.6); if (l) l.s += (/[\u3400-\u9fff]$/.test(l.s) || /^[\u3400-\u9fff]/.test(o.s) ? "" : " ") + o.s; else lines.push({ y: o.y, h: o.h, s: o.s }); }
+    if (rest) lines.unshift({ s: rest });
+    const main = lines[0]?.s, extra = lines.slice(1, 3).map((l) => l.s).join(" ");
+    return main ? { name: main, desc: extra, ev: `${lab.s} → ${lines.slice(0, 3).map((l) => l.s).join(" ｜ ")}` } : null;
+  }
+
   function valueNear(doc, labelRe, accept = () => true) {
     for (const it of doc.items) {
       const m = it.s.match(labelRe);
@@ -131,17 +158,19 @@
 
     // 1) 標題欄
     const dno = valueNear(doc, LABELS.drawingNo, (v) => /[A-Z0-9]{2,}[-_A-Z0-9]*/i.test(v) && v.length <= 30);
-    if (dno) set("圖號", dno.v.split(" ")[0], "high", dno.ev);
+    if (dno && /\d/.test(pickCode(dno.v))) set("圖號", pickCode(dno.v), "high", dno.ev);
     else {
-      const m = allText.match(/\b\d{5,8}-[A-Z]{0,2}\d{1,3}\b/) || allText.match(/\b[A-Z]{1,4}\d{2,6}-[A-Z0-9]{1,6}(-[A-Z0-9]{1,4})?\b/);
+      const m = allText.replace(/\s*-\s*/g, "-").match(/\b\d{5,8}-[A-Z]{0,2}\d{1,3}\b/) || allText.match(/\b[A-Z]{1,4}\d{2,6}-[A-Z0-9]{1,6}(-[A-Z0-9]{1,4})?\b/);
       if (m) set("圖號", m[0], "mid", "圖號樣式 " + m[0]); else if (stem) set("圖號", stem, "low", "取自檔名");
     }
     const cad = valueNear(doc, LABELS.cadNo, (v) => /[A-Z0-9]/i.test(v) && v.length <= 30);
-    if (cad) set("CAD NO", cad.v.split(" ")[0], "high", cad.ev);
+    if (cad) set("CAD NO", pickCode(cad.v), "high", cad.ev);
     else { const m = allText.match(/\bS\d{3}-[A-Z]\d{1,3}\b/); if (m) set("CAD NO", m[0], "mid", m[0]); }
 
-    const nm = valueNear(doc, LABELS.name, (v) => v.length <= 24 && !/^\d+([.,]\d+)?$/.test(v) && !matchMaterial(v));
-    if (nm) set("零件名稱", nm.v, "high", nm.ev);
+    const nb = nameBlock(doc);
+    const nm = nb ? null : valueNear(doc, LABELS.name, (v) => v.length <= 24 && !/^\d+([.,]\d+)?$/.test(v) && !matchMaterial(v));
+    if (nb) { set("零件名稱", nb.name, "high", nb.ev); if (nb.desc) set("圖名說明", nb.desc, "high", "圖名欄第 2、3 行"); }
+    else if (nm) set("零件名稱", nm.v, "high", nm.ev);
     else { const m = allText.match(/(滾輪|軸|環|塊|板|座|架|蓋|套|桿|銷|支架|治具|底座|墊片|夾爪|導軌|齒輪|皮帶輪|法蘭|接頭)/); if (m) { const ln = all.find((l) => l.includes(m[0]) && l.length <= 16); if (ln) set("零件名稱", ln, "low", "關鍵字 " + m[0]); } }
 
     const mat = valueNear(doc, LABELS.material, (v) => !!matchMaterial(v));
@@ -214,7 +243,8 @@
     }
     for (const m of allWithDims.matchAll(/±\s*(0\.\d+)/g)) { tolBand = Math.min(tolBand, 2 * +m[1]); tolEv.push(m[0]); }
     for (const m of allWithDims.matchAll(/\+\s*(0\.\d+)\s*\/?\s*-\s*(0\.\d+)/g)) { tolBand = Math.min(tolBand, +m[1] + +m[2]); tolEv.push(m[0]); }
-    for (const m of allWithDims.matchAll(/\b([A-HJ-NP-Z]|[a-hj-np-z]|js)([5-9])\b/g)) { if (!/[HhGgFfKkMmNnPpJj]|js/.test(m[1])) continue; const it = +m[2]; tolBand = Math.min(tolBand, it <= 6 ? 0.01 : it === 7 ? 0.025 : 0.05); tolEv.push(m[0]); }
+    for (const m of allWithDims.matchAll(/(?:^|(?<=[^A-Za-z\-]))(js|[HGFJKNPhgfjkmnp])([5-9])(?![\dxX×.])/gm)) { // 配合公差 H7、g6、35k6（排除 8-M5 這類螺牙）
+      const it = +m[2]; tolBand = Math.min(tolBand, it <= 6 ? 0.01 : it === 7 ? 0.025 : 0.05); tolEv.push(m[0]); }
     const generalTol = allText.match(/(未註公差|一般公差|未標註公差)[^\n]*?±\s*(0\.\d+)/);
     if (generalTol) tolEv.unshift(generalTol[0]);
     if (tolEv.length) set("公差", tolBand <= 0.02 ? "嚴" : tolBand <= 0.1 ? "中等" : "一般", "mid", tolEv.slice(0, 5).join("、"));
@@ -264,6 +294,21 @@
           const v = +m[3]; if (!(v >= 1 && v <= 6000)) continue;
           dims.push({ kind: m[2] === "Ø" ? "diameter" : m[2] === "R" ? "radius" : "linear", v, text: m[0] + (/[a-hA-H]\d\b|±/.test(it.s) ? " " + it.s : ""), x: it.x, y: it.y, h: it.h, vertical: !!it.vertical, conf: it.conf ?? 90 });
         }
+      }
+    }
+    // 軸類判斷（Ø 符號未被讀成文字時）：長件 + 多個遠小於全長的直書尺寸，或帶軸用配合公差（k6、h6、g6…）
+    // → 這些尺寸其實是直徑
+    let shaftEv = "";
+    if (!dims.some((d) => d.kind === "diameter")) {
+      const lv = dims.filter((d) => d.kind === "linear"), Lmax = Math.max(0, ...lv.map((d) => d.v));
+      const FIT = /\d\s*([a-hj-np-z]{1,2}\d{1,2}|js\d{1,2})(?![\w.])/;
+      const fitD = lv.filter((d) => FIT.test(d.text) && d.v < Lmax * 0.5);
+      const vert = lv.filter((d) => d.vertical && d.v < Lmax * 0.35 && d.v >= 3);
+      const cand = [...new Set([...fitD, ...vert])];
+      const runout = /[↗⌰◎⊚]|同心|偏擺|圓周|振れ/.test(allWithDims);
+      if (Lmax > 0 && cand.length >= 2 && (fitD.length >= 1 || vert.length >= 3 || runout)) {
+        cand.forEach((d) => { d.kind = "diameter"; });
+        shaftEv = `直書／配合公差尺寸視為直徑：Ø${[...new Set(cand.map((d) => d.v))].sort((a, b) => b - a).join("、Ø")}`;
       }
     }
     const lin = [...new Set(dims.filter((d) => d.kind === "linear").map((d) => +d.v.toFixed(2)))].sort((a, b) => b - a);
@@ -317,18 +362,21 @@
     if ((fields["焊道長mm"] !== undefined && maxL > 300) || (section && maxL > 300) || (raster && big3 && !fields["板厚T"])) shape = "frame";
     else if (fields["折彎數"] || (tVal && tVal <= 6)) shape = "sheet";
     else if (maxD && maxD >= maxL * 0.25 && lin.length <= 8 + dia.length * 2 && (!overall[1] || maxD >= overall[1] * 0.8)) shape = "round";
+    else if (shaftEv) shape = "round";
+    else if (maxD && dia.length >= 3 && maxD < maxL * 0.25) shape = "round"; // 細長軸：多段直徑
     else if (tVal) shape = "plate";
     else if (raster && thinCand && thinCand <= 6 && !fields["焊道長mm"]) shape = "sheet";
     else if (raster && chainW && !thinCand) shape = "plate"; // 座標式標註的平面圖，多為板件；板厚請人工補
     else shape = (overall[2] && overall[2] < overall[1] * 0.25) || (raster && thinCand) ? "plate" : "block";
-    set("外形", shape, "low", { round: "直徑標註為主", sheet: "板厚/折彎註記", frame: section ? "型鋼規格註記（角鐵/方管）" : fields["焊道長mm"] !== undefined ? "焊接註記 + 大尺寸" : "三向尺寸皆 > 250mm，判為架構/焊接件", plate: "厚度遠小於長寬", block: "三向尺寸相近" }[shape]);
+    set("外形", shape, shaftEv && shape === "round" ? "mid" : "low", { round: shaftEv || "直徑標註為主", sheet: "板厚/折彎註記", frame: section ? "型鋼規格註記（角鐵/方管）" : fields["焊道長mm"] !== undefined ? "焊接註記 + 大尺寸" : "三向尺寸皆 > 250mm，判為架構/焊接件", plate: "厚度遠小於長寬", block: "三向尺寸相近" }[shape]);
 
     if (shape === "round") {
       set("外徑OD", maxD, dimConf, "最大直徑 Ø" + maxD);
       set("長L", overall[0] || "", dimConf, "最大長度 " + (overall[0] || "?"));
       const bore = dims.find((d) => d.kind === "diameter" && d.v < maxD * 0.9 && (/H\d|內|孔|ID/i.test(d.text) || holeTolVals.has(d.v)));
       const holeDias = new Set(holeEv.map((h) => +(h.match(/Ø\s*(\d+(?:\.\d+)?)/) || [])[1]));
-      const inner = bore ? bore.v : [...dia].reverse().find((v) => v < maxD * 0.9 && v > maxD * 0.15 && !holeDias.has(v)); // 無公差線索時取最小的非孔直徑
+      // 無公差線索時：短件（法蘭、環、套）取最小的非孔直徑為內孔；細長軸視為實心
+      const inner = bore ? bore.v : (overall[0] || 0) < maxD * 2 && !shaftEv ? [...dia].reverse().find((v) => v < maxD * 0.9 && v > maxD * 0.15 && !holeDias.has(v)) : 0;
       if (inner) set("內徑ID", inner, "low", bore ? bore.text : "次大直徑（請確認是否為內孔）");
       const extM = tapEv.find((t) => { const m = t.match(/M\s*(\d+)/); return m && +m[1] >= maxD * 0.85; });
       if (extM) { set("外螺紋數", 1, "mid", extM); fields["攻牙數"] = Math.max(0, (fields["攻牙數"] || 1) - 1); }
