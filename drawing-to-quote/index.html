@@ -548,7 +548,11 @@ dialog form { display: flex; justify-content: space-between; align-items: center
         const pages = await DrawingReader.readFile(f, { langs: $("#optChi").checked ? "eng+chi_tra" : "eng", ocrPdf: $("#optOcrPdf").checked }, (msg) => { r.status = msg; const m = msg.match(/(\d+)%/); r.progress = m ? +m[1] : r.progress; updateStatus(r); });
         const idx = recogs.indexOf(r); const made = pages.map((pg, i) => {
           const rec = DrawingParser.recognize(pg.input);
-          return { id: i ? ++rid : r.id, fileName: pg.fileName, source: pg.source, preview: pg.preview, previewMap: pg.previewMap, previewSize: pg.previewSize, items: pg.input.items, dims: pg.input.dims, note: pg.note, status: "完成", fields: rec.fields, conf: rec.conf, evidence: rec.evidence, score: rec.score };
+          // 穩定性：同一份資料辨識＋估價兩次，結果必須完全相同
+          const rec2 = DrawingParser.recognize(pg.input);
+          const p1 = Estimator.estimatePart({ ...rec.fields }, db).best.price.fair, p2 = Estimator.estimatePart({ ...rec2.fields }, db).best.price.fair;
+          const stable = JSON.stringify(rec.fields) === JSON.stringify(rec2.fields) && Math.abs(p1 - p2) < 1e-6;
+          return { id: i ? ++rid : r.id, fileName: pg.fileName, source: pg.source, preview: pg.preview, previewMap: pg.previewMap, previewSize: pg.previewSize, items: pg.input.items, dims: pg.input.dims, note: pg.note, status: "完成", fields: rec.fields, conf: rec.conf, evidence: rec.evidence, score: rec.score, stable };
         });
         recogs.splice(idx, 1, ...made);
         if ($("#optAuto").checked) made.forEach(addToParts);
@@ -586,7 +590,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
       return `<article class="rc${r.added ? " added" : ""}">
         <div class="thumb" data-view="${r.id}" title="點擊放大核對"><div class="ovw"><img src="${r.preview}" alt="${esc(r.fileName)} 預覽">${overlaySvg(r)}</div></div>
         <div class="body">
-          <div class="head"><span class="fname">${esc(r.fileName)}</span><span class="pill tag">${srcLabel[r.source] || r.source}</span><span class="pill ${lvl}">辨識信心 ${r.score}%</span>
+          <div class="head"><span class="fname">${esc(r.fileName)}</span><span class="pill tag">${srcLabel[r.source] || r.source}</span><span class="pill ${lvl}">辨識信心 ${r.score}%</span><span class="pill ${r.stable ? "低" : "高"}" title="同一圖面辨識與估價執行兩次比對">${r.stable ? "雙次比對一致 ✔" : "雙次結果不一致，請核對"}</span>
             <span class="spacer"></span>${r.added ? '<span class="pill 低">已加入估價</span>' : `<button type="button" class="primary" data-add="${r.id}">加入估價</button>`}<button class="ghost" data-rm="${r.id}" type="button">移除</button></div>
           <div class="fgrid">${RFIELDS.filter(([k]) => !(r.fields["外形"] === "round" && ["寬W", "高H", "板厚T", "折彎數"].includes(k)) && !(r.fields["外形"] !== "round" && ["外徑OD", "內徑ID", "外螺紋數"].includes(k))).map((f) => fieldCtl(r, f)).join("")}</div>
           <details><summary>辨識依據（${esc(r.note || "")}）</summary><ul class="evid">${ev}</ul>${r.fields["備註"] ? `<p class="note">圖面註記：${esc(r.fields["備註"])}</p>` : ""}</details>

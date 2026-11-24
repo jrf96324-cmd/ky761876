@@ -222,7 +222,8 @@
     if (/(焊接|滿焊|點焊|WELD)/i.test(allText)) { const m = allText.match(/焊道\s*(\d+)/); set("焊道長mm", m ? +m[1] : "", m ? "mid" : "low", "註記：焊接"); }
     if (/(展開|折彎|BEND|鈑金)/i.test(allText) && !bends) bends = (allText.match(/折彎線|BEND LINE/gi) || []).length || 1;
     if (bends) set("折彎數", bends, "low", "註記：折彎/UP/DOWN");
-    const tm = allText.match(/(?:板厚|厚度|\bt\s*=|\bT\s*=)\s*(\d+(?:\.\d+)?)/i) || (input.source !== "ocr" && allText.match(/\bt\s*(\d+(?:\.\d+)?)\b/));
+    // 板厚只認明確寫法：板厚 3、厚度 3、t=3、T=3、t3.0（t 緊接數字）；不認「t 1」這類鬆散字串
+    const tm = allText.match(/(?:板厚|厚度|\bt\s*=|\bT\s*=)\s*(\d+(?:\.\d+)?)/i) || (input.source !== "ocr" && allText.match(/(?:^|[\s(（,，])t(\d+(?:\.\d+)?)(?:\s*mm)?(?=$|[\s)），,])/m));
     if (tm) set("板厚T", +tm[1], "mid", tm[0]);
 
     // 3) 公差與粗糙度
@@ -279,7 +280,11 @@
       // 公差表範圍：由「Grade、≤、>500、±0.x」等指標字推出整個表格框
       const ind = doc.items.filter((it) => /Grade|等級|[≤≦≥≧]|^[<>]|^±\s*0?\.\d|^2(100|500)$/i.test(it.s));
       let tz = null;
-      if (ind.length >= 3) { const h = Math.max(...ind.map((i) => i.h)); tz = { x0: Math.min(...ind.map((i) => i.x)) - h * 3, x1: Math.max(...ind.map((i) => i.x + estW(i))) + h * 3, y0: Math.min(...ind.map((i) => i.y)) - h * 3, y1: Math.max(...ind.map((i) => i.y)) + h * 3 }; }
+      // 只取最大的一群緊鄰指標字（公差表本身）；圖中零星的「68 ±0.05」不會把範圍撐大
+      const groups = [];
+      for (const it of ind) { const g = groups.find((G) => G.some((o) => Math.hypot(o.x - it.x, o.y - it.y) < Math.max(o.h, it.h) * 12)); if (g) g.push(it); else groups.push([it]); }
+      const tg = groups.sort((a, b) => b.length - a.length)[0] || [];
+      if (tg.length >= 3) { const h = Math.max(...tg.map((i) => i.h)); tz = { x0: Math.min(...tg.map((i) => i.x)) - h * 3, x1: Math.max(...tg.map((i) => i.x + estW(i))) + h * 3, y0: Math.min(...tg.map((i) => i.y)) - h * 3, y1: Math.max(...tg.map((i) => i.y)) + h * 3 }; }
       const inTolTable = (it) => (tz && it.x >= tz.x0 && it.x <= tz.x1 && it.y >= tz.y0 && it.y <= tz.y1) || tolRows.some((l) => Math.abs(l.y - it.y) < l.h * 1.2 && it.x >= l.x0 - l.h * 2 && it.x <= l.x1 + l.h * 2);
       for (const it of doc.items) {
         if (inTB(it) || inTolTable(it) || reserved.has(it.s) || Object.values(LABELS).some((re) => re.test(it.s))) continue;
@@ -362,6 +367,30 @@
       }
     }
 
+    // 三視圖正交取尺寸：長＝主視圖最大水平尺寸、高＝主視圖最大直書尺寸、第三向＝其他視圖的最大尺寸
+    // （與前兩者同列／同欄的尺寸是連鎖或分段，不當外形）
+    let orthoEv = "";
+    if (!chainW && !shaftEv) {
+      const pts = dims.filter((d) => d.kind === "linear" && d.x != null && d.v >= 1);
+      const H0 = pts.filter((d) => !d.vertical), V0 = pts.filter((d) => d.vertical);
+      if (H0.length && V0.length && pts.length >= 3) {
+        const clusterOf = (arr) => { const cl = []; for (const d of arr) { const hit = cl.filter((c) => c.some((o) => Math.hypot(o.x - d.x, o.y - d.y) < 10 * Math.max(o.h, d.h))); if (!hit.length) cl.push([d]); else { hit[0].push(d); for (const o of hit.slice(1)) { hit[0].push(...o); cl.splice(cl.indexOf(o), 1); } } } return cl; };
+        const mx = (c) => Math.max(...c.map((d) => d.v)), rng = (c, k) => [Math.min(...c.map((d) => d[k])), Math.max(...c.map((d) => d[k]))];
+        const HC = clusterOf(H0).sort((a, b) => mx(b) - mx(a)), VC = clusterOf(V0).sort((a, b) => mx(b) - mx(a));
+        const hc = HC[0], vc = VC[0], a = mx(hc), b = mx(vc), hh = Math.max(...pts.map((d) => d.h));
+        const [hx0, hx1] = rng(hc, "x"), [vy0, vy1] = rng(vc, "y");
+        const sameX = (c) => { const [x0, x1] = rng(c, "x"); return x1 >= hx0 - 8 * hh && x0 <= hx1 + 8 * hh; };   // 同一視圖欄（同方向）
+        const sameY = (c) => { const [y0, y1] = rng(c, "y"); return y1 >= vy0 - 8 * hh && y0 <= vy1 + 8 * hh; };
+        const others = [...HC.slice(1).filter((c) => !sameX(c)), ...VC.slice(1).filter((c) => !sameY(c))].map(mx).filter((v) => v <= Math.max(a, b));
+        const c3 = others.length ? Math.max(...others) : 0;
+        const tri = [a, b, c3].filter(Boolean).sort((x, y) => y - x);
+        if (tri.length >= 2) {
+          overall = [...new Set([...tri, ...overall.filter((v) => !tri.includes(v) && v < tri[tri.length - 1])])];
+          orthoEv = `三視圖正交尺寸：水平 ${a}、直書 ${b}${c3 ? `、另一視圖 ${c3}` : ""}`;
+        }
+      }
+    }
+
     // 5) 外形判斷
     let shape, shapeNote = "";
     const tVal = +fields["板厚T"] || 0;
@@ -397,9 +426,9 @@
       if (extM) { set("外螺紋數", 1, "mid", extM); fields["攻牙數"] = Math.max(0, (fields["攻牙數"] || 1) - 1); }
       const gm = allText.match(/(?:退刀槽|溝槽|GROOVE)\s*(\d+)\s*(?:處|PLACES|個)?/i); const grooves = gm ? +gm[1] : (allText.match(/退刀槽|溝槽|GROOVE/gi) || []).length; if (grooves) set("退刀槽數", grooves, "low", "註記：退刀槽");
     } else {
-      set("長L", overall[0] || "", dimConf, "最大長度 " + (overall[0] || "?"));
-      set("寬W", overall[1] || "", dimConf, "次大長度 " + (overall[1] || "?"));
-      if (shape === "block" || shape === "frame") set("高H", overall[2] || "", dimConf, "第三大長度 " + (overall[2] || "?"));
+      set("長L", overall[0] || "", dimConf, (orthoEv || "最大長度") + " → 長 " + (overall[0] || "?"));
+      set("寬W", overall[1] || "", dimConf, (orthoEv ? "正交第二向 " : "次大長度 ") + (overall[1] || "?"));
+      if (shape === "block" || shape === "frame") set("高H", overall[2] || "", dimConf, (orthoEv ? "正交第三向 " : "第三大長度 ") + (overall[2] || "?"));
       if ((shape === "plate" || shape === "sheet") && !tVal && (thinCand || (!chainW && overall[2]))) set("板厚T", thinCand || overall[2], "low", thinCand ? "側視圖小尺寸當板厚" : "第三大尺寸當板厚");
       if ((shape === "plate" || shape === "sheet") && !fields["板厚T"]) { fields["板厚T"] = ""; conf["板厚T"] = "low"; ev["板厚T"] = "⚠ 未讀到板厚，請輸入（影響材料與加工估價）"; }
       if (chainW) { conf["寬W"] = "mid"; ev["寬W"] = `座標尺寸欄最大值 ${chainW}`; }

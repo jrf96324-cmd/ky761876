@@ -6,6 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "quote": "node cli.js samples/parts.csv -o out/報價分析.xlsx",
-    "test": "node test/run-test.js"
+    "test": "node test/run-test.js && node test/benchmark.js",
+    "benchmark": "node test/benchmark.js"
   }
 }
