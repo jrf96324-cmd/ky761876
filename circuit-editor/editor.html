@@ -58,6 +58,11 @@ aside{background:var(--panel);min-height:0;overflow:auto}
 .cell:hover{border-color:var(--accent)}
 .cell.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .cell svg{width:100%;height:46px;background:#fff;border-radius:3px}
+#lib[data-sz="m"] .cell svg{height:72px} #lib[data-sz="m"] .cell b{font-size:13px} #lib[data-sz="m"] .cell i{font-size:11px}
+#lib[data-sz="l"] .cells{grid-template-columns:1fr} #lib[data-sz="l"] .cell svg{height:96px} #lib[data-sz="l"] .cell b{font-size:15px} #lib[data-sz="l"] .cell i{font-size:12px}
+.lsz{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}
+.lsz h2{margin:0!important}
+.seg.sm button{padding:2px 8px;font-size:12px}
 .cell b{font-size:11px;font-weight:500;line-height:1.25}
 .cell i{font-style:normal;font-size:10px;color:var(--muted);font-family:var(--font-mono)}
 
@@ -159,7 +164,8 @@ table.bom tfoot td{font-weight:700}
       <button class="btn" id="bNew" title="新增空白專案">新增</button>
       <button class="btn" id="bSample" title="載入範例（依上傳電氣迴路圖）">範例</button>
       <button class="btn" id="bOpen" title="開啟 .json 專案檔">開啟</button>
-      <button class="btn" id="bSave" title="儲存專案為 .json (Ctrl+S)">儲存</button>
+      <button class="btn" id="bSave" title="儲存專案 .json (Ctrl+S)">儲存</button>
+      <button class="btn" id="bSaveAs" title="另存新檔：選擇資料夾與檔名 (Ctrl+Shift+S)">另存</button>
     </div>
     <div class="grp">
       <button class="btn" id="bXlIn" title="匯入 Excel：零件表、IO 表或本編輯器匯出的專案">匯入 Excel</button>
@@ -197,7 +203,7 @@ table.bom tfoot td{font-weight:700}
 
   <div id="main">
     <aside id="lib" aria-label="元件庫">
-      <div class="ph"><h2>元件庫</h2><input class="search" id="q" placeholder="搜尋：按鈕、NFB、PLC…" aria-label="搜尋元件"></div>
+      <div class="ph"><div class="lsz"><h2>元件庫</h2><div class="seg sm" id="libsz" role="group" aria-label="圖示大小"><button type="button" data-sz="s">小</button><button type="button" data-sz="m">中</button><button type="button" data-sz="l">大</button></div></div><input class="search" id="q" placeholder="搜尋：按鈕、NFB、PLC…" aria-label="搜尋元件"></div>
       <div id="cats"></div>
     </aside>
     <div id="stage">
@@ -225,7 +231,7 @@ table.bom tfoot td{font-weight:700}
       <button class="btn" id="pgR" title="往後移">▶</button>
       <button class="btn danger" id="pgDel" title="刪除目前圖頁">刪除</button>
     </div>
-    <div id="status"><span id="sXY">X 0.0  Y 0.0 mm</span><span id="sSel" class="opt-hide"></span><span id="sSave" class="opt-hide"></span></div>
+    <div id="status"><span id="sXY">X 0.0  Y 0.0 mm</span><span id="sSel" class="opt-hide"></span><span id="sFile" class="opt-hide"></span><span id="sSave" class="opt-hide"></span></div>
   </footer>
 </div>
 <input type="file" id="fileIn" accept=".json,.xlsx,application/json" hidden>
@@ -334,13 +340,13 @@ const B={
   box:p=>{const pit=Math.max(20,ceil10(+p.pitch||20));const Ls=list(p.left),Rs=list(p.right),Ts=list(p.top),Bs=list(p.bottom);
     const nv=Math.max(Ls.length,Rs.length,1),nh=Math.max(Ts.length,Bs.length);
     const tl=Math.max(0,...String(p.title||'').split('\n').map(t=>tw(t,fz(11)))),lw=Math.max(0,...Ls.map(t=>tw(t,fz(9)))),rw=Math.max(0,...Rs.map(t=>tw(t,fz(9))));
-    let W=ceil10(Math.max(+p.w||100,nh?(nh-1)*pit+40:0,tl+(lw?lw+8:0)+(rw?rw+8:0)+16));let H=(nv-1)*pit+40;if(nh)H=Math.max(H,60);
+    let W=ceil10(Math.max(+p.w||100,nh?(nh-1)*pit+40:0,tl+(lw?lw+8:0)+(rw?rw+8:0)+16));const tlines=String(p.title||'').split('\n').length;let H=Math.max((nv-1)*pit+40,ceil10(tlines*fz(13)+(Ts.length||Bs.length?30:14)));if(nh)H=Math.max(H,60);
     let s=R(10,0,W,H,'#fff'),pins=[];
     Ls.forEach((t,i)=>{const y=20+i*pit;pins.push({x:0,y,n:t});s+=L(0,y,10,y)+T(14,y+3.5,t,9,'start');});
     Rs.forEach((t,i)=>{const y=20+i*pit;pins.push({x:W+20,y,n:t});s+=L(W+10,y,W+20,y)+T(W+6,y+3.5,t,9,'end');});
     Ts.forEach((t,i)=>{const x=30+i*pit;pins.push({x,y:-10,n:t});s+=L(x,-10,x,0)+T(x,12,t,9);});
     Bs.forEach((t,i)=>{const x=30+i*pit;pins.push({x,y:H+10,n:t});s+=L(x,H,x,H+10)+T(x,H-4,t,9);});
-    const lines=String(p.title||'').split('\n');lines.forEach((t,i)=>s+=T(10+W/2,H/2+4+(i-(lines.length-1)/2)*13,t,i===0?11:10,'middle',i===0));
+    const lines=String(p.title||'').split('\n');lines.forEach((t,i)=>s+=T(10+W/2,H/2+fz(4)+(i-(lines.length-1)/2)*fz(13),t,i===0?11:10,'middle',i===0));
     return{pins,box:[0,nh&&Ts.length?-10:0,W+20,H+(Bs.length?10:0)],svg:s}},
   plc:p=>{const pit=Math.max(20,ceil10(+p.pitch||20)),n=Math.max(1,Math.min(32,+p.n||8)),w=ceil10(+p.w||70),nw=+p.noteW||170;
     const m=String(p.base||'X0').match(/^([A-Za-z]*)(\d+)$/)||['', 'X','0'];const pre=m[1],oct=!!p.octal,b0=parseInt(m[2],oct?8:10)||0;
@@ -825,7 +831,7 @@ window.addEventListener('keydown',e=>{const tg=e.target;const typing=tg&&(tg.tag
   if(mod&&k==='v'){e.preventDefault();paste();return}
   if(mod&&k==='d'){e.preventDefault();copySel();paste();return}
   if(mod&&k==='a'){e.preventDefault();sel=new Set(cur().items.map(i=>i.id));render();renderProps();return}
-  if(mod&&k==='s'){e.preventDefault();saveJSON();return}
+  if(mod&&k==='s'){e.preventDefault();saveJSON(e.shiftKey);return}
   if(mod)return;
   if(e.key===' '){spaceDown=true;svg.classList.add('pan');e.preventDefault();return}
   if(k==='delete'||k==='backspace'){e.preventDefault();delSel();return}
@@ -851,6 +857,9 @@ function renderLib(){const q=$('#q').value.trim().toLowerCase();let s='';
       items.map(it=>`<div class="cell" draggable="true" data-id="${it.id}" tabindex="0" title="${esc(it.name)}${it.spec?' · '+esc(it.spec):''}">${thumb(it)}<b>${esc(it.name)}</b>${it.pre?`<i>${esc(it.pre)}</i>`:''}</div>`).join('')+'</div></div>'}
   $('#cats').innerHTML=s||'<p class="note" style="padding:12px">找不到符合的元件</p>';}
 $('#q').addEventListener('input',renderLib);
+function setLibSz(z){$('#lib').dataset.sz=z;document.querySelectorAll('#libsz button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.sz===z));try{localStorage.setItem('ckt-libsz',z)}catch(e){}}
+$('#libsz').addEventListener('click',e=>{const b=e.target.closest('[data-sz]');if(b)setLibSz(b.dataset.sz)});
+(()=>{let z='m';try{z=localStorage.getItem('ckt-libsz')||'m'}catch(e){}setLibSz(z)})();
 $('#cats').addEventListener('click',e=>{const b=e.target.closest('.cat>button');if(b){const c=b.parentElement;c.classList.toggle('closed');b.setAttribute('aria-expanded',!c.classList.contains('closed'));return}
   const cell=e.target.closest('.cell');if(cell){startPlace(cell.dataset.id);if(innerWidth<=980)$('#lib').classList.remove('open')}});
 $('#cats').addEventListener('keydown',e=>{if(e.key==='Enter'){const c=e.target.closest('.cell');if(c)startPlace(c.dataset.id)}});
@@ -870,10 +879,13 @@ function renderProps(){const pb=$('#pbody');const items=selItems();let s='';
         <div class="row"><label for="g_symW">元件線寬</label><input type="number" id="g_symW" data-k="st.symW" step="0.1" min="0.3" max="6" value="${ST().symW}"></div>
         <div class="row"><label for="g_wireW">導線線寬</label><input type="number" id="g_wireW" data-k="st.wireW" step="0.1" min="0.3" max="8" value="${ST().wireW}"></div>
         <div class="row"><label for="g_tag">代號字高</label><input type="number" id="g_tag" data-k="st.tagSize" step="1" min="5" max="40" value="${ST().tagSize}"></div>
-        <div class="row"><label for="g_txt">內文字倍率</label><input type="number" id="g_txt" data-k="st.txtScale" step="0.1" min="0.5" max="3" value="${ST().txtScale}"></div>
+        <div class="row"><label for="g_txt">符號文字大小</label><input type="number" id="g_txt" data-k="st.txtScale" step="0.1" min="0.5" max="3" value="${ST().txtScale}"></div>
         <div class="row"><label for="g_wl">線標字高</label><input type="number" id="g_wl" data-k="st.wireLbl" step="1" min="5" max="40" value="${ST().wireLbl}"></div>
         <div class="btns"><button class="btn" data-act="clrstyle">全部改用全域樣式</button></div>
         <p class="note">字高 10 = 2.5 mm。「全部改用全域樣式」會清除所有物件的個別線寬與字高（不含圖示大小）。</p></div>
+      <div class="sec"><h3>檔案儲存位置</h3>
+        <label class="chk" style="height:auto;padding:0"><input type="checkbox" id="prefAsk" ${pref.askPath?'checked':''}> 儲存 / 匯出時選擇資料夾與檔名</label>
+        <p class="note">${window.claude?'在 claude.ai 中由瀏覽器處理儲存；若要每次選擇資料夾，請在瀏覽器設定開啟「下載前詢問每個檔案的儲存位置」，或改用單機版 HTML。':pickerOK()?'會開啟「另存新檔」視窗，可選資料夾與檔名，並記住上次的資料夾。「儲存」會直接覆寫目前開啟的專案檔，「另存」可存到新位置。':'此瀏覽器不支援選擇儲存位置（請用 Chrome 或 Edge），檔案會存到「下載」資料夾；也可在瀏覽器設定開啟「下載前詢問每個檔案的儲存位置」。'}</p></div>
       <div class="sec"><h3>統計</h3><p class="note">共 ${doc.pages.length} 頁 · 本頁 ${pg.items.length} 物件 · 元件 ${pg.items.filter(i=>i.t==='s').length} · 導線 ${pg.items.filter(i=>i.t==='w').length}</p></div>`;
   }else if(items.length>1){$('#ptitle').textContent=`已選取 ${items.length} 個物件`;
     s+=`<div class="sec"><h3>對齊</h3><div class="btns">${[['l','靠左'],['ch','水平置中'],['r','靠右'],['t','靠上'],['cv','垂直置中'],['b','靠下']].map(([k,n])=>`<button class="btn" data-align="${k}">${n}</button>`).join('')}</div>
@@ -883,6 +895,7 @@ function renderProps(){const pb=$('#pbody');const items=selItems();let s='';
         <div class="row"><label for="b_sc">圖示大小</label><input type="number" id="b_sc" data-b="sc" step="0.1" min="0.3" max="5" placeholder="例 1.5"></div><div class="btns">${[[0.5,'50%'],[0.75,'75%'],[1,'100%'],[1.5,'150%'],[2,'200%']].map(([v,n])=>`<button class="btn" data-set="sc:${v}">${n}</button>`).join('')}</div>
         <div class="row"><label for="b_sw">元件線寬</label><input type="number" id="b_sw" data-b="sw" step="0.1" min="0.3" max="6" placeholder="例 1.3"></div>
         <div class="row"><label for="b_w">導線線寬</label><input type="number" id="b_w" data-b="w" step="0.1" min="0.3" max="8" placeholder="例 1.4"></div>
+        <div class="row"><label for="b_fs">符號文字大小</label><input type="number" id="b_fs" data-b="fs" step="0.1" min="0.5" max="3" placeholder="倍率 例 1.5"></div><div class="btns">${[[0.8,'80%'],[1,'100%'],[1.25,'125%'],[1.5,'150%'],[2,'200%']].map(([v,n])=>`<button class="btn" data-set="fs:${v}">${n}</button>`).join('')}</div>
         <div class="row"><label for="b_fz">文字字高</label><input type="number" id="b_fz" data-b="font" step="1" min="5" max="60" placeholder="例 10"></div>
         <p class="note">輸入後即套用到選取範圍內對應的物件；文字字高同時套用元件代號、導線線標與文字。</p></div>`;
     const ws=items.filter(i=>i.t==='w');if(ws.length)s+=`<div class="sec"><h3>導線 (${ws.length})</h3>${colorBtns('w.color',ws[0].color)}</div>`;
@@ -893,8 +906,8 @@ function renderProps(){const pb=$('#pbody');const items=selItems();let s='';
       s+=`<div class="sec"><h3>外觀</h3><div class="row"><label for="f_sc">圖示大小</label><input type="number" id="f_sc" data-k="sc" step="0.1" min="0.3" max="5" value="${+it.sc||1}"></div><div class="btns">${[[0.5,'50%'],[0.75,'75%'],[1,'100%'],[1.5,'150%'],[2,'200%']].map(([v,n])=>`<button class="btn" data-set="sc:${v}">${n}</button>`).join('')}</div>
         <div class="row"><label for="f_sw">線條粗細</label><input type="number" id="f_sw" data-k="sw" step="0.1" min="0.3" max="6" value="${+it.sw||st.symW}"></div>
         <div class="row"><label for="f_tsz">代號字高</label><input type="number" id="f_tsz" data-k="tsz" step="1" min="5" max="40" value="${+it.tsz||st.tagSize}"></div>
-        <div class="row"><label for="f_fs">內文字倍率</label><input type="number" id="f_fs" data-k="fs" step="0.1" min="0.5" max="3" value="${+it.fs||st.txtScale}"></div>
-        <p class="note">字高 10 = 2.5 mm。改變圖示大小後，接腳位置會改變，原本相連的導線需重新拉到接腳。快捷鍵 <b>]</b> 放大、<b>[</b> 縮小。</p></div>`;
+        <div class="row"><label for="f_fs">符號文字大小</label><input type="number" id="f_fs" data-k="fs" step="0.1" min="0.5" max="3" value="${+it.fs||st.txtScale}"></div><div class="btns">${[[0.8,'80%'],[1,'100%'],[1.25,'125%'],[1.5,'150%'],[2,'200%']].map(([v,n])=>`<button class="btn" data-set="fs:${v}">${n}</button>`).join('')}</div>
+        <p class="note">符號文字大小為倍率，作用於方塊標題、腳位名稱、箭頭與線號文字。字高 10 = 2.5 mm。改變圖示大小後，接腳位置會改變，原本相連的導線需重新拉到接腳。快捷鍵 <b>]</b> 放大、<b>[</b> 縮小。</p></div>`;
       const pk=Object.keys(it.p||{});
       if(pk.length)s+=`<div class="sec"><h3>符號參數</h3>${pk.map(k=>{const v=it.p[k];const lab=PLAB[k]||k;
         if(typeof v==='boolean')return fld('p.'+k,lab,v,'checkbox');if(typeof v==='number')return fld('p.'+k,lab,v,'number','step="10"');
@@ -938,10 +951,10 @@ $('#pbody').addEventListener('input',e=>{const t=e.target;const k=t.dataset.k;if
   setPath(k,v);render();});
 $('#pbody').addEventListener('input',e=>{const t=e.target;const b=t.dataset.b;if(!b||t.value===''||!(+t.value>0))return;if(pendMark){mark();pendMark=false}applyStyle(b,+t.value);render()});
 function applyStyle(k,v){for(const it of selItems()){
-  if(k==='sc'&&it.t==='s')it.sc=v;else if(k==='sw'&&(it.t==='s'||it.t==='l'||it.t==='r'||it.t==='e'))it.sw=v;else if(k==='w'&&it.t==='w')it.w=v;
+  if(k==='sc'&&it.t==='s')it.sc=v;else if(k==='fs'&&it.t==='s')it.fs=v;else if(k==='sw'&&(it.t==='s'||it.t==='l'||it.t==='r'||it.t==='e'))it.sw=v;else if(k==='w'&&it.t==='w')it.w=v;
   else if(k==='font'){if(it.t==='s')it.tsz=v;else if(it.t==='w')it.lsz=v;else if(it.t==='t')it.size=v}}}
 function scaleSel(f){const items=selItems().filter(i=>i.t==='s'||i.t==='t');if(!items.length)return;mark();items.forEach(it=>{if(it.t==='s')it.sc=Math.min(5,Math.max(0.3,r2((+it.sc||1)*f)));else it.size=Math.min(60,Math.max(5,Math.round((+it.size||12)*f)))});render();renderProps()}
-$('#pbody').addEventListener('change',e=>{if(e.target.dataset.k==='pg.size')renderProps()});
+$('#pbody').addEventListener('change',e=>{if(e.target.id==='prefAsk'){pref.askPath=e.target.checked;try{localStorage.setItem('ckt-askpath',pref.askPath?'1':'0')}catch(err){}return}if(e.target.dataset.k==='pg.size')renderProps()});
 $('#pbody').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.color){mark();setPath(b.dataset.k,b.dataset.color);render();renderProps();return}
   if(b.dataset.align){align(b.dataset.align);return}
@@ -1015,8 +1028,8 @@ function xlReady(){if(!window.ExcelJS){toast('Excel 元件尚未載入，請確�
 function xlStyleHead(row){row.eachCell(c=>{c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFDCE6EC'}};c.alignment={vertical:'middle',horizontal:'center',wrapText:true}})}
 function xlBorder(ws,r0,r1,c0,c1){for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++)ws.getCell(r,c).border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}}
 const sheetName=(s,used)=>{let n=String(s).replace(/[\[\]:*?\/\\]/g,'_').slice(0,31);let k=2;while(used.has(n)){n=n.slice(0,28)+'_'+k++}used.add(n);return n};
-async function exportXLSX(){if(!xlReady())return;toast('正在產生 Excel…');
-  try{const wb=new ExcelJS.Workbook();wb.creator='線路圖編輯器';wb.created=new Date();const used=new Set();const m=doc.meta;
+async function exportXLSX(){if(!xlReady())return;
+  try{await saveFile(fname('電氣圖','xlsx'),async()=>{toast('正在產生 Excel…');const wb=new ExcelJS.Workbook();wb.creator='線路圖編輯器';wb.created=new Date();const used=new Set();const m=doc.meta;
   // 1 零件表
   let ws=wb.addWorksheet(sheetName('零件表',used),{pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
   ws.columns=[{width:6},{width:22},{width:24},{width:10},{width:8},{width:10},{width:12},{width:14},{width:28},{width:16}];
@@ -1051,7 +1064,7 @@ async function exportXLSX(){if(!xlReady())return;toast('正在產生 Excel…');
     const dw=W>H?1120:800;w2.addImage(id,{tl:{col:0,row:0},ext:{width:dw,height:Math.round(dw*H/W)}})}
   // 6 專案資料（供本編輯器重新開啟）
   ws=wb.addWorksheet('_project',{state:'veryHidden'});const js=JSON.stringify(doc);for(let k=0;k*30000<js.length;k++)ws.getCell(k+1,1).value=js.slice(k*30000,(k+1)*30000);
-  const buf=await wb.xlsx.writeBuffer();await saveFile(fname('電氣圖','xlsx'),new Blob([buf],{type:XLMIME}))}
+  const buf=await wb.xlsx.writeBuffer();return new Blob([buf],{type:XLMIME})})}
   catch(err){toast('Excel 匯出失敗：'+err.message)}}
 
 /* ====================== Excel 匯入 ====================== */
@@ -1146,7 +1159,8 @@ function applyImport(){const res=xlPending;if(!res)return;const ck=id=>{const e=
     if(ck('xoExtra')){doc.extra=doc.extra||[];res.parts.items.filter(i=>!i.lib).forEach(i=>doc.extra.push({id:uid(),name:i.name,spec:i.spec,maker:i.maker,partno:i.partno,qty:i.qty,price:i.price,note:i.note}));msg.push('其他材料 '+res.parts.items.filter(i=>!i.lib).length+' 項')}}
   if(res.io&&ck('xoIO')){mark1();const pgs=buildIOPages(res.io.items);msg.push(`產生 IO 圖 ${pgs.length} 頁`)}
   if(first>=0&&first<doc.pages.length)pi=first;sel.clear();closeDlg();full();fit();toast('匯入完成：'+(msg.join('、')||'已更新標題欄'))}
-async function templateXLSX(){if(!xlReady())return;const wb=new ExcelJS.Workbook();
+function templateXLSX(){if(!xlReady())return;saveFile('線路圖_Excel範本.xlsx',makeTemplate)}
+async function makeTemplate(){const wb=new ExcelJS.Workbook();
   let ws=wb.addWorksheet('零件表');ws.columns=[{header:'NO',width:6},{header:'名稱',width:20},{header:'規格',width:22},{header:'廠商',width:10},{header:'數量',width:8},{header:'單價',width:10},{header:'合計',width:12},{header:'料號',width:14},{header:'元件代號',width:12},{header:'備註',width:16}];
   [['人機介面','MT8102iE','怡振',1,9500,'G02I000378'],['PLC主機(電晶體)','FX5UC-32MT/DS-TS','怡振',1,8300,'G02I000118'],['無熔絲開關','BW32AAG-3P15A','廣富',1,450,'S015000353'],['電磁開關','SC-0 AC220V','廣富',3,380,'S015000357'],['電磁開關過載保護','TR-ON(4~6A)','廣富',3,190,'S802000055'],['電源供應器','MDR-60-24','廣富',1,450,'S005000336'],['繼電器','RJ2S-CL-D24','廣富',4,80,'S005001887'],['電線','0.75*20C','廣富',100,65,'S005000387'],['線槽','45MM*65MM','廣富',7,130,'S005001902']]
    .forEach((r,i)=>{const n=i+2;ws.addRow([i+1,r[0],r[1],r[2],r[3],r[4],{formula:`E${n}*F${n}`,result:r[3]*r[4]},r[5],'','']);});xlStyleHead(ws.getRow(1));
@@ -1160,7 +1174,7 @@ async function templateXLSX(){if(!xlReady())return;const wb=new ExcelJS.Workbook
    '　輸出：含「燈」→ 指示燈；含「閥 / 缸」→ 電磁閥；含「蜂鳴」→ 蜂鳴器；其他 → 繼電器線圈',
    '　可指定的兩端子元件：'+Object.values(LIBM).filter(l=>{const g=B[l.b](l.p||{});return g.pins.length===2&&g.pins[1].x===40&&g.pins[1].y===0}).map(l=>l.name).join('、'),
    '【還原】由本編輯器「匯出 Excel」產生的檔案含完整專案，匯入即可原樣還原。'].forEach(t=>{const r=ws.addRow([t]);r.getCell(1).alignment={wrapText:true}});
-  const buf=await wb.xlsx.writeBuffer();await saveFile('線路圖_Excel範本.xlsx',new Blob([buf],{type:XLMIME}))}
+  const buf=await wb.xlsx.writeBuffer();return new Blob([buf],{type:XLMIME})}
 
 function bomPagesSVG(){const rows=bomRows();const per=26;const pages=[];const base={size:'A4L',meta:{title:'零件表',dwgNo:'',rev:''}};
   for(let k=0;k<Math.max(1,Math.ceil(rows.length/per));k++){const chunk=rows.slice(k*per,(k+1)*per);const cw=[40,190,220,100,150,60,90,110];const hd=['NO','名稱','規格','廠商','料號','數量','單價','合計'];
@@ -1180,10 +1194,33 @@ function pageSVG(pg,idx,total,body,titleOverride){const [W,H]=SIZES[pg.size];
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W/U}mm" height="${H/U}mm" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>${frameSVG(pg,idx,total,titleOverride)}${body??itemsSVG(pg,true)}</svg>`}
 function svgToCanvas(str,W,H,dpi){return new Promise((res,rej)=>{const img=new Image();const sc=dpi/25.4/U;img.onload=()=>{const c=document.createElement('canvas');c.width=Math.round(W*sc);c.height=Math.round(H*sc);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);res(c)};img.onerror=()=>rej(new Error('圖面轉換失敗'));img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(str)})}
 let dlP=null;function dlNS(){if(!dlP)dlP=(window.claude&&typeof window.claude.use==='function')?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);return dlP}
-async function saveFile(name,blob){const ns=await dlNS();
-  if(ns){try{await ns.save({filename:name,data:blob});toast('已儲存 '+name)}catch(e){const c=e&&e.code;toast(c==='declined'?'已取消儲存':c==='rate_limited'?'已有一個儲存視窗開啟中，請稍後再試':'此檢視無法儲存檔案（'+(c||'unavailable')+'）')}return}
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('已下載 '+name)}
-function saveJSON(){saveFile(fname('專案','json'),new Blob([JSON.stringify(doc,null,1)],{type:'application/json'}))}
+/* ---- 檔案儲存：可選擇資料夾與檔名（Chrome / Edge 的 File System Access API） ---- */
+const FTYPES={pdf:['PDF 文件','application/pdf'],xlsx:['Excel 活頁簿',XLMIME],json:['線路圖專案','application/json'],csv:['CSV 逗號分隔','text/csv'],png:['PNG 圖片','image/png'],svg:['SVG 向量圖','image/svg+xml']};
+const pref={askPath:true};try{const v=localStorage.getItem('ckt-askpath');if(v!==null)pref.askPath=v==='1'}catch(e){}
+const pickerOK=()=>!window.claude&&typeof window.showSaveFilePicker==='function';
+let lastDir=null,projHandle=null;
+function setProjHandle(h){projHandle=h;$('#sFile').textContent=h?'檔案：'+h.name:''}
+async function pickSave(name){const ext=name.split('.').pop().toLowerCase();const t=FTYPES[ext];
+  const o={suggestedName:name,types:t?[{description:t[0],accept:{[t[1]]:['.'+ext]}}]:undefined};if(lastDir)o.startIn=lastDir;else o.startIn='documents';
+  try{const h=await window.showSaveFilePicker(o);lastDir=h;return h}catch(e){if(e&&e.name==='AbortError')return 'cancel';if(o.startIn){try{delete o.startIn;const h=await window.showSaveFilePicker(o);lastDir=h;return h}catch(e2){if(e2&&e2.name==='AbortError')return 'cancel'}}return null}}
+async function writeHandle(h,blob){const w=await h.createWritable();await w.write(blob);await w.close()}
+/* data：Blob，或回傳 Promise<Blob> 的函式（先選位置再產生檔案） */
+async function saveFile(name,data,opts={}){const mk=async()=>typeof data==='function'?await data():data;
+  const ns=await dlNS();
+  if(ns){const blob=await mk();try{await ns.save({filename:name,data:blob});toast('已儲存 '+name);return{ok:true}}catch(e){const c=e&&e.code;toast(c==='declined'?'已取消儲存':c==='rate_limited'?'已有一個儲存視窗開啟中，請稍後再試':'此檢視無法儲存檔案（'+(c||'unavailable')+'）');return{ok:false}}}
+  if(opts.handle){try{await writeHandle(opts.handle,await mk());toast('已儲存到 '+opts.handle.name);return{ok:true,handle:opts.handle}}catch(e){toast('無法覆寫原檔，請選擇位置另存')}}
+  if(pref.askPath&&pickerOK()){const h=await pickSave(name);if(h==='cancel'){toast('已取消儲存');return{ok:false}}
+    if(h){try{const blob=await mk();await writeHandle(h,blob);toast('已儲存到 '+h.name);return{ok:true,handle:h}}catch(e){toast('儲存失敗：'+e.message);return{ok:false}}}}
+  const blob=await mk();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('已下載 '+name+'（瀏覽器「下載」資料夾）');return{ok:true}}
+async function saveJSON(asNew){const mk=()=>new Blob([JSON.stringify(doc,null,1)],{type:'application/json'});
+  const r=await saveFile(projHandle&&!asNew?projHandle.name:fname('專案','json'),mk,{handle:asNew?null:projHandle});if(r.ok&&r.handle)setProjHandle(r.handle)}
+function loadProjectText(text,name){const d=JSON.parse(text);if(!d||!Array.isArray(d.pages)||!d.pages.length)throw new Error('不是線路圖專案檔');
+  d.meta=d.meta||blankDoc().meta;d.extra=d.extra||[];d.pages.forEach(p=>{p.items=(p.items||[]).filter(i=>i.t!=='s'||LIBM[i.s]);p.size=SIZES[p.size]?p.size:'A4L';p.meta=p.meta||{title:'',dwgNo:'',rev:''}});
+  mark();doc=d;pi=0;sel.clear();full();fit();toast('已開啟 '+name)}
+async function openFile(){if(pickerOK()&&typeof window.showOpenFilePicker==='function'){let hs;
+    try{hs=await window.showOpenFilePicker({startIn:lastDir||'documents',types:[{description:'線路圖專案 / Excel',accept:{'application/json':['.json'],[XLMIME]:['.xlsx']}}]})}catch(e){if(e&&e.name==='AbortError')return;hs=null}
+    if(hs&&hs[0]){const h=hs[0];lastDir=h;const f=await h.getFile();if(/\.xlsx$/i.test(f.name)){readExcel(f);return}try{loadProjectText(await f.text(),f.name);setProjHandle(h)}catch(err){toast('無法開啟：'+err.message)}return}}
+  $('#fileIn').click()}
 const ex={range:'all',dpi:300,bom:true};
 function exportDlg(){const seg=(k,opts)=>`<div class="seg">${opts.map(([v,n])=>`<button type="button" data-ek="${k}" data-ev="${v}" aria-pressed="${String(ex[k])===String(v)}">${n}</button>`).join('')}</div>`;
   openDlg('匯出圖面',`<div class="opt"><span>頁面範圍</span>${seg('range',[['all',`全部 ${doc.pages.length} 頁`],['cur','目前頁']])}</div>
@@ -1194,11 +1231,11 @@ function exportDlg(){const seg=(k,opts)=>`<div class="seg">${opts.map(([v,n])=>`
     `<button class="btn" data-x="svg">SVG（目前頁）</button><button class="btn" data-x="png">PNG（目前頁）</button><button class="btn primary" data-x="pdf">匯出 PDF</button>`);
   $('#dlg .body').addEventListener('click',e=>{const b=e.target.closest('[data-ek]');if(!b)return;const k=b.dataset.ek;let v=b.dataset.ev;ex[k]=k==='dpi'?+v:k==='bom'?v==='true':v;b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   $('#dlg [data-x="pdf"]').onclick=exportPDF;
-  $('#dlg [data-x="png"]').onclick=async()=>{const pg=cur();const [W,H]=SIZES[pg.size];const c=await svgToCanvas(pageSVG(pg,pi,doc.pages.length),W,H,ex.dpi);c.toBlob(b=>saveFile(fname(pg.name,'png'),b),'image/png')};
+  $('#dlg [data-x="png"]').onclick=()=>{const pg=cur();const [W,H]=SIZES[pg.size];saveFile(fname(pg.name,'png'),async()=>{const c=await svgToCanvas(pageSVG(pg,pi,doc.pages.length),W,H,ex.dpi);return await new Promise(r=>c.toBlob(r,'image/png'))})};
   $('#dlg [data-x="svg"]').onclick=()=>{const pg=cur();saveFile(fname(pg.name,'svg'),new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+pageSVG(pg,pi,doc.pages.length)],{type:'image/svg+xml'}))};}
 async function exportPDF(){if(!window.jspdf){toast('PDF 元件尚未載入，請確認網路後重試');return}
-  const btn=$('#dlg [data-x="pdf"]');btn.disabled=true;const prog=$('#eprog');prog.hidden=false;
-  try{const list=[];const total=doc.pages.length;const bp=ex.bom?bomPagesSVG():[];const tot2=total+bp.length;
+  const btn=$('#dlg [data-x="pdf"]');const prog=$('#eprog');
+  try{const r=await saveFile(fname(ex.range==='all'?'電氣迴路圖':cur().name,'pdf'),async()=>{btn.disabled=true;prog.hidden=false;const list=[];const total=doc.pages.length;const bp=ex.bom?bomPagesSVG():[];const tot2=total+bp.length;
     (ex.range==='all'?doc.pages.map((p,i)=>[p,i]):[[cur(),pi]]).forEach(([p,i])=>list.push({pg:p,svg:pageSVG(p,i,tot2)}));
     bp.forEach((b,k)=>list.push({pg:b.page,svg:pageSVG(b.page,total+k,tot2,b.body,'零件表')}));
     let pdf=null;
@@ -1207,7 +1244,7 @@ async function exportPDF(){if(!window.jspdf){toast('PDF 元件尚未載入，請
       if(!pdf)pdf=new window.jspdf.jsPDF({orientation:ori,unit:'mm',format:[wmm,hmm],compress:true});else pdf.addPage([wmm,hmm],ori);
       pdf.addImage(data,'PNG',0,0,wmm,hmm,undefined,'FAST');prog.firstElementChild.style.width=((k+1)/list.length*100)+'%';await new Promise(r=>setTimeout(r,0))}
     pdf.setProperties({title:doc.meta.project||'電氣迴路圖',subject:'電氣迴路圖',creator:'線路圖編輯器'});
-    await saveFile(fname(ex.range==='all'?'電氣迴路圖':cur().name,'pdf'),pdf.output('blob'));closeDlg()}
+    return pdf.output('blob')});if(r.ok)closeDlg()}
   catch(err){toast('匯出失敗：'+err.message)}finally{if(btn.isConnected){btn.disabled=false;prog.hidden=true}}}
 
 /* ====================== 對話框 / 提示 ====================== */
@@ -1215,7 +1252,7 @@ function openDlg(title,body,foot,wide){$('#dlg').innerHTML=`<div class="mask"><d
   $('#dlg .mask').addEventListener('click',e=>{if(e.target.classList.contains('mask')||e.target.closest('[data-x="close"]'))closeDlg()})}
 function closeDlg(){$('#dlg').innerHTML='';render()}
 let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
-function helpDlg(){const K=[['V','選取 / 移動'],['W','導線'],['T','文字'],['L','直線'],['B','矩形'],['E','橢圓 / 虛線框'],['R','旋轉 90°'],['M','水平鏡像'],[']  /  [','元件放大 / 縮小'],['Del','刪除'],['Ctrl+Z / Ctrl+Y','復原 / 重做'],['Ctrl+C / Ctrl+V','複製 / 貼上'],['Ctrl+D','原地複製'],['Ctrl+A','全選本頁'],['Ctrl+S','儲存專案 .json'],['方向鍵','微調 2.5 mm（Shift 12.5 mm）'],['F','整頁顯示'],['滾輪','以游標為中心縮放'],['空白鍵 / 中鍵 拖曳','平移畫面'],['Enter / 雙擊 / 右鍵','結束導線'],['/','導線切換先橫或先直'],['Esc','取消 / 回到選取']];
+function helpDlg(){const K=[['V','選取 / 移動'],['W','導線'],['T','文字'],['L','直線'],['B','矩形'],['E','橢圓 / 虛線框'],['R','旋轉 90°'],['M','水平鏡像'],[']  /  [','元件放大 / 縮小'],['Del','刪除'],['Ctrl+Z / Ctrl+Y','復原 / 重做'],['Ctrl+C / Ctrl+V','複製 / 貼上'],['Ctrl+D','原地複製'],['Ctrl+A','全選本頁'],['Ctrl+S','儲存專案 .json'],['Ctrl+Shift+S','另存新檔（選擇位置）'],['方向鍵','微調 2.5 mm（Shift 12.5 mm）'],['F','整頁顯示'],['滾輪','以游標為中心縮放'],['空白鍵 / 中鍵 拖曳','平移畫面'],['Enter / 雙擊 / 右鍵','結束導線'],['/','導線切換先橫或先直'],['Esc','取消 / 回到選取']];
   openDlg('操作說明',`<div class="keys">${K.map(([k,v])=>`<div><span>${v}</span><kbd>${k}</kbd></div>`).join('')}</div>
    <p class="note"><b>參考市售軟體的做法：</b>元件接腳落在 2.5 mm 格點上（同 EPLAN / AutoCAD Electrical）；導線端點碰到接腳或其他導線即自動連接，T 字分歧自動加黑點，未連接的交叉自動畫跳線弧（同原圖的 R/S/T 匯流排畫法）；移動元件時相連導線會跟著拉伸；框選由左往右為「完全包含」、由右往左為「碰到即選」（同 AutoCAD）。</p>
    <p class="note"><b>Excel：</b>「匯入 Excel」可讀取零件表（自動放置元件、耗材列入其他材料）、IO 表（每 8 點自動產生 PLC 圖頁）或本編輯器匯出的檔案（完整還原）；「匯出 Excel」產生零件表（含公式）、IO 表、元件清單、接線表及各頁圖面。</p><p class="note">元件代號自動編號（NFB1、MS1、CR1…），零件表由元件屬性自動彙整並可匯出 CSV 或附在 PDF 最後一頁。專案會自動暫存於此瀏覽器，正式保存請按「儲存」下載 .json 檔。</p>`,`<button class="btn primary" data-x="close">知道了</button>`,true)}
@@ -1223,15 +1260,13 @@ function helpDlg(){const K=[['V','選取 / 移動'],['W','導線'],['T','文字'
 /* ====================== 工具列 ====================== */
 document.querySelectorAll('#tools [data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 $('#bUndo').onclick=undo;$('#bRedo').onclick=redo;$('#bRot').onclick=rotSel;$('#bMir').onclick=mirSel;$('#bDel').onclick=delSel;
-$('#bNew').onclick=()=>{mark();doc=blankDoc();pi=0;sel.clear();full();fit();toast('已建立空白專案（可按復原取回）')};
-$('#bSample').onclick=()=>{mark();doc=sampleDoc();pi=0;sel.clear();full();fit();toast('已載入範例（可按復原取回）')};
-$('#bOpen').onclick=()=>$('#fileIn').click();
+$('#bNew').onclick=()=>{setProjHandle(null);mark();doc=blankDoc();pi=0;sel.clear();full();fit();toast('已建立空白專案（可按復原取回）')};
+$('#bSample').onclick=()=>{setProjHandle(null);mark();doc=sampleDoc();pi=0;sel.clear();full();fit();toast('已載入範例（可按復原取回）')};
+$('#bOpen').onclick=openFile;$('#bSaveAs').onclick=()=>saveJSON(true);
 $('#xlIn').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)readExcel(f)};
 $('#bXlIn').onclick=excelImportDlg;$('#bXlOut').onclick=exportXLSX;
-$('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;if(/\.xlsx$/i.test(f.name)){e.target.value='';readExcel(f);return}const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||!Array.isArray(d.pages)||!d.pages.length)throw new Error('不是線路圖專案檔');
-  d.meta=d.meta||blankDoc().meta;d.extra=d.extra||[];d.pages.forEach(p=>{p.items=(p.items||[]).filter(i=>i.t!=='s'||LIBM[i.s]);p.size=SIZES[p.size]?p.size:'A4L';p.meta=p.meta||{title:'',dwgNo:'',rev:''}});
-  mark();doc=d;pi=0;sel.clear();full();fit();toast('已開啟 '+f.name)}catch(err){toast('無法開啟：'+err.message)}};r.readAsText(f);e.target.value=''};
-$('#bSave').onclick=saveJSON;$('#bExport').onclick=exportDlg;$('#bBom').onclick=bomDialog;$('#bHelp').onclick=helpDlg;
+$('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;if(/\.xlsx$/i.test(f.name)){e.target.value='';readExcel(f);return}const r=new FileReader();r.onload=()=>{try{loadProjectText(r.result,f.name);setProjHandle(null)}catch(err){toast('無法開啟：'+err.message)}};r.readAsText(f);e.target.value=''};
+$('#bSave').onclick=()=>saveJSON(false);$('#bExport').onclick=exportDlg;$('#bBom').onclick=bomDialog;$('#bHelp').onclick=helpDlg;
 $('#oGrid').onchange=e=>{opt.grid=e.target.checked;render()};$('#oSnap').onchange=e=>{opt.snap=e.target.checked};$('#oHop').onchange=e=>{opt.hops=e.target.checked;render()};
 $('#wcol').innerHTML=WCOL.map(([c,n])=>`<option value="${c}">${n}</option>`).join('');$('#wcol').onchange=e=>{wireColor=e.target.value};
 $('#bLib').onclick=()=>{$('#lib').classList.toggle('open');$('#props').classList.remove('open')};
