@@ -142,6 +142,7 @@
       g.areaDm2 = (Math.PI * p.OD * p.L + Math.PI * p.ID * p.L + 2 * Math.PI / 4 * (p.OD ** 2 - p.ID ** 2)) / 1e4;
       g.finishTurnCm2 = (Math.PI * p.OD * p.L + Math.PI * p.ID * p.L + Math.PI / 2 * (p.OD ** 2 - p.ID ** 2)) / 100;
       g.outline = `Ø${p.OD}${p.ID ? "/Ø" + p.ID : ""}×${p.L}`;
+      g.stock = `圓棒 Ø${g.stockD} × ${g.stockL}`;
     } else if (p.shape === "sheet") {
       const t = p.T;
       g.stockVol = p.L * p.W * t / 1000 / 0.8; // 排版利用率 80%
@@ -149,12 +150,14 @@
       g.cutMm = p.cutMm || 2 * (p.L + p.W) + p.holes * Math.PI * 8 + p.slots * 60;
       g.areaDm2 = 2 * p.L * p.W * p.solidity / 1e4;
       g.outline = `${p.L}×${p.W}×t${t}`;
+      g.stock = `板材 ${p.L}×${p.W}×t${t}（排版利用率 80%）`;
     } else if (p.shape === "frame") {
       const env = p.L * p.W * p.H / 1000;
       g.partVol = p.netWeightKg ? p.netWeightKg * 1000 / rho : env * p.solidity * 0.15; // 架構件實際材積遠小於包絡
       g.stockVol = g.partVol * 1.12;
       g.areaDm2 = g.partVol * 1000 / 5 / 1e4 * 2 + 2 * (p.L * p.W + p.L * p.H + p.W * p.H) / 1e4 * 0.15;
       g.outline = `${p.L}×${p.W}×${p.H} (架構)`;
+      g.stock = p.netWeightKg ? `型材約 ${p.netWeightKg} kg` : "型材（依重量估算）";
     } else { // block / plate
       const sL = p.L + 6, sW = p.W + 6, sH = (p.H || p.T) + 3;
       g.stockVol = sL * sW * sH / 1000;
@@ -163,6 +166,7 @@
       g.finishMillCm2 = 2 * (p.L * p.W) / 100 + (p.faces > 2 ? 2 * (p.L + p.W) * (p.H || p.T) / 100 : 0);
       g.cutMm = p.cutMm || 2 * (p.L + p.W);
       g.outline = `${p.L}×${p.W}×${p.H || p.T}`;
+      g.stock = `${p.shape === "plate" ? "厚板" : "方料"} ${+(sL).toFixed(1)}×${+(sW).toFixed(1)}×${+(sH).toFixed(1)}（各邊加工餘量）`;
     }
     if (p.netWeightKg && p.shape !== "frame") g.partVol = p.netWeightKg * 1000 / rho;
     g.removeVol = Math.max(0, g.stockVol - g.partVol);

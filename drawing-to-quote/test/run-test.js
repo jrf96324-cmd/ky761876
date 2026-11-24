@@ -92,6 +92,14 @@ assert.ok(!shaft["內徑ID"], "實心軸不應有內徑");
 assert.strictEqual(q603["零件名稱"], "心軸座");
 const shaftEst = E.estimatePart(shaft);
 assert.strictEqual(shaftEst.part.shape, "round");
+// ── 方形件含 Ø 凹弧與沉頭孔標註（支撐塊）：不可誤判為圓件，取料尺寸用三向直線尺寸 ──
+const block = DP.recognize(JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "block_n763_pdftext.json"), "utf8"))).fields;
+assert.deepStrictEqual([block["外形"], block["長L"], [block["寬W"], block["高H"]].sort().join("/"), block["孔數"], block["外徑OD"], block["內徑ID"], block["零件名稱"], block["材料"]],
+  ["block", 18, "11/14.5", 2, undefined, undefined, "支撐塊", "S50C"]);
+const blockEst = E.estimatePart(block);
+assert.ok(/方料 24×/.test(blockEst.geometry.stock), blockEst.geometry.stock);
+console.log(`方形件（含 Ø 凹弧）測試通過 ✔（取料 ${blockEst.geometry.stock}，估價 NT$${Math.round(blockEst.best.price.fair)}/件）`);
+
 // ── 估價穩定性：缺尺寸仍出價（預設值＋警告），可信度隨資料品質變化 ──
 const sparse = E.estimatePart({ 圖號: "X1", 材料: "", 數量: 2, 外形: "block", 長L: 120, 辨識來源: "OCR 影像 45%" });
 assert.ok(sparse.best.price.fair > 0 && Number.isFinite(sparse.best.price.fair), "缺尺寸也必須算出價格");

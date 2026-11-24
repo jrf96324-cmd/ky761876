@@ -391,7 +391,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
       const alt = r.routes.filter((rt) => !rt.recommended).map((rt) => `<details><summary>${rt.id} ${esc(rt.name)} 的加工步驟（估價 ${n0(rt.price.fair)}/件）</summary>${stepsTable(rt.price, p.qty)}</details>`).join("");
       return `<article class="card">
         <div class="card-h"><span class="dno">${esc(p.drawingNo)}</span><span class="name">${esc(p.name)}</span>
-          <span class="muted">${esc(p.material)} × ${p.qty} 件 · ${esc(r.shapeLabel)} · ${esc(r.geometry.outline)} · 胚料 ${r.geometry.stockKg.toFixed(2)} kg${p.ratio !== 1 ? ` · 本圖估價比例 ${Math.round(p.ratio * 100)}%` : ""}</span>
+          <span class="muted">${esc(p.material)} × ${p.qty} 件 · ${esc(r.shapeLabel)} · 成品 ${esc(r.geometry.outline)} · 取料 ${esc(r.geometry.stock || "")}（${r.geometry.stockKg.toFixed(2)} kg）${p.ratio !== 1 ? ` · 本圖估價比例 ${Math.round(p.ratio * 100)}%` : ""}</span>
           <span class="spacer"></span><span class="mono"><b>${nt(r.lineTotal)}</b> <small class="muted">（${n0(r.reliability.low * p.qty)}–${n0(r.reliability.high * p.qty)}）</small></span>
           <span class="pill ${{ 高: "低", 中: "中", 低: "高" }[r.reliability.level]}" title="${esc(r.reliability.why.join("；") || "資料完整")}">估價可信度 ${r.reliability.level} ${r.reliability.score}</span><span class="pill ${r.risk.level}">風險 ${r.risk.level}</span></div>
         <div class="card-b">

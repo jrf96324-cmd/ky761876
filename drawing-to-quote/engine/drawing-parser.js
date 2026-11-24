@@ -284,6 +284,9 @@
       for (const it of doc.items) {
         if (inTB(it) || inTolTable(it) || reserved.has(it.s) || Object.values(LABELS).some((re) => re.test(it.s))) continue;
         if (/[A-Z]{1,4}\d*-[A-Z0-9]|\d{5,}|^1\s*[\/:]\s*\d+$/i.test(it.s)) continue; // 圖號、料號、比例 1/10
+        // 孔／沉頭／牙標註（2-Ø3.4xØ6x2.5L、Ø6 深 5、4-M5）裡的直徑是孔特徵，不是外形
+        if (/^\d{1,2}\s*-\s*[ØMR]|[xX×]\s*Ø|\d(\.\d+)?\s*L$|沉頭|深|通|THRU|DP|C'?BORE|錐孔/i.test(it.s)) continue;
+        if (/^\d+\s*-\s*R|^R\s*\d/i.test(it.s)) continue; // 圓角 R、2-R0.2
         if (input.source === "ocr") { // OCR：逐詞檢查，只收乾淨的尺寸字串（如 600、Ø80 g6、120±0.01）
           for (const tok of it.s.split(/\s+(?![a-hA-H]\d\b|±)/)) {
             const m = tok.trim().match(/^([ØR]?)\s*(\d{1,4}(?:\.\d{1,3})?)(\s*±.*|\s*[a-hA-H]\d{1,2}.*|\s*[+\-]\s*0?\.\d.*)?$/);
@@ -360,12 +363,18 @@
     }
 
     // 5) 外形判斷
-    let shape;
+    let shape, shapeNote = "";
     const tVal = +fields["板厚T"] || 0;
     const section = /(\d+\s*[xX×]\s*\d+\s*[xX×]\s*\d+(\.\d+)?\s*t)|角鐵|方管|槽鐵|[HC]型鋼|扁鐵|圓管/.test(allWithDims);
     const big3 = overall.length >= 3 && Math.min(overall[0], overall[1], overall[2]) > 250;
     if ((fields["焊道長mm"] !== undefined && maxL > 300) || (section && maxL > 300) || (raster && big3 && !fields["板厚T"])) shape = "frame";
     else if (fields["折彎數"] || (tVal && tVal <= 6)) shape = "sheet";
+    // 方形件證據：水平與直書的「直線尺寸」各 ≥2 個且與最大 Ø 同量級 → Ø 只是凹槽／孔等特徵，外形是方塊
+    const linD = dims.filter((d) => d.kind === "linear" && d.x != null && d.v >= Math.max(3, maxD * 0.4));
+    const prismatic = !!maxD && !shaftEv && linD.filter((d) => !d.vertical).length >= 2 && linD.filter((d) => d.vertical).length >= 2;
+    if (prismatic) shapeNote = `水平／直書直線尺寸皆有（${[...new Set(linD.map((d) => d.v))].sort((a, b) => b - a).slice(0, 4).join("、")}），Ø${maxD} 判為凹槽或孔特徵`;
+    if (shape) { /* 已判定 */ }
+    else if (prismatic) shape = (overall[2] && overall[2] < overall[1] * 0.25) ? "plate" : "block";
     else if (maxD && maxD >= maxL * 0.25 && lin.length <= 8 + dia.length * 2 && (!overall[1] || maxD >= overall[1] * 0.8)) shape = "round";
     else if (shaftEv) shape = "round";
     else if (maxD && dia.length >= 3 && maxD < maxL * 0.25) shape = "round"; // 細長軸：多段直徑
@@ -373,7 +382,8 @@
     else if (raster && thinCand && thinCand <= 6 && !fields["焊道長mm"]) shape = "sheet";
     else if (raster && chainW && !thinCand) shape = "plate"; // 座標式標註的平面圖，多為板件；板厚請人工補
     else shape = (overall[2] && overall[2] < overall[1] * 0.25) || (raster && thinCand) ? "plate" : "block";
-    set("外形", shape, shaftEv && shape === "round" ? "mid" : "low", { round: shaftEv || "直徑標註為主", sheet: "板厚/折彎註記", frame: section ? "型鋼規格註記（角鐵/方管）" : fields["焊道長mm"] !== undefined ? "焊接註記 + 大尺寸" : "三向尺寸皆 > 250mm，判為架構/焊接件", plate: "厚度遠小於長寬", block: "三向尺寸相近" }[shape]);
+    if (prismatic && shape !== "round") { fields["槽數"] = (+fields["槽數"] || 0) + 1; conf["槽數"] = "mid"; ev["槽數"] = `Ø${maxD} 凹弧／凹槽特徵（以 1 槽計工時）`; }
+    set("外形", shape, (shaftEv && shape === "round") || shapeNote ? "mid" : "low", shapeNote && shape !== "round" ? { [shape]: shapeNote } [shape] : { round: shaftEv || "直徑標註為主", sheet: "板厚/折彎註記", frame: section ? "型鋼規格註記（角鐵/方管）" : fields["焊道長mm"] !== undefined ? "焊接註記 + 大尺寸" : "三向尺寸皆 > 250mm，判為架構/焊接件", plate: "厚度遠小於長寬", block: "三向尺寸相近" }[shape]);
 
     if (shape === "round") {
       set("外徑OD", maxD, dimConf, "最大直徑 Ø" + maxD);

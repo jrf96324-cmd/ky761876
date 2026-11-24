@@ -39,9 +39,9 @@
     ], merges: ["A1:D1", "B19:D19"] });
 
     // 01 圖面辨識總表
-    sheets.push({ name: "01_圖面辨識總表", freeze: 1, colWidths: [16, 12, 16, 24, 10, 8, 16, 22, 10, 10, 12, 12, 12, 10, 14, 30],
-      rows: [["圖號", "CAD NO", "零件名稱", "圖名說明", "材料", "數量", "外形分類", "主要尺寸 mm", "胚料kg", "成品kg", "公差", "粗糙度", "表面處理", "熱處理", "辨識來源", "辨識警示"].map(H),
-        ...results.map((r) => { const p = r.part; return [p.drawingNo, p.cadNo, p.name, p.desc, p.material, { v: p.qty, s: "n0" }, r.shapeLabel, r.geometry.outline,
+    sheets.push({ name: "01_圖面辨識總表", freeze: 1, colWidths: [16, 12, 16, 24, 10, 8, 16, 22, 30, 10, 10, 12, 12, 12, 10, 14, 30],
+      rows: [["圖號", "CAD NO", "零件名稱", "圖名說明", "材料", "數量", "外形分類", "主要尺寸 mm", "取料尺寸 mm", "胚料kg", "成品kg", "公差", "粗糙度", "表面處理", "熱處理", "辨識來源", "辨識警示"].map(H),
+        ...results.map((r) => { const p = r.part; return [p.drawingNo, p.cadNo, p.name, p.desc, p.material, { v: p.qty, s: "n0" }, r.shapeLabel, r.geometry.outline, r.geometry.stock || "",
           { v: +r.geometry.stockKg.toFixed(3), s: "" }, { v: +r.geometry.partKg.toFixed(3), s: "" }, p.tolerance, p.roughness, p.surface, p.heat, p.source || "人工輸入", p.warnings.join("；")]; })] });
 
     // 02 製程審查表
