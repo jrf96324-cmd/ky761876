@@ -1651,8 +1651,19 @@ async function pickSave(name){const ext=name.split('.').pop().toLowerCase();cons
   try{const h=await window.showSaveFilePicker(o);lastDir=h;return h}catch(e){if(e&&e.name==='AbortError')return 'cancel';if(o.startIn){try{delete o.startIn;const h=await window.showSaveFilePicker(o);lastDir=h;return h}catch(e2){if(e2&&e2.name==='AbortError')return 'cancel'}}return null}}
 async function writeHandle(h,blob){const w=await h.createWritable();await w.write(blob);await w.close()}
 /* data：Blob，或回傳 Promise<Blob> 的函式（先選位置再產生檔案） */
+const cleanName=n=>String(n||'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').replace(/^\s+|[\s.]+$/g,'').slice(0,150);
+let nameResolve=null;
+function askName(name,where){const i=name.lastIndexOf('.');const base=i>0?name.slice(0,i):name,ext=i>0?name.slice(i):'';
+  return new Promise(res=>{openDlg('儲存檔案',`<div class="row" style="grid-template-columns:52px 1fr"><label for="fnIn">檔名</label><div style="display:flex;gap:6px;align-items:center;min-width:0"><input id="fnIn" value="${esc(base)}" style="flex:1;min-width:0;height:32px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);padding:0 8px" spellcheck="false"><b style="font-family:var(--font-mono)">${esc(ext)}</b></div></div>
+    <p class="note">${esc(where)}</p><p class="note" id="fnErr" class="danger"></p>`,`<button class="btn" data-x="close">取消</button><button class="btn primary" id="fnOk">儲存</button>`);
+    nameResolve=res;const inp=$('#fnIn');inp.focus();inp.select();
+    const ok=()=>{const v=cleanName(inp.value);if(!v){$('#fnErr').textContent='請輸入檔名';inp.focus();return}nameResolve=null;$('#dlg').innerHTML='';res(v+ext)};
+    $('#fnOk').onclick=ok;inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ok()}})})}
 async function saveFile(name,data,opts={}){const mk=async()=>typeof data==='function'?await data():data;
-  const ns=await dlNS();
+  const ns=await dlNS();name=cleanName(name)||'未命名';
+  const native=!ns&&pref.askPath&&pickerOK();
+  if(!opts.handle&&!opts.named&&!native){const n=await askName(name,ns?'按「儲存」後由瀏覽器確認並存檔（位置依瀏覽器設定）。':'檔案會存到瀏覽器的「下載」資料夾；若要每次選擇資料夾，請用 Chrome / Edge 並在「圖頁 / 圖框」面板勾選「儲存 / 匯出時選擇資料夾與檔名」。');
+    if(n===null){toast('已取消儲存');return{ok:false}}name=n}
   if(ns){const blob=await mk();try{await ns.save({filename:name,data:blob});toast('已儲存 '+name);return{ok:true}}catch(e){const c=e&&e.code;toast(c==='declined'?'已取消儲存':c==='rate_limited'?'已有一個儲存視窗開啟中，請稍後再試':'此檢視無法儲存檔案（'+(c||'unavailable')+'）');return{ok:false}}}
   if(opts.handle){try{await writeHandle(opts.handle,await mk());toast('已儲存到 '+opts.handle.name);return{ok:true,handle:opts.handle}}catch(e){toast('無法覆寫原檔，請選擇位置另存')}}
   if(pref.askPath&&pickerOK()){const h=await pickSave(name);if(h==='cancel'){toast('已取消儲存');return{ok:false}}
@@ -1671,17 +1682,19 @@ const ex={range:'all',dpi:300,bom:true};
 function exportDlg(){const seg=(k,opts)=>`<div class="seg">${opts.map(([v,n])=>`<button type="button" data-ek="${k}" data-ev="${v}" aria-pressed="${String(ex[k])===String(v)}">${n}</button>`).join('')}</div>`;
   openDlg('匯出圖面',`<div class="opt"><span>頁面範圍</span>${seg('range',[['all',`全部 ${doc.pages.length} 頁`],['cur','目前頁']])}</div>
     <div class="opt"><span>解析度</span>${seg('dpi',[[200,'200 dpi'],[300,'300 dpi (建議)'],[400,'400 dpi']])}</div>
+    <div class="opt"><span>檔名</span><input id="exName" value="${esc((doc.meta.project||'線路圖').replace(/[\\/:*?"<>|]/g,'_')+'_電氣迴路圖')}" spellcheck="false" style="flex:1;min-width:160px;height:30px;border:1px solid var(--line);border-radius:5px;background:var(--panel2);padding:0 8px" aria-label="匯出檔名"><span class="note" style="width:auto">.pdf / .png / .svg</span></div>
     <div class="opt"><span>零件表</span>${seg('bom',[[true,'附在最後'],[false,'不附']])}</div>
     <p class="note">PDF 為每頁一張高解析圖面（中文字型完整保留），圖紙尺寸依各頁設定（A4 / A3）。需要向量檔可匯出 SVG，再以 AutoCAD / Inkscape 開啟。</p>
     <div class="prog" id="eprog" hidden><i></i></div>`,
     `<button class="btn" data-x="svg">SVG（目前頁）</button><button class="btn" data-x="png">PNG（目前頁）</button><button class="btn primary" data-x="pdf">匯出 PDF</button>`);
   $('#dlg .body').addEventListener('click',e=>{const b=e.target.closest('[data-ek]');if(!b)return;const k=b.dataset.ek;let v=b.dataset.ev;ex[k]=k==='dpi'?+v:k==='bom'?v==='true':v;b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
   $('#dlg [data-x="pdf"]').onclick=exportPDF;
-  $('#dlg [data-x="png"]').onclick=()=>{const pg=cur();const [W,H]=SIZES[pg.size];saveFile(fname(pg.name,'png'),async()=>{const c=await svgToCanvas(pageSVG(pg,pi,doc.pages.length),W,H,ex.dpi);return await new Promise(r=>c.toBlob(r,'image/png'))})};
-  $('#dlg [data-x="svg"]').onclick=()=>{const pg=cur();saveFile(fname(pg.name,'svg'),new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+pageSVG(pg,pi,doc.pages.length)],{type:'image/svg+xml'}))};}
+  $('#dlg [data-x="png"]').onclick=()=>{const pg=cur();const [W,H]=SIZES[pg.size];saveFile(exBase()+(ex.range==='all'&&doc.pages.length>1?'_'+pg.name:'')+'.png',async()=>{const c=await svgToCanvas(pageSVG(pg,pi,doc.pages.length),W,H,ex.dpi);return await new Promise(r=>c.toBlob(r,'image/png'))},{named:true})};
+  $('#dlg [data-x="svg"]').onclick=()=>{const pg=cur();saveFile(exBase()+(doc.pages.length>1?'_'+pg.name:'')+'.svg',new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+pageSVG(pg,pi,doc.pages.length)],{type:'image/svg+xml'}),{named:true})};}
+function exBase(){const e=$('#exName');return cleanName(e&&e.value)||'線路圖'}
 async function exportPDF(){if(!window.jspdf){toast('PDF 元件尚未載入，請確認網路後重試');return}
   const btn=$('#dlg [data-x="pdf"]');const prog=$('#eprog');
-  try{const r=await saveFile(fname(ex.range==='all'?'電氣迴路圖':cur().name,'pdf'),async()=>{btn.disabled=true;prog.hidden=false;const list=[];const total=doc.pages.length;const bp=ex.bom?bomPagesSVG():[];const tot2=total+bp.length;
+  try{const r=await saveFile(exBase()+(ex.range==='all'?'':'_'+cur().name)+'.pdf',async()=>{btn.disabled=true;prog.hidden=false;const list=[];const total=doc.pages.length;const bp=ex.bom?bomPagesSVG():[];const tot2=total+bp.length;
     (ex.range==='all'?doc.pages.map((p,i)=>[p,i]):[[cur(),pi]]).forEach(([p,i])=>list.push({pg:p,svg:pageSVG(p,i,tot2)}));
     bp.forEach((b,k)=>list.push({pg:b.page,svg:pageSVG(b.page,total+k,tot2,b.body,'零件表')}));
     let pdf=null;
@@ -1690,13 +1703,13 @@ async function exportPDF(){if(!window.jspdf){toast('PDF 元件尚未載入，請
       if(!pdf)pdf=new window.jspdf.jsPDF({orientation:ori,unit:'mm',format:[wmm,hmm],compress:true});else pdf.addPage([wmm,hmm],ori);
       pdf.addImage(data,'PNG',0,0,wmm,hmm,undefined,'FAST');prog.firstElementChild.style.width=((k+1)/list.length*100)+'%';await new Promise(r=>setTimeout(r,0))}
     pdf.setProperties({title:doc.meta.project||'電氣迴路圖',subject:'電氣迴路圖',creator:'線路圖編輯器'});
-    return pdf.output('blob')});if(r.ok)closeDlg()}
+    return pdf.output('blob')},{named:true});if(r.ok)closeDlg()}
   catch(err){toast('匯出失敗：'+err.message)}finally{if(btn.isConnected){btn.disabled=false;prog.hidden=true}}}
 
 /* ====================== 對話框 / 提示 ====================== */
 function openDlg(title,body,foot,wide){$('#dlg').innerHTML=`<div class="mask"><div class="dlg${wide?' wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><h2>${esc(title)}</h2><button class="btn" data-x="close" aria-label="關閉">✕</button></header><div class="body">${body}</div><div class="foot">${foot||''}</div></div></div>`;
   $('#dlg .mask').addEventListener('click',e=>{if(e.target.classList.contains('mask')||e.target.closest('[data-x="close"]'))closeDlg()})}
-function closeDlg(){$('#dlg').innerHTML='';render()}
+function closeDlg(){$('#dlg').innerHTML='';if(nameResolve){const r=nameResolve;nameResolve=null;r(null)}render()}
 let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
 function helpDlg(){const K=[['V','選取 / 移動'],['W','導線'],['T','文字'],['L','直線'],['B','矩形'],['E','橢圓 / 虛線框'],['R','旋轉 90°'],['M','水平鏡像'],[']  /  [','元件放大 / 縮小'],['Del','刪除'],['Ctrl+Z / Ctrl+Y','復原 / 重做'],['Ctrl+C / Ctrl+V','複製 / 貼上'],['Ctrl+D','原地複製'],['Ctrl+A','全選本頁'],['Ctrl+S','儲存專案 .json'],['Ctrl+Shift+S','另存新檔（選擇位置）'],['方向鍵','微調 2.5 mm（Shift 12.5 mm）'],['F','整頁顯示'],['滾輪','以游標為中心縮放'],['空白鍵 / 中鍵 拖曳','平移畫面'],['Enter / 雙擊 / 右鍵','結束導線'],['/','導線切換先橫或先直'],['Esc','取消 / 回到選取']];
   openDlg('操作說明',`<div class="keys">${K.map(([k,v])=>`<div><span>${v}</span><kbd>${k}</kbd></div>`).join('')}</div>
