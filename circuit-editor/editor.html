@@ -1,0 +1,1021 @@
+<title>電控線路圖編輯器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: CAD workbench — toolbar / [symbol library | drawing sheet | properties] / sheet tabs + status */
+:root{
+  --bg:#e6eaee; --panel:#f5f7f9; --panel2:#ffffff; --line:#d0d8de; --fg:#1a242b; --muted:#5b6a74;
+  --accent:#0d6f8c; --accent-ink:#ffffff; --accent-soft:#d9eef4; --desk:#c5ced5; --sel:#1478d4; --danger:#c23b2a; --ok:#1e8a4c;
+  --font-ui:'Noto Sans TC','Microsoft JhengHei','PingFang TC',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13181c; --panel:#1a2126; --panel2:#20282e; --line:#2e3941; --fg:#e2e8ec; --muted:#91a0aa;
+  --accent:#4cb6d4; --accent-ink:#04222b; --accent-soft:#16343e; --desk:#0d1114; --sel:#4aa3ff; --danger:#ff7b66; --ok:#4fd18a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13181c; --panel:#1a2126; --panel2:#20282e; --line:#2e3941; --fg:#e2e8ec; --muted:#91a0aa;
+  --accent:#4cb6d4; --accent-ink:#04222b; --accent-soft:#16343e; --desk:#0d1114; --sel:#4aa3ff; --danger:#ff7b66; --ok:#4fd18a; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:13px;overflow:hidden}
+#app{display:grid;grid-template-rows:auto 1fr auto;height:100%}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* toolbar */
+.tb{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-block:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px));background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.02em;margin-right:6px;white-space:nowrap}
+.brand svg{flex:none}
+.grp{display:flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.btn{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 9px;border:0;border-radius:4px;background:transparent;white-space:nowrap}
+.btn:hover{background:var(--accent-soft)}
+.btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn svg{width:16px;height:16px;flex:none}
+.btn kbd{font-family:var(--font-mono);font-size:10px;opacity:.6}
+.btn:disabled{opacity:.4;cursor:default}
+.sp{flex:1}
+.chk{display:inline-flex;align-items:center;gap:4px;padding:0 6px;height:30px;white-space:nowrap;cursor:pointer}
+.swatch{width:16px;height:16px;border-radius:3px;border:1px solid var(--line);display:inline-block}
+
+/* main */
+#main{display:grid;grid-template-columns:232px 1fr 272px;min-height:0}
+aside{background:var(--panel);min-height:0;overflow:auto}
+#lib{border-right:1px solid var(--line)}
+#props{border-left:1px solid var(--line)}
+.ph{position:sticky;top:0;z-index:2;background:var(--panel);padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+.ph h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.search{width:100%;height:30px;border:1px solid var(--line);border-radius:5px;background:var(--panel2);padding:0 8px}
+.cat{border-bottom:1px solid var(--line)}
+.cat>button{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:0;background:transparent;font-weight:700;font-size:12px}
+.cat>button span{color:var(--muted);font-weight:400;font-family:var(--font-mono)}
+.cat.closed .cells{display:none}
+.cells{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:0 10px 10px}
+.cell{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px 5px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);cursor:grab;user-select:none;text-align:center;min-width:0}
+.cell:hover{border-color:var(--accent)}
+.cell.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.cell svg{width:100%;height:46px;background:#fff;border-radius:3px}
+.cell b{font-size:11px;font-weight:500;line-height:1.25}
+.cell i{font-style:normal;font-size:10px;color:var(--muted);font-family:var(--font-mono)}
+
+#stage{position:relative;background:var(--desk);overflow:hidden;min-width:0;touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none}
+#cv.pan{cursor:grab}
+#cv.cross{cursor:crosshair}
+.hit{pointer-events:all}
+.hint{position:absolute;left:12px;top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--muted);pointer-events:none;max-width:calc(100% - 24px)}
+.hint b{color:var(--fg)}
+.zoombox{position:absolute;right:12px;bottom:12px;display:flex;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px}
+.zoombox .btn{height:28px;padding:0 8px}
+#zl{font-family:var(--font-mono);font-size:11px;min-width:44px;text-align:center;align-self:center}
+
+/* properties */
+.pf{padding:10px 12px;display:grid;gap:10px}
+.sec{display:grid;gap:7px}
+.sec h3{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:4px 0 0;text-transform:uppercase}
+.row{display:grid;grid-template-columns:72px 1fr;align-items:center;gap:6px}
+.row>label{color:var(--muted);font-size:12px}
+.row input,.row select,.row textarea{width:100%;min-width:0;height:28px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);padding:0 7px}
+.row textarea{height:auto;min-height:70px;padding:5px 7px;resize:vertical;font-family:var(--font-mono);font-size:12px;line-height:1.45}
+.row input[type=checkbox]{width:16px;height:16px}
+.row input[type=color]{padding:1px 2px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btns{display:flex;flex-wrap:wrap;gap:4px}
+.btns .btn{border:1px solid var(--line);background:var(--panel2);height:28px;padding:0 8px}
+.btns .btn:hover{border-color:var(--accent)}
+.colors{display:flex;flex-wrap:wrap;gap:4px}
+.colors button{width:22px;height:22px;border-radius:4px;border:1px solid var(--line);padding:0}
+.colors button[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+.note{font-size:12px;color:var(--muted);line-height:1.5}
+.pill{display:inline-block;padding:1px 7px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;font-family:var(--font-mono)}
+.danger{color:var(--danger)}
+
+/* footer */
+footer{display:flex;align-items:stretch;gap:8px;background:var(--panel);border-top:1px solid var(--line);padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px));min-height:36px;flex-wrap:wrap}
+#tabs{display:flex;align-items:stretch;gap:2px;overflow-x:auto;flex:1;min-width:0}
+.tab{display:flex;align-items:center;gap:6px;padding:0 12px;border:0;border-top:3px solid transparent;background:transparent;white-space:nowrap;color:var(--muted)}
+.tab.on{border-top-color:var(--accent);background:var(--panel2);color:var(--fg);font-weight:500}
+.tab small{font-family:var(--font-mono);font-size:10px;opacity:.7}
+.tab input{width:120px;height:24px;border:1px solid var(--accent);border-radius:3px;background:var(--panel2);padding:0 5px}
+.pgops{display:flex;align-items:center;gap:2px}
+#status{display:flex;align-items:center;gap:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap}
+
+/* dialogs */
+.mask{position:fixed;inset:0;background:rgba(10,16,20,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(560px,100%);max-height:calc(100% - 20px);display:flex;flex-direction:column}
+.dlg.wide{width:min(1100px,100%)}
+.dlg header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+.dlg header h2{margin:0;font-size:15px}
+.dlg .body{padding:14px 16px;overflow:auto;display:grid;gap:12px}
+.dlg .foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.dlg .foot .btn{border:1px solid var(--line)}
+.opt{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.opt>span{width:84px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button{border:0;background:var(--panel2);padding:5px 11px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tblwrap{overflow:auto;border:1px solid var(--line);border-radius:6px}
+table.bom{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+table.bom th,table.bom td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:left;white-space:nowrap}
+table.bom th{background:var(--panel2);position:sticky;top:0;font-weight:700;color:var(--muted);font-size:11px}
+table.bom td.n{text-align:right;font-family:var(--font-mono)}
+table.bom input{width:100%;min-width:70px;border:1px solid transparent;background:transparent;padding:2px 4px;border-radius:3px}
+table.bom input:hover,table.bom input:focus{border-color:var(--line);background:var(--panel2)}
+table.bom tfoot td{font-weight:700}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 18px}
+.keys div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:3px 0}
+.keys kbd{font-family:var(--font-mono);font-size:11px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:0 5px}
+#toast{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:13px;z-index:60;max-width:calc(100% - 32px)}
+.prog{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);width:0}
+.mob{display:none}
+
+@media (max-width:980px){
+  #main{grid-template-columns:1fr}
+  #lib,#props{position:absolute;top:0;bottom:0;width:min(300px,86vw);z-index:20;box-shadow:0 0 30px rgba(0,0,0,.25)}
+  #lib{left:0} #props{right:0}
+  #main{position:relative}
+  #lib:not(.open),#props:not(.open){display:none}
+  .mob{display:inline-flex}
+  .tlabel{display:none}
+  #status .opt-hide{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div id="app">
+  <div class="tb" role="toolbar" aria-label="主工具列">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="4" fill="var(--accent)"/><path d="M5 11h4m4 0h4M9 6v10M13 6v10" stroke="var(--accent-ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+      <span class="tlabel">線路圖編輯器</span>
+    </div>
+    <button class="btn mob" id="bLib" title="元件庫">元件庫</button>
+    <div class="grp">
+      <button class="btn" id="bNew" title="新增空白專案">新增</button>
+      <button class="btn" id="bSample" title="載入範例（依上傳電氣迴路圖）">範例</button>
+      <button class="btn" id="bOpen" title="開啟 .json 專案檔">開啟</button>
+      <button class="btn" id="bSave" title="儲存專案為 .json (Ctrl+S)">儲存</button>
+    </div>
+    <div class="grp">
+      <button class="btn" id="bUndo" title="復原 (Ctrl+Z)"><svg viewBox="0 0 16 16"><path d="M5 3L2 6l3 3M2.5 6H10a4 4 0 010 8H7" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn" id="bRedo" title="重做 (Ctrl+Y)"><svg viewBox="0 0 16 16"><path d="M11 3l3 3-3 3M13.5 6H6a4 4 0 000 8h3" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="grp" id="tools">
+      <button class="btn" data-tool="select" title="選取 / 移動 (V)"><svg viewBox="0 0 16 16"><path d="M3 2l9 6-4 1 2 4.5-1.6.7-2-4.5L3 12z" fill="currentColor"/></svg><span class="tlabel">選取</span></button>
+      <button class="btn" data-tool="wire" title="導線 (W)：點擊起點→轉折→點到接點結束；/ 切換轉向"><svg viewBox="0 0 16 16"><path d="M2 12h5V4h7" stroke="currentColor" fill="none" stroke-width="1.8"/><circle cx="2" cy="12" r="1.6" fill="currentColor"/><circle cx="14" cy="4" r="1.6" fill="currentColor"/></svg><span class="tlabel">導線</span></button>
+      <button class="btn" data-tool="text" title="文字 (T)"><svg viewBox="0 0 16 16"><path d="M3 3h10M8 3v10" stroke="currentColor" stroke-width="1.8" fill="none"/></svg><span class="tlabel">文字</span></button>
+      <button class="btn" data-tool="line" title="直線 (L)"><svg viewBox="0 0 16 16"><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.6"/></svg></button>
+      <button class="btn" data-tool="rect" title="矩形框 (B)"><svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></button>
+      <button class="btn" data-tool="ellipse" title="橢圓 / 虛線框 (E)"><svg viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="6" ry="4.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="2 1.5"/></svg></button>
+    </div>
+    <div class="grp">
+      <button class="btn" id="bRot" title="旋轉 90° (R)"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 11-1.5-3.6M13 2v3h-3" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <button class="btn" id="bMir" title="水平鏡像 (M)"><svg viewBox="0 0 16 16"><path d="M8 1v14M6 4L2 12h4zM10 4l4 8h-4z" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
+      <button class="btn" id="bDel" title="刪除 (Del)"><svg viewBox="0 0 16 16"><path d="M3 4h10M6 4V2.5h4V4M4.5 4l.8 9.5h5.4l.8-9.5" stroke="currentColor" fill="none" stroke-width="1.5"/></svg></button>
+    </div>
+    <label class="chk" title="新導線顏色"><span class="tlabel">線色</span>
+      <select id="wcol" aria-label="新導線顏色"></select>
+    </label>
+    <div class="sp"></div>
+    <label class="chk"><input type="checkbox" id="oGrid" checked> 格點</label>
+    <label class="chk"><input type="checkbox" id="oSnap" checked> 吸附</label>
+    <label class="chk" title="導線交叉處畫跳線弧"><input type="checkbox" id="oHop" checked> 跳線弧</label>
+    <button class="btn" id="bBom" title="零件表 / 估價">零件表</button>
+    <button class="btn" id="bHelp" title="快捷鍵說明">?</button>
+    <button class="btn primary" id="bExport" title="匯出 PDF / PNG / SVG">匯出 PDF</button>
+    <button class="btn mob" id="bProps" title="屬性">屬性</button>
+  </div>
+
+  <div id="main">
+    <aside id="lib" aria-label="元件庫">
+      <div class="ph"><h2>元件庫</h2><input class="search" id="q" placeholder="搜尋：按鈕、NFB、PLC…" aria-label="搜尋元件"></div>
+      <div id="cats"></div>
+    </aside>
+    <div id="stage">
+      <svg id="cv" xmlns="http://www.w3.org/2000/svg">
+        <defs id="defs"></defs>
+        <g id="vp"></g>
+      </svg>
+      <div class="hint" id="hint"></div>
+      <div class="zoombox">
+        <button class="btn" id="zOut" title="縮小 (-)">−</button>
+        <span id="zl">100%</span>
+        <button class="btn" id="zIn" title="放大 (+)">+</button>
+        <button class="btn" id="zFit" title="整頁 (F)">整頁</button>
+      </div>
+    </div>
+    <aside id="props" aria-label="屬性"><div class="ph"><h2 id="ptitle">屬性</h2></div><div id="pbody" class="pf"></div></aside>
+  </div>
+
+  <footer>
+    <div id="tabs" role="tablist" aria-label="圖頁"></div>
+    <div class="pgops">
+      <button class="btn" id="pgAdd" title="新增圖頁">＋ 頁</button>
+      <button class="btn" id="pgDup" title="複製目前圖頁">複製</button>
+      <button class="btn" id="pgL" title="往前移">◀</button>
+      <button class="btn" id="pgR" title="往後移">▶</button>
+      <button class="btn danger" id="pgDel" title="刪除目前圖頁">刪除</button>
+    </div>
+    <div id="status"><span id="sXY">X 0.0  Y 0.0 mm</span><span id="sSel" class="opt-hide"></span><span id="sSave" class="opt-hide"></span></div>
+  </footer>
+</div>
+<input type="file" id="fileIn" accept=".json,application/json" hidden>
+<div id="dlg"></div>
+<div id="toast" hidden></div>
+
+<script>
+(()=>{
+'use strict';
+/* ====================== 基本工具 ====================== */
+const $=s=>document.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,10);
+const clone=o=>JSON.parse(JSON.stringify(o));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2=n=>Math.round(n*100)/100;
+const PF="'Microsoft JhengHei','PingFang TC','Noto Sans CJK TC','Noto Sans TC','Heiti TC',Arial,sans-serif";
+const INK='#111';
+const U=4;            // 4 單位 = 1 mm
+const GRID=10;        // 2.5 mm 格點
+const SIZES={A4L:[1188,840,'A4 橫式'],A4P:[840,1188,'A4 直式'],A3L:[1680,1188,'A3 橫式'],A3P:[1188,1680,'A3 直式']};
+const WCOL=[['#111111','黑'],['#d12a1f','紅'],['#1f4fd1','藍'],['#8a5a2b','棕'],['#e07b00','橙'],['#c9a800','黃'],['#1e8f3a','綠'],['#8a8f94','灰/白'],['#7a3fb0','紫']];
+const mctx=document.createElement('canvas').getContext('2d');
+const tw=(s,size)=>{mctx.font=`${size}px ${PF}`;return mctx.measureText(String(s)).width};
+
+/* ---------- SVG primitives (local symbol coordinates) ---------- */
+let TX={rot:0,mir:false};   // current symbol transform, used to keep text readable
+const L=(x1,y1,x2,y2,d)=>`<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}"${d?' stroke-dasharray="4 3"':''}/>`;
+const C=(cx,cy,r,f)=>`<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r}"${f?` fill="${f===1?INK:f}"`:''}/>`;
+const R=(x,y,w,h,f,d)=>`<rect x="${r2(x)}" y="${r2(y)}" width="${r2(w)}" height="${r2(h)}"${f?` fill="${f}"`:''}${d?' stroke-dasharray="4 3"':''}/>`;
+const E=(cx,cy,rx,ry,d,f)=>`<ellipse cx="${r2(cx)}" cy="${r2(cy)}" rx="${r2(rx)}" ry="${r2(ry)}"${d?' stroke-dasharray="4 3"':''}${f?` fill="${f}"`:''}/>`;
+const P=(d,f,dash)=>`<path d="${d}"${f?` fill="${f===1?INK:f}"`:''}${dash?' stroke-dasharray="4 3"':''}/>`;
+function T(x,y,s,size=10,anchor='middle',bold){
+  s=String(s??''); if(!s) return '';
+  const w=tw(s,size);
+  const cx=anchor==='start'?x+w/2:anchor==='end'?x-w/2:x, cy=y-size*0.35;
+  let tf='';
+  if(TX.mir) tf+=`matrix(-1 0 0 1 ${r2(2*cx)} 0) `;
+  if(TX.rot===90||TX.rot===180) tf+=`rotate(180 ${r2(cx)} ${r2(cy)})`;
+  return `<text x="${r2(x)}" y="${r2(y)}" font-size="${size}" text-anchor="${anchor}"${bold?' font-weight="700"':''} fill="${INK}" stroke="none"${tf?` transform="${tf.trim()}"`:''}>${esc(s)}</text>`;
+}
+const list=s=>String(s??'').split(',').map(x=>x.trim()).filter((x,i,a)=>!(a.length===1&&x===''));
+const snapU=v=>Math.round(v/10)*10;
+const ceil10=v=>Math.ceil(v/10)*10;
+
+/* ====================== 符號幾何 ====================== */
+const P2=[{x:0,y:0,n:'1'},{x:40,y:0,n:'2'}];
+const lead=()=>L(0,0,11,0)+C(14,0,3)+C(26,0,3)+L(29,0,40,0);
+const contactNO=()=>L(0,0,16,0)+L(16,-8,16,8)+L(24,-8,24,8)+L(24,0,40,0);
+const B={
+  no:()=>({pins:P2,box:[0,-10,40,10],svg:contactNO()}),
+  nc:()=>({pins:P2,box:[0,-10,40,10],svg:contactNO()+L(11,9,29,-9)}),
+  pb_no:()=>({pins:P2,box:[0,-14,40,6],svg:lead()+R(8,-13,24,4)+L(20,-9,20,-3,1)}),
+  pb_nc:()=>({pins:P2,box:[0,-14,40,8],svg:lead()+L(11,5,29,5)+R(8,-13,24,4)+L(20,-9,20,5,1)}),
+  emg:()=>({pins:P2,box:[0,-19,40,8],svg:lead()+L(11,5,29,5)+P('M7,-9 A13,9 0 0 1 33,-9 Z')+L(20,-9,20,5,1)}),
+  ls_no:()=>({pins:P2,box:[0,-14,40,6],svg:lead()+P('M10,-2 A10,10 0 0 1 30,-2')+R(16.5,-11,7,10,'#fff')}),
+  ls_nc:()=>({pins:P2,box:[0,-14,40,8],svg:lead()+L(11,5,29,5)+P('M10,-2 A10,10 0 0 1 30,-2')+R(16.5,-11,7,10,'#fff')}),
+  ol_nc:()=>({pins:P2,box:[0,-19,40,10],svg:contactNO()+L(11,9,29,-9)+P('M12,-12 h5 v-5 h6 v5 h5')+L(20,-12,20,-8,1)}),
+  td_no:()=>({pins:P2,box:[0,-21,40,10],svg:contactNO()+P('M13,-14 A7,6 0 0 1 27,-14 Z')+L(20,-14,20,-8,1)}),
+  coil:()=>({pins:P2,box:[0,-9,40,9],svg:L(0,0,6,0)+E(20,0,14,8.5)+L(34,0,40,0),tag:'in'}),
+  tcoil:()=>({pins:P2,box:[0,-9,40,9],svg:L(0,0,8,0)+R(8,-8,24,16)+L(32,0,40,0)+L(8,-3,13,-8),tag:'in'}),
+  sol:()=>({pins:P2,box:[0,-9,40,9],svg:L(0,0,8,0)+R(8,-8,24,16)+L(8,8,32,-8)+L(32,0,40,0)}),
+  lamp:()=>({pins:P2,box:[0,-10,40,10],svg:L(0,0,11,0)+C(20,0,9)+L(13.6,-6.4,26.4,6.4)+L(13.6,6.4,26.4,-6.4)+L(29,0,40,0)}),
+  buzzer:()=>({pins:P2,box:[0,-10,40,4],svg:L(0,0,12,0)+P('M12,0 A8,8 0 0 1 28,0 Z')+L(28,0,40,0)+L(20,-8,20,-10)}),
+  diode:()=>({pins:P2,box:[0,-8,40,8],svg:L(0,0,14,0)+P('M14,-7 L26,0 L14,7 Z')+L(26,-7,26,7)+L(26,0,40,0)}),
+  led:()=>({pins:P2,box:[0,-18,40,8],svg:L(0,0,14,0)+P('M14,-7 L26,0 L14,7 Z')+L(26,-7,26,7)+L(26,0,40,0)+L(19,-9,24,-15)+P('M24,-15 l-3.5,0.5 l2.5,2.5 Z',1)+L(24,-9,29,-15)+P('M29,-15 l-3.5,0.5 l2.5,2.5 Z',1)}),
+  fuse:()=>({pins:P2,box:[0,-5,40,5],svg:L(0,0,40,0)+R(10,-4,20,8)}),
+  res:()=>({pins:P2,box:[0,-5,40,5],svg:L(0,0,8,0)+R(8,-4.5,24,9)+L(32,0,40,0)}),
+  term:()=>({pins:[{x:0,y:0,n:'1'},{x:20,y:0,n:'2'}],box:[0,-5,20,5],svg:L(0,0,6.5,0)+C(10,0,3.5,'#fff')+L(13.5,0,20,0)+L(7.5,2.5,12.5,-2.5)}),
+  gnd:()=>({pins:[{x:0,y:0,n:'E'}],box:[-10,0,10,20],svg:L(0,0,0,10)+L(-10,10,10,10)+L(-6,14,6,14)+L(-2,18,2,18),tag:'none'}),
+  fg:()=>({pins:[{x:0,y:0,n:'FG'}],box:[-9,0,9,24],svg:L(0,0,0,6)+C(0,15,9)+L(0,8,0,13)+L(-5,13,5,13)+L(-3,16,3,16)+L(-1,19,1,19),tag:'none'}),
+  dot:()=>({pins:[{x:0,y:0,n:'J'}],box:[-3,-3,3,3],svg:C(0,0,2.8,1),tag:'none'}),
+  arrow_out:p=>{const w=tw(p.text,10);return{pins:[{x:0,y:0,n:'S'}],box:[0,-7,46+w,6],svg:L(0,0,30,0)+P('M30,-4 L40,0 L30,4 Z',1)+T(44,3.5,p.text,10,'start'),tag:'none'}},
+  arrow_in:p=>{const w=tw(p.text,10);return{pins:[{x:0,y:0,n:'S'}],box:[-46-w,-7,0,6],svg:L(-40,0,0,0)+P('M-10,-4 L0,0 L-10,4 Z',1)+T(-44,3.5,p.text,10,'end'),tag:'none'}},
+  net:p=>{const w=tw(p.text,10)+8;return{pins:[{x:0,y:0,n:'N'}],box:[0,-7,w+6,7],svg:P(`M0,0 L6,-7 H${r2(w+6)} V7 H6 Z`,'#fff')+T(6+w/2,3.5,p.text,10),tag:'none'}},
+  cable:p=>{const w=tw(p.text,9)+12;return{pins:[],box:[0,-7,w,7],svg:`<rect x="0" y="-7" width="${r2(w)}" height="14" fill="#d9d9d9" stroke="none"/>`+T(w/2,3,p.text,9),tag:'none'}},
+  shield:p=>{const h=+p.h||40;return{pins:[],box:[-9,-h/2,9,h/2],svg:E(0,0,8,h/2,1),tag:'none'}},
+  brk:p=>{const n=Math.max(1,Math.min(4,+p.n||1));let s='',pins=[];
+    for(let i=0;i<n;i++){const x=i*20;pins.push({x,y:0,n:String(2*i+1)},{x,y:60,n:String(2*i+2)});
+      s+=L(x,0,x,18)+C(x,21,3)+C(x,45,3)+L(x,48,x,60)+L(x,42,x+9,24)+P(`M${x+5},17 Q${x+9},21 ${x+5},25`);}
+    if(n>1)s+=L(4,33,(n-1)*20+6,33,1);
+    return{pins,box:[-6,0,(n-1)*20+12,60],svg:s,tag:'right'}},
+  ms:p=>{const n=Math.max(1,Math.min(4,+p.n||3));let s='',pins=[];
+    for(let i=0;i<n;i++){const y=i*20;pins.push({x:0,y,n:'L'+(i+1)},{x:40,y,n:'T'+(i+1)});s+=L(0,y,16,y)+L(16,y-7,16,y+7)+L(24,y-7,24,y+7)+L(24,y,40,y);}
+    s+=L(20,-10,20,(n-1)*20+8,1);
+    return{pins,box:[0,-10,40,(n-1)*20+8],svg:s}},
+  ol:p=>{const n=Math.max(1,Math.min(4,+p.n||3));let s='',pins=[];
+    for(let i=0;i<n;i++){const y=i*20;pins.push({x:0,y,n:String(i+1)},{x:40,y,n:String(i+1)+"'"});s+=P(`M0,${y} H14 V${y-9} H26 V${y} H40`);}
+    s+=L(20,-13,20,(n-1)*20+6,1);
+    return{pins,box:[0,-13,40,(n-1)*20+6],svg:s}},
+  nf:p=>{const n=Math.max(2,Math.min(4,+p.n||2));let s='',pins=[];const h=(n-1)*20;
+    for(let i=0;i<n;i++){const y=i*20;pins.push({x:0,y,n:'I'+(i+1)},{x:60,y,n:'O'+(i+1)});s+=L(0,y,10,y)+L(50,y,60,y);}
+    s+=R(10,-10,40,h+20)+P(`M18,${h/2} q3,-5 6,0 t6,0 t6,0 t6,0`)+T(30,h+6,'NF',8);
+    return{pins,box:[0,-10,60,h+10],svg:s}},
+  trans:()=>{let s=L(0,0,22,0)+L(22,0,22,4)+L(0,40,22,40)+L(22,36,22,40)+L(38,0,60,0)+L(38,0,38,4)+L(38,36,38,40)+L(38,40,60,40)+L(29,2,29,38)+L(31,2,31,38);
+    let a='M22,4',b='M38,4';for(let i=0;i<4;i++){a+=` A4,4 0 0 1 22,${12+i*8}`;b+=` A4,4 0 0 0 38,${12+i*8}`;}
+    return{pins:[{x:0,y:0,n:'1'},{x:0,y:40,n:'2'},{x:60,y:0,n:'3'},{x:60,y:40,n:'4'}],box:[0,-4,60,44],svg:s+P(a)+P(b)}},
+  motor:p=>{const cx=20,cy=46,r=18;let s='';const pins=[{x:0,y:0,n:'U'},{x:20,y:0,n:'V'},{x:40,y:0,n:'W'}];
+    for(const q of pins){const top=q.x===20?cy-r:18;s+=L(q.x,0,q.x,Math.min(top,20));if(q.x!==20){const dx=cx-q.x,dy=cy-20,d=Math.hypot(dx,dy);s+=L(q.x,20,cx-dx/d*r,cy-dy/d*r);}}
+    const lines=String(p.label||'M').split('\n');s+=C(cx,cy,r);lines.forEach((t,i)=>s+=T(cx,cy+4+(i-(lines.length-1)/2)*12,t,11,'middle',1));
+    return{pins,box:[-2,0,42,cy+r],svg:s}},
+  box:p=>{const pit=Math.max(20,ceil10(+p.pitch||20));const Ls=list(p.left),Rs=list(p.right),Ts=list(p.top),Bs=list(p.bottom);
+    const nv=Math.max(Ls.length,Rs.length,1),nh=Math.max(Ts.length,Bs.length);
+    let W=ceil10(Math.max(+p.w||100,nh?(nh-1)*pit+40:0));let H=(nv-1)*pit+40;if(nh)H=Math.max(H,60);
+    let s=R(10,0,W,H,'#fff'),pins=[];
+    Ls.forEach((t,i)=>{const y=20+i*pit;pins.push({x:0,y,n:t});s+=L(0,y,10,y)+T(14,y+3.5,t,9,'start');});
+    Rs.forEach((t,i)=>{const y=20+i*pit;pins.push({x:W+20,y,n:t});s+=L(W+10,y,W+20,y)+T(W+6,y+3.5,t,9,'end');});
+    Ts.forEach((t,i)=>{const x=30+i*pit;pins.push({x,y:-10,n:t});s+=L(x,-10,x,0)+T(x,12,t,9);});
+    Bs.forEach((t,i)=>{const x=30+i*pit;pins.push({x,y:H+10,n:t});s+=L(x,H,x,H+10)+T(x,H-4,t,9);});
+    const lines=String(p.title||'').split('\n');lines.forEach((t,i)=>s+=T(10+W/2,H/2+4+(i-(lines.length-1)/2)*13,t,i===0?11:10,'middle',i===0));
+    return{pins,box:[0,nh&&Ts.length?-10:0,W+20,H+(Bs.length?10:0)],svg:s}},
+  plc:p=>{const pit=Math.max(20,ceil10(+p.pitch||20)),n=Math.max(1,Math.min(32,+p.n||8)),w=ceil10(+p.w||70),nw=+p.noteW||170;
+    const m=String(p.base||'X0').match(/^([A-Za-z]*)(\d+)$/)||['', 'X','0'];const pre=m[1],oct=!!p.octal,b0=parseInt(m[2],oct?8:10)||0;
+    const notes=String(p.notes||'').split('\n');const H=n*pit+40;let s=R(10,0,w,H,'#fff'),pins=[];
+    for(let i=0;i<=n;i++){const y=20+i*pit;const a=i<n?pre+(oct?(b0+i).toString(8):String(b0+i)).padStart(oct&&m[2].length>1?2:1,'0'):(p.com||'COM');
+      pins.push({x:0,y,n:a});s+=L(0,y,10,y)+T(16,y+3.5,a,10,'start',i<n);
+      if(i<n){s+=L(10+w,y,10+w+nw,y,1);if(notes[i])s+=T(16+w,y-4,notes[i],10,'start');}}
+    s+=T(10+w/2,-6,p.model||'',9);
+    return{pins,box:[0,-16,10+w+nw,H],svg:s}},
+  table:p=>{const rows=String(p.rows||'').split('\n').map(r=>r.split(',').map(x=>x.trim())).filter(r=>r.length>=2);
+    const cw=[74,28,28,74],W=cw.reduce((a,b)=>a+b,0),X=[10,10+cw[0],10+cw[0]+cw[1],10+cw[0]+cw[1]+cw[2],10+W];
+    let s='',pins=[];const H=40+rows.length*20;
+    s+=R(10,0,W,H,'#fff')+T(10+W/2,15,p.title||'',11,'middle',1)+L(10,20,10+W,20)+L(10,40,10+W,40);
+    ['定義','腳位','腳位','定義'].forEach((t,i)=>s+=T((X[i]+X[i+1])/2,34,t,10));
+    s+=`<rect x="${X[1]}" y="40" width="${cw[1]+cw[2]}" height="${rows.length*20}" fill="#d9d9d9" stroke="none"/>`;
+    rows.forEach((r,i)=>{const y=40+i*20,c=y+10;s+=L(10,y+20,10+W,y+20);
+      s+=T((X[0]+X[1])/2,c+3.5,r[1]||'',10)+T((X[1]+X[2])/2,c+3.5,r[0]||'',10)+T((X[2]+X[3])/2,c+3.5,r[2]||'',10)+T((X[3]+X[4])/2,c+3.5,r[3]||'',10);
+      pins.push({x:0,y:c,n:r[0]||''});s+=L(0,c,10,c);if(r[2]){pins.push({x:W+20,y:c,n:r[2]});s+=L(10+W,c,W+20,c);}});
+    for(let i=1;i<4;i++)s+=L(X[i],20,X[i],H);
+    return{pins,box:[0,0,W+20,H],svg:s}},
+  circ:p=>{const Ps=list(p.pins);const n=Math.max(Ps.length,1);const r=Math.max(+p.r||28,n*10+6);const cy=20+(n-1)*10,cx=r;const len=+p.len||70;const X=ceil10(2*r+len);
+    let s=C(cx,cy,r,'#fff');const lines=String(p.title||'').split('\n');lines.forEach((t,i)=>s+=T(cx,cy+4+(i-(lines.length-1)/2)*13,t,11));
+    const pins=[];Ps.forEach((t,i)=>{const y=20+i*20;const dy=y-cy;const xe=cx+Math.sqrt(Math.max(0,r*r-dy*dy));pins.push({x:X,y,n:t});s+=L(xe,y,X,y)+T(X-6,y-3,t,9,'end');});
+    return{pins,box:[0,cy-r,X,cy+r],svg:s}},
+  sel:p=>{const n=Math.max(2,Math.min(6,+p.n||2));let s='',pins=[];const labs=list(p.labels);
+    for(let i=0;i<n;i++){const y=i*20;pins.push({x:0,y,n:String(2*i+1)},{x:40,y,n:String(2*i+2)});s+=L(0,y,11,y)+C(14,y,3)+C(26,y,3)+L(29,y,40,y);if(labs[i])s+=T(44,y+3.5,labs[i],8,'start');}
+    s+=L(20,-8,20,(n-1)*20-4,1)+P('M14,-14 H26 M20,-14 V-8')+L(12,-10,28,-18);
+    return{pins,box:[0,-18,40+(labs.length?30:0),(n-1)*20+4],svg:s}},
+};
+
+/* ---------- 元件庫（依上傳圖檔整理） ---------- */
+const CN1_ROWS=`1,TPOS_O4+,26,TPOS_O4-
+2,WARN_O3-,27,ALRM_O5-
+3,WARN_O3+,28,ALRM_O5+
+4,ZSPD_O2-,29,DI9-
+5,ZSPD_O2+,30,EMGS_I8
+6,SRDY_O1-,31,PL_I7
+7,SRDY_O1+,32,NL_I6
+8,TCM1_I4,33,ARST_I5
+9,SON_I1,34,TCM0_I3
+10,CCLR_I2,35,PULL HI_S
+11,COM+,36,SIGN+
+12,GND,37,SIGN-
+13,GND,38,DI10-
+14,NC,39,PULL HI_P
+15,MON2,40,DO6-
+16,MON1,41,PULSE-
+17,VDD,42,V_REF
+18,T-REF,43,PULSE+
+19,GND,44,GND
+20,GND,45,NC
+21,OA,46,DO6+
+22,/OA,47,NC
+23,/OB,48,OCZ
+24,/OZ,49,NC
+25,OB,50,OZ`;
+const LIB=[
+ {cat:'電源與保護',items:[
+  {id:'nfb3',b:'brk',name:'無熔絲開關 3P',pre:'NFB',p:{n:3},spec:'3P15A, AC220V'},
+  {id:'nfb2',b:'brk',name:'無熔絲開關 2P',pre:'NFB',p:{n:2},spec:'2P5A, AC220V'},
+  {id:'nfb1',b:'brk',name:'無熔絲開關 1P',pre:'CP',p:{n:1},spec:'CP-1P2A'},
+  {id:'ms3',b:'ms',name:'電磁開關主接點',pre:'MS',p:{n:3},spec:'SC-0 AC220V'},
+  {id:'ol3',b:'ol',name:'積熱電驛',pre:'OL',p:{n:3},spec:'TR-ON(4~6A)'},
+  {id:'fuse',b:'fuse',name:'保險絲',pre:'F'},
+  {id:'nf',b:'nf',name:'雜訊濾波器',pre:'NF',p:{n:2}},
+  {id:'trans',b:'trans',name:'變壓器',pre:'TR'},
+  {id:'psu',b:'box',name:'電源供應器',pre:'PS',spec:'MDR-60-24',p:{title:'MDR-60-24\n(24-26V)',left:'L,N,FG',right:'+V,-V',top:'',bottom:'',w:110,pitch:20}},
+  {id:'gnd',b:'gnd',name:'接地',pre:'',bom:0},
+  {id:'fg',b:'fg',name:'機殼接地 FG',pre:'',bom:0},
+ ]},
+ {cat:'按鈕 / 開關 / 接點',items:[
+  {id:'pb_no',b:'pb_no',name:'按鈕 a 接點',pre:'PB'},
+  {id:'pb_nc',b:'pb_nc',name:'按鈕 b 接點',pre:'PB'},
+  {id:'emg',b:'emg',name:'緊急停止按鈕',pre:'EMG'},
+  {id:'ls_no',b:'ls_no',name:'極限開關 a',pre:'LS'},
+  {id:'ls_nc',b:'ls_nc',name:'極限開關 b',pre:'LS'},
+  {id:'sel2',b:'sel',name:'選擇開關 2 段',pre:'SS',p:{n:2,labels:''}},
+  {id:'sel3',b:'sel',name:'選擇開關 3 段',pre:'SS',p:{n:3,labels:''}},
+  {id:'sel4',b:'sel',name:'選擇開關 4 段',pre:'SS',p:{n:4,labels:'X,Y,Z,4'}},
+  {id:'no',b:'no',name:'繼電器 a 接點',pre:'CR',bom:0},
+  {id:'nc',b:'nc',name:'繼電器 b 接點',pre:'CR',bom:0},
+  {id:'ol_nc',b:'ol_nc',name:'積熱 b 接點',pre:'OL',bom:0},
+  {id:'td_no',b:'td_no',name:'限時 a 接點',pre:'TR',bom:0},
+  {id:'term',b:'term',name:'端子',pre:'X',bom:0},
+ ]},
+ {cat:'線圈 / 負載',items:[
+  {id:'coil',b:'coil',name:'繼電器線圈',pre:'CR',spec:'RJ2S-CL-D24'},
+  {id:'mc',b:'coil',name:'電磁開關線圈',pre:'MC',bom:0},
+  {id:'tcoil',b:'tcoil',name:'計時器線圈',pre:'TR'},
+  {id:'sol',b:'sol',name:'電磁閥',pre:'SV'},
+  {id:'lamp',b:'lamp',name:'指示燈',pre:'PL'},
+  {id:'led',b:'led',name:'LED',pre:'LED'},
+  {id:'buzzer',b:'buzzer',name:'蜂鳴器',pre:'BZ'},
+  {id:'motor',b:'motor',name:'三相馬達',pre:'M',p:{label:'M\n3~'}},
+  {id:'servo',b:'motor',name:'伺服馬達',pre:'SM',p:{label:'SM'},spec:'0.4kW'},
+  {id:'res',b:'res',name:'電阻 / 回生電阻',pre:'R'},
+  {id:'diode',b:'diode',name:'二極體',pre:'D'},
+ ]},
+ {cat:'PLC / 控制器 / 模組',items:[
+  {id:'plc_in',b:'plc',name:'PLC 輸入 X',pre:'PLC',bom:0,p:{model:'FX5UC-32MT/DS-TS  INPUT',base:'X0',n:8,octal:true,pitch:40,com:'S/S',w:70,noteW:170,notes:'輸入 1\n輸入 2\n輸入 3\n輸入 4\n輸入 5\n輸入 6\n輸入 7\n輸入 8'}},
+  {id:'plc_out',b:'plc',name:'PLC 輸出 Y',pre:'PLC',bom:0,p:{model:'FX5UC-32MT/DS-TS  OUTPUT',base:'Y0',n:8,octal:true,pitch:40,com:'COM0',w:70,noteW:170,notes:'輸出 1\n輸出 2\n輸出 3\n輸出 4\n輸出 5\n輸出 6\n輸出 7\n輸出 8'}},
+  {id:'plc_cpu',b:'box',name:'PLC 主機',pre:'PLC',spec:'FX5UC-32MT/DS-TS',p:{title:'FX5UC-32MT/DS-TS',left:'24V,0V,FG',right:'SDA,SDB,RDA,RDB,GND',top:'',bottom:'',w:130,pitch:20}},
+  {id:'ad4',b:'box',name:'類比輸入模組',pre:'AD',spec:'FX5-4AD-ADP',p:{title:'FX5-4AD-ADP',left:'V1+,COM1,V2+,COM2,V3+,COM3,V4+,COM4',right:'FG',top:'',bottom:'',w:110,pitch:20}},
+  {id:'hmi',b:'box',name:'人機介面',pre:'HMI',spec:'MT8102iE',p:{title:'MT8102iE',left:'24V,0V,FG',right:'RX-,RX+,TX-,TX+,GND',top:'',bottom:'',w:110,pitch:20}},
+  {id:'drv',b:'box',name:'伺服驅動器',pre:'DRV',spec:'ASD-A3-0421-L',p:{title:'Motor 驅動器\nASD-A3-0421-L\nAC220V 400W',left:'R,S,T,L1c,L2c',right:'U,V,W,P+,D,C',top:'',bottom:'CN1,CN2,CN5',w:150,pitch:20}},
+  {id:'cn1',b:'table',name:'CN1 腳位表',pre:'CN',bom:0,p:{title:'台達 ASDA-A3 CN1 腳位定義',rows:CN1_ROWS}},
+  {id:'tb50',b:'box',name:'端子台',pre:'TB',spec:'3MMDR50TBB',p:{title:'端子台\n3MMDR50TBB',left:'',right:'',top:'',bottom:'',w:90,pitch:20}},
+  {id:'mpg',b:'circ',name:'手輪 MPG',pre:'MPG',p:{title:'手輪',pins:'V+(紅),0V(黑),A相(橙),B相(粉紅)',r:30,len:80}},
+  {id:'prox',b:'box',name:'近接開關 PNP',pre:'PX',p:{title:'近接\nPNP',left:'',right:'+V(棕),OUT(黑),0V(藍)',top:'',bottom:'',w:60,pitch:20}},
+  {id:'sensor',b:'box',name:'類比感測器',pre:'SEN',spec:'TB-5000',p:{title:'TB-5000',left:'',right:'IN/OUT,SIGN,0V',top:'',bottom:'',w:80,pitch:20}},
+  {id:'box',b:'box',name:'通用方塊',pre:'U',p:{title:'名稱',left:'1,2',right:'3,4',top:'',bottom:'',w:100,pitch:20}},
+ ]},
+ {cat:'標註 / 連接',items:[
+  {id:'arrow_out',b:'arrow_out',name:'信號箭頭 →',pre:'',bom:0,p:{text:'P.3 X00-X07'}},
+  {id:'arrow_in',b:'arrow_in',name:'信號箭頭 ←',pre:'',bom:0,p:{text:'P1.MDR-60-24(+V)'}},
+  {id:'net',b:'net',name:'線號 / 信號名',pre:'',bom:0,p:{text:'P1'}},
+  {id:'dot',b:'dot',name:'連接點',pre:'',bom:0},
+  {id:'cable',b:'cable',name:'線徑標籤',pre:'',bom:0,p:{text:'3C*2mm'}},
+  {id:'shield',b:'shield',name:'遮蔽 / 絞線',pre:'',bom:0,p:{h:40}},
+ ]},
+];
+const LIBM={};LIB.forEach(c=>c.items.forEach(it=>{it.cat=c.cat;LIBM[it.id]=it;}));
+const PLAB={n:'極數 / 段數 / 點數',title:'標題文字',left:'左側腳位',right:'右側腳位',top:'上方腳位',bottom:'下方腳位',w:'寬度',pitch:'腳位間距',label:'符號文字',text:'文字',h:'高度',model:'型號標題',base:'起始位址',octal:'8 進位編號',com:'共點名稱',noteW:'註解線長',notes:'各點註解',rows:'腳位列',pins:'腳位',r:'半徑',len:'引線長',labels:'段位文字'};
+const PMULTI=new Set(['title','notes','rows','label']);
+
+/* ====================== 幾何 / 座標 ====================== */
+function geom(it){const lb=LIBM[it.s];if(!lb)return{pins:[],box:[0,0,20,20],svg:R(0,0,20,20)};TX={rot:it.rot||0,mir:!!it.mir};const g=B[lb.b](it.p||{});TX={rot:0,mir:false};return g;}
+function pivot(g){return[snapU((g.box[0]+g.box[2])/2),snapU((g.box[1]+g.box[3])/2)]}
+function xf(it,g,x,y){const [cx,cy]=pivot(g);let qx=x-cx,qy=y-cy;if(it.mir)qx=-qx;const r=((it.rot||0)%360+360)%360;
+  let rx=qx,ry=qy;if(r===90){rx=-qy;ry=qx}else if(r===180){rx=-qx;ry=-qy}else if(r===270){rx=qy;ry=-qx}
+  return[r2(rx+cx+it.x),r2(ry+cy+it.y)];}
+function symPins(it,g){g=g||geom(it);return g.pins.map(p=>{const[x,y]=xf(it,g,p.x,p.y);return{x,y,n:p.n}})}
+function symBox(it,g){g=g||geom(it);const b=g.box;const c=[xf(it,g,b[0],b[1]),xf(it,g,b[2],b[3]),xf(it,g,b[0],b[3]),xf(it,g,b[2],b[1])];
+  return[Math.min(...c.map(p=>p[0])),Math.min(...c.map(p=>p[1])),Math.max(...c.map(p=>p[0])),Math.max(...c.map(p=>p[1]))];}
+function textBox(it){const lines=String(it.text||'').split('\n');const s=+it.size||12;const w=Math.max(...lines.map(l=>tw(l,s)),8);const h=lines.length*s*1.25;
+  let x0=it.anchor==='middle'?it.x-w/2:it.anchor==='end'?it.x-w:it.x;let b=[x0,it.y-s,x0+w,it.y-s+h];
+  if((it.rot||0)%180===90){const cx=it.x,cy=it.y;b=[cx-(b[3]-cy),cy+(b[0]-cx),cx-(b[1]-cy),cy+(b[2]-cx)];b=[Math.min(b[0],b[2]),Math.min(b[1],b[3]),Math.max(b[0],b[2]),Math.max(b[1],b[3])];}
+  return b;}
+function bbox(it){
+  if(it.t==='s')return symBox(it);
+  if(it.t==='w'){const xs=it.pts.map(p=>p[0]),ys=it.pts.map(p=>p[1]);return[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)]}
+  if(it.t==='t')return textBox(it);
+  if(it.t==='l')return[Math.min(it.x1,it.x2),Math.min(it.y1,it.y2),Math.max(it.x1,it.x2),Math.max(it.y1,it.y2)];
+  return[it.x,it.y,it.x+it.w,it.y+it.h];}
+function translate(it,dx,dy){
+  if(it.t==='w')it.pts=it.pts.map(p=>[p[0]+dx,p[1]+dy]);
+  else if(it.t==='l'){it.x1+=dx;it.x2+=dx;it.y1+=dy;it.y2+=dy}
+  else{it.x+=dx;it.y+=dy}}
+const rotP=(p,c)=>[c[0]-(p[1]-c[1]),c[1]+(p[0]-c[0])];
+const mirP=(p,c)=>[2*c[0]-p[0],p[1]];
+
+/* ====================== 文件 / 狀態 ====================== */
+let doc,pi=0,sel=new Set(),tool='select',placing=null,draft=null,cursor={x:0,y:0},hoverPin=null;
+let view={x:40,y:40,k:1},undoS=[],redoS=[],clip=null,pasteN=0,drag=null,spaceDown=false,wireColor='#111111';
+const opt={grid:true,snap:true,hops:true};
+const cur=()=>doc.pages[pi];
+const findIt=id=>cur().items.find(i=>i.id===id);
+const selItems=()=>cur().items.filter(i=>sel.has(i.id));
+const newPage=(name)=>({id:uid(),name:name||'新圖頁',size:'A4L',meta:{title:name||'電氣迴路圖',dwgNo:'',rev:'A'},items:[]});
+const blankDoc=()=>({v:1,meta:{company:'',project:'',cadNo:'',designer:'',checker:'',approver:'',date:new Date().toISOString().slice(0,10)},pages:[newPage('圖頁 1')]});
+
+function mkSym(libId,x,y,extra={}){const lb=LIBM[libId];const it={id:uid(),t:'s',s:libId,x,y,rot:0,mir:false,tag:'',p:clone(lb.p||{}),
+  props:{name:lb.name,spec:lb.spec||'',maker:'',partno:'',price:0,qty:lb.bom===0?0:1,note:''},showSpec:false,tdx:0,tdy:0};
+  return Object.assign(it,extra,{props:Object.assign(it.props,extra.props||{}),p:Object.assign(it.p,extra.p||{})});}
+function allSyms(){const a=[];doc.pages.forEach(pg=>pg.items.forEach(i=>{if(i.t==='s')a.push(i)}));return a}
+function nextTag(pre){if(!pre)return'';let m=0;const re=new RegExp('^'+pre.replace(/[^\w]/g,'')+'(\\d+)$');allSyms().forEach(s=>{const k=re.exec(s.tag||'');if(k)m=Math.max(m,+k[1])});return pre+(m+1)}
+
+/* ---------- 範例專案（依上傳之電氣迴路圖重建） ---------- */
+function sampleDoc(){
+  const d=blankDoc();d.meta.project='整車車體尺寸諸元量測設備';d.meta.cadNo='R926';d.meta.company='';d.pages=[];
+  const W=(pts,o={})=>({id:uid(),t:'w',pts,color:o.c||'#111111',w:o.w||1.4,dash:!!o.dash,label:o.l||''});
+  const Tx=(x,y,text,size=12,o={})=>Object.assign({id:uid(),t:'t',x,y,text,size,rot:0,bold:false,anchor:'start',color:'#111111'},o);
+  // P1 系統動力圖
+  let pg=newPage('系統動力圖');pg.meta.dwgNo='1002501-EC01';const it=pg.items;
+  it.push(Tx(70,40,'外部電源',14,{bold:true}));
+  it.push(mkSym('nfb3',100,60,{tag:'NFB1',showSpec:true,props:{spec:'3P15A, AC 220V',maker:'廣富',partno:'S015000353',price:450}}));
+  it.push(Tx(86,158,'R',11),Tx(106,178,'S',11),Tx(126,198,'T',11));
+  it.push(W([[100,120],[100,460]]),W([[120,120],[120,460]]),W([[140,120],[140,400]]));
+  [0,1,2].forEach(k=>{const y0=160+k*100;
+    it.push(W([[100,y0],[300,y0]],{l:'(紅)'}),W([[120,y0+20],[300,y0+20]],{l:'(白)'}),W([[140,y0+40],[300,y0+40]],{l:'(黑)'}));
+    it.push(mkSym('cable',182,y0+58,{p:{text:'3C*2mm'}}));
+    it.push(mkSym('ms3',300,y0,{tag:'MS'+(k+1),showSpec:true,props:{spec:'SC-0',maker:'廣富',partno:'S015000357',price:380}}));
+    for(let i=0;i<3;i++)it.push(W([[340,y0+i*20],[380,y0+i*20]]),W([[420,y0+i*20],[520,y0+i*20]],{l:i===0?'R'+(k+1):''}));
+    it.push(mkSym('ol3',380,y0,{tag:'OL'+(k+1),props:{spec:'TR-ON(4~6A)',maker:'廣富',partno:'S802000055',price:190}}));
+    it.push(mkSym('drv',520,y0-20,{tag:'DRV'+(k+1),p:{title:`Motor 驅動器 -${k+1}\nASD-A3-0421-L\nAC220V 400W`,left:'R,S,T',right:'',bottom:''},props:{maker:'台達'}}));
+  });
+  it.push(mkSym('nfb2',100,460,{tag:'NFB2',showSpec:true,props:{spec:'2P5A, AC 220V',maker:'廣富',partno:'S015002P5A',price:350}}));
+  it.push(W([[100,520],[100,560],[300,560]],{l:'220A'}),W([[120,520],[120,580],[300,580]],{l:'220B'}));
+  it.push(mkSym('psu',300,540,{tag:'PS1',props:{spec:'MDR-60-24',maker:'廣富',partno:'S005000336',price:450}}));
+  it.push(W([[300,600],[280,600],[280,620]]),mkSym('gnd',280,620));
+  it.push(W([[430,560],[600,560]],{l:'P1',c:'#d12a1f'}),W([[430,580],[600,580]],{l:'N1',c:'#1f4fd1'}));
+  it.push(mkSym('hmi',600,540,{tag:'HMI1',p:{right:''},props:{maker:'怡振',partno:'G02I000378',price:9500}}));
+  it.push(W([[600,600],[580,600],[580,620]]),mkSym('gnd',580,620));
+  it.push(W([[500,560],[500,640],[520,640]],{c:'#d12a1f'}),mkSym('arrow_out',520,640,{p:{text:'P1 至 P.2 X00-X07 / P.3 Y00-Y07'}}));
+  it.push(W([[480,580],[480,660],[520,660]],{c:'#1f4fd1'}),mkSym('arrow_out',520,660,{p:{text:'N1 至 0V 共點'}}));
+  d.pages.push(pg);
+  // P2 輸入
+  pg=newPage('X00-X07 輸入');pg.meta.title='INPUT X00~X07';pg.meta.dwgNo='1002501-EC02';const i2=pg.items;
+  i2.push(mkSym('arrow_in',160,60,{p:{text:'P1.MDR-60-24(+V)'}}),W([[160,60],[160,360]],{c:'#d12a1f'}));
+  const ins=[['pb_no','PB1','原點復歸'],['pb_no','PB2','啟動'],['pb_nc','PB3','停止'],['ls_no','LS1','X 前限'],['ls_no','LS2','X 後限'],['ls_no','LS3','Y 前限'],['ls_no','LS4','Y 後限'],['emg','EMG1','緊急停止']];
+  ins.forEach((r,i)=>{const y=80+i*40;i2.push(W([[160,y],[320,y]],{c:'#d12a1f'}),mkSym(r[0],320,y,{tag:r[1],props:{note:r[2]}}),W([[360,y],[700,y]]));});
+  i2.push(mkSym('plc_in',700,60,{tag:'PLC1',p:{model:'FX5UC-32MT/DS-TS  INPUT X00~X07',notes:ins.map(r=>r[2]).join('\n')}}));
+  i2.push(W([[700,400],[600,400]],{c:'#1f4fd1'}),mkSym('arrow_in',600,400,{p:{text:'N1 (0V)'}}));
+  d.pages.push(pg);
+  // P3 輸出
+  pg=newPage('Y00-Y07 輸出');pg.meta.title='OUTPUT Y00~Y07';pg.meta.dwgNo='1002501-EC03';const i3=pg.items;
+  i3.push(mkSym('arrow_in',160,60,{p:{text:'P2.MDR-60-24(+V)'}}),W([[160,60],[160,360]],{c:'#d12a1f'}));
+  const outs=[['coil','CR1','servo1 SON'],['coil','CR2','servo2 SON'],['coil','CR3','servo3 SON'],['sol','SV1','氣壓缸上升'],['sol','SV2','氣壓缸下降'],['lamp','PL1','運轉指示燈'],['lamp','PL2','異常指示燈'],['buzzer','BZ1','蜂鳴器']];
+  outs.forEach((r,i)=>{const y=80+i*40;i3.push(W([[160,y],[320,y]],{c:'#d12a1f'}),mkSym(r[0],320,y,{tag:r[1],props:{note:r[2],...(r[0]==='coil'?{spec:'RJ2S-CL-D24',maker:'廣富',partno:'S005001887',price:80}:{})}}),W([[360,y],[700,y]]));});
+  i3.push(mkSym('plc_out',700,60,{tag:'PLC1',p:{model:'FX5UC-32MT/DS-TS  OUTPUT Y00~Y07',notes:outs.map(r=>r[2]).join('\n')}}));
+  i3.push(W([[700,400],[600,400]],{c:'#1f4fd1'}),mkSym('arrow_in',600,400,{p:{text:'N1 (0V)'}}));
+  d.pages.push(pg);
+  // P4 CN1
+  pg=newPage('伺服 CN1 (1)');pg.meta.title='台達 ASDA-A3 CN1 (1)';pg.meta.dwgNo='1002501-EC11';const i4=pg.items;
+  i4.push(mkSym('cn1',360,60,{tag:'CN1'}));
+  const lp=k=>60+50+k*20;
+  [[8,'P.3 Y00 servo1 SON'],[9,'Y11 CCLR'],[10,'P2 (+24V)'],[6,'X20 SRDY'],[2,'X26 WARN']].forEach(([k,t])=>i4.push(W([[360,lp(k)],[300,lp(k)]]),mkSym('arrow_in',300,lp(k),{p:{text:t}})));
+  [[2,'CR1 ALRM'],[0,'X31 TPOS'],[5,'Y4 EMGS']].forEach(([k,t])=>i4.push(W([[572,lp(k)],[620,lp(k)]]),mkSym('arrow_out',620,lp(k),{p:{text:t}})));
+  i4.push(Tx(40,640,'ASDA-A3 參數設定：\nP1-00: 0x1 (PT 模式)\nP1-44: 1280000\nP1-45: 200 (1 圈 200 pulse)\nP2-10: 0x101 伺服 ON',9));
+  d.pages.push(pg);
+  return d;}
+
+/* ====================== 渲染 ====================== */
+const svg=$('#cv'),vp=$('#vp');
+(function defs(){let s='<pattern id="gridp" width="50" height="50" patternUnits="userSpaceOnUse">';
+  for(let x=0;x<50;x+=10)for(let y=0;y<50;y+=10)s+=`<rect x="${x-0.6}" y="${y-0.6}" width="1.2" height="1.2" fill="${x===0&&y===0?'#7d98ab':'#b9c8d3'}"/>`;
+  $('#defs').innerHTML=s+'</pattern>';})();
+
+function segs(pg){const out=[];pg.items.forEach(w=>{if(w.t!=='w')return;for(let i=0;i<w.pts.length-1;i++){const a=w.pts[i],b=w.pts[i+1];out.push({w,i,a,b,h:a[1]===b[1]&&a[0]!==b[0],v:a[0]===b[0]&&a[1]!==b[1]})}});return out}
+function computeHops(pg){const S=segs(pg),H=S.filter(s=>s.h),V=S.filter(s=>s.v),hops=new Map();
+  for(const h of H){const y=h.a[1],x1=Math.min(h.a[0],h.b[0]),x2=Math.max(h.a[0],h.b[0]);const xs=[];
+    for(const v of V){const x=v.a[0],y1=Math.min(v.a[1],v.b[1]),y2=Math.max(v.a[1],v.b[1]);if(x>x1+5&&x<x2-5&&y>y1+0.5&&y<y2-0.5)xs.push(x)}
+    if(xs.length)hops.set(h.w.id+':'+h.i,xs)}return hops}
+function computeDots(pg){const S=segs(pg),pins=[];pg.items.forEach(i=>{if(i.t==='s')pins.push(...symPins(i))});
+  const cand=new Map();pg.items.forEach(w=>{if(w.t==='w'&&w.pts.length>1){[w.pts[0],w.pts[w.pts.length-1]].forEach(p=>cand.set(p[0]+','+p[1],p))}});
+  const dots=[];for(const p of cand.values()){let deg=0;
+    pg.items.forEach(w=>{if(w.t!=='w')return;w.pts.forEach((q,j)=>{if(q[0]===p[0]&&q[1]===p[1])deg+=(j===0||j===w.pts.length-1)?1:2})});
+    for(const s of S){if(s.h&&p[1]===s.a[1]&&p[0]>Math.min(s.a[0],s.b[0])&&p[0]<Math.max(s.a[0],s.b[0]))deg+=2;else if(s.v&&p[0]===s.a[0]&&p[1]>Math.min(s.a[1],s.b[1])&&p[1]<Math.max(s.a[1],s.b[1]))deg+=2}
+    pins.forEach(q=>{if(q.x===p[0]&&q.y===p[1])deg+=1});if(deg>=3)dots.push(p)}
+  return dots}
+function wirePath(w,hops){const r=4;let d=`M${w.pts[0][0]},${w.pts[0][1]}`;
+  for(let i=0;i<w.pts.length-1;i++){const a=w.pts[i],b=w.pts[i+1];const xs=hops&&hops.get(w.id+':'+i);
+    if(xs){const dir=Math.sign(b[0]-a[0]);xs.sort((p,q)=>dir*(p-q));for(const x of xs)d+=` L${x-dir*r},${a[1]} A${r},${r} 0 0 ${dir>0?1:0} ${x+dir*r},${a[1]}`}
+    d+=` L${b[0]},${b[1]}`}return d}
+function wireLabelPos(w){let best=null,bl=-1;for(let i=0;i<w.pts.length-1;i++){const a=w.pts[i],b=w.pts[i+1];const l=Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1]);if(a[1]===b[1]&&l>bl){bl=l;best=[(a[0]+b[0])/2,a[1]]}}
+  if(!best){const a=w.pts[0],b=w.pts[1]||a;best=[(a[0]+b[0])/2+6,(a[1]+b[1])/2]}return best}
+
+function symSVG(it,exp){const g=geom(it);const [cx,cy]=pivot(g);const r=it.rot||0;
+  let s=`<g${exp?'':` data-id="${it.id}"`} transform="translate(${it.x+cx},${it.y+cy}) rotate(${r}) scale(${it.mir?-1:1},1) translate(${-cx},${-cy})" stroke="${INK}" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+  if(!exp)s+=`<rect class="hit" x="${g.box[0]-3}" y="${g.box[1]-3}" width="${g.box[2]-g.box[0]+6}" height="${g.box[3]-g.box[1]+6}" fill="transparent" stroke="none"/>`;
+  s+=g.svg+'</g>';
+  // 標籤
+  const lb=LIBM[it.s];let mode=g.tag||'top';if(mode==='top'&&r%180===90)mode='right';
+  if(mode!=='none'&&(it.tag||(it.showSpec&&it.props.spec))){const bb=symBox(it,g);const dx=+it.tdx||0,dy=+it.tdy||0;const spec=it.showSpec&&it.props.spec?it.props.spec:'';
+    const t=(x,y,str,anc='middle',sz=10)=>str?`<text${exp?'':` data-id="${it.id}"`} x="${r2(x)}" y="${r2(y)}" font-size="${sz}" text-anchor="${anc}" fill="${INK}">${esc(str)}</text>`:'';
+    if(mode==='right')s+=t(bb[2]+6+dx,(bb[1]+bb[3])/2+4+dy,(it.tag||'')+(spec?`(${spec})`:''),'start',11);
+    else if(mode==='in')s+=t((bb[0]+bb[2])/2+dx,(bb[1]+bb[3])/2+3.5+dy,it.tag,'middle',9)+t((bb[0]+bb[2])/2+dx,bb[3]+11+dy,spec?`(${spec})`:'','middle',9);
+    else s+=t((bb[0]+bb[2])/2+dx,bb[1]-(spec?15:4)+dy,it.tag)+t((bb[0]+bb[2])/2+dx,bb[1]-4+dy,spec?`(${spec})`:'','middle',9);}
+  return s}
+function wireSVG(w,hops,exp){const dash=w.dash?' stroke-dasharray="6 4"':'';
+  let s=`<g${exp?'':` data-id="${w.id}"`}><path d="${wirePath(w,hops)}" stroke="${w.color||INK}" stroke-width="${w.w||1.4}" fill="none" stroke-linejoin="round"${dash}/>`;
+  if(w.label){const [x,y]=wireLabelPos(w);s+=`<text x="${r2(x)}" y="${r2(y-4)}" font-size="9" text-anchor="middle" fill="${INK}">${esc(w.label)}</text>`}
+  if(!exp)for(let i=0;i<w.pts.length-1;i++){const a=w.pts[i],b=w.pts[i+1];s+=`<line class="hit" data-seg="${i}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="transparent" stroke-width="9"/>`}
+  return s+'</g>'}
+function textSVG(it,exp){const lines=String(it.text||'').split('\n');const s=+it.size||12;
+  return `<text${exp?'':` data-id="${it.id}"`} x="${it.x}" y="${it.y}" font-size="${s}" text-anchor="${it.anchor||'start'}" fill="${it.color||INK}"${it.bold?' font-weight="700"':''}${it.rot?` transform="rotate(${it.rot} ${it.x} ${it.y})"`:''}>`+
+    lines.map((l,i)=>`<tspan x="${it.x}" dy="${i?s*1.25:0}">${esc(l)||' '}</tspan>`).join('')+'</text>'}
+function shapeSVG(it,exp){const a=exp?'':` data-id="${it.id}"`;const st=` stroke="${it.color||INK}" stroke-width="${it.sw||1.2}" fill="${it.fill||'none'}"${it.dash?' stroke-dasharray="5 3"':''}`;
+  const hit=exp?'':' class="hit"';
+  if(it.t==='l')return `<g${a}><line x1="${it.x1}" y1="${it.y1}" x2="${it.x2}" y2="${it.y2}"${st}/>${exp?'':`<line${hit} x1="${it.x1}" y1="${it.y1}" x2="${it.x2}" y2="${it.y2}" stroke="transparent" stroke-width="9"/>`}</g>`;
+  if(it.t==='r')return `<rect${a} x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}"${st} pointer-events="${exp?'auto':'stroke'}"/>`;
+  return `<ellipse${a} cx="${it.x+it.w/2}" cy="${it.y+it.h/2}" rx="${Math.abs(it.w/2)}" ry="${Math.abs(it.h/2)}"${st} pointer-events="${exp?'auto':'stroke'}"/>`}
+function itemsSVG(pg,exp){const hops=opt.hops?computeHops(pg):null;let s='';
+  const order={r:0,e:0,l:0,w:1,s:2,t:3};const arr=[...pg.items].sort((a,b)=>order[a.t]-order[b.t]);
+  for(const it of arr){if(it.t==='s')s+=symSVG(it,exp);else if(it.t==='w')s+=wireSVG(it,hops,exp);else if(it.t==='t')s+=textSVG(it,exp);else s+=shapeSVG(it,exp)}
+  computeDots(pg).forEach(p=>s+=`<circle cx="${p[0]}" cy="${p[1]}" r="2.8" fill="${INK}"/>`);
+  return `<g font-family="${PF.replace(/"/g,'')}">${s}</g>`}
+
+function frameSVG(pg,idx,total,overrideTitle){const [W,H]=SIZES[pg.size];const m=doc.meta,pm=pg.meta;let s='';
+  s+=`<g font-family="${PF}" fill="none" stroke="${INK}">`;
+  s+=`<rect x="10" y="10" width="${W-20}" height="${H-20}" stroke-width="0.6"/><rect x="20" y="20" width="${W-40}" height="${H-40}" stroke-width="1.6"/>`;
+  const nc=Math.max(4,Math.round((W-40)/150)),nr=Math.max(3,Math.round((H-40)/150));
+  for(let i=0;i<nc;i++){const x=20+(W-40)*i/nc,xm=x+(W-40)/nc/2;if(i)s+=`<line x1="${x}" y1="10" x2="${x}" y2="20" stroke-width=".6"/><line x1="${x}" y1="${H-20}" x2="${x}" y2="${H-10}" stroke-width=".6"/>`;
+    s+=`<text x="${xm}" y="18" font-size="7" text-anchor="middle" fill="${INK}" stroke="none">${i+1}</text><text x="${xm}" y="${H-12}" font-size="7" text-anchor="middle" fill="${INK}" stroke="none">${i+1}</text>`}
+  for(let i=0;i<nr;i++){const y=20+(H-40)*i/nr,ym=y+(H-40)/nr/2+2.5;if(i)s+=`<line x1="10" y1="${y}" x2="20" y2="${y}" stroke-width=".6"/><line x1="${W-20}" y1="${y}" x2="${W-10}" y2="${y}" stroke-width=".6"/>`;
+    const L=String.fromCharCode(65+i);s+=`<text x="15" y="${ym}" font-size="7" text-anchor="middle" fill="${INK}" stroke="none">${L}</text><text x="${W-15}" y="${ym}" font-size="7" text-anchor="middle" fill="${INK}" stroke="none">${L}</text>`}
+  // 標題欄
+  const cw=[50,190,50,110,50,110],tbW=560,rh=22,x0=W-20-tbW,y0=H-20-rh*5;
+  s+=`<rect x="${x0}" y="${y0}" width="${tbW}" height="${rh*5}" fill="#fff" stroke-width="1.2"/>`;
+  for(let r=1;r<5;r++)s+=`<line x1="${x0}" y1="${y0+r*rh}" x2="${x0+tbW}" y2="${y0+r*rh}" stroke-width=".7"/>`;
+  const X=[x0];cw.forEach(w=>X.push(X[X.length-1]+w));
+  const vline=(c,r0,r1)=>s+=`<line x1="${X[c]}" y1="${y0+r0*rh}" x2="${X[c]}" y2="${y0+r1*rh}" stroke-width=".7"/>`;
+  vline(1,1,5);vline(2,1,5);vline(3,1,5);vline(4,2,5);vline(5,2,5);
+  const lab=(c,r,t)=>s+=`<text x="${(X[c]+X[c+1])/2}" y="${y0+r*rh+14}" font-size="8" text-anchor="middle" fill="#555" stroke="none">${esc(t)}</text>`;
+  const val=(c,r,t,span=1,sz=10,bold)=>{const x=(X[c]+X[c+span])/2;s+=`<text x="${x}" y="${y0+r*rh+15}" font-size="${sz}" text-anchor="middle" fill="${INK}" stroke="none"${bold?' font-weight="700"':''}>${esc(t)}</text>`};
+  s+=`<text x="${x0+tbW/2}" y="${y0+16}" font-size="13" text-anchor="middle" font-weight="700" fill="${INK}" stroke="none">${esc(m.company||'')}</text>`;
+  lab(0,1,'件名');val(1,1,m.project);lab(2,1,'圖號');val(3,1,pm.dwgNo,3,11,true);
+  lab(0,2,'圖名');val(1,2,overrideTitle||pm.title,1,10,true);lab(2,2,'CAD NO');val(3,2,m.cadNo);lab(4,2,'比例');val(5,2,'NTS');
+  lab(0,3,'設計');val(1,3,m.designer);lab(2,3,'檢圖');val(3,3,m.checker);lab(4,3,'認可');val(5,3,m.approver);
+  lab(0,4,'日期');val(1,4,m.date);lab(2,4,'版次');val(3,4,pm.rev);lab(4,4,'頁次');val(5,4,`${idx+1} / ${total}`);
+  return s+'</g>'}
+
+function overlaySVG(){let s='';const k=view.k,sw=1.2/k;
+  for(const it of selItems()){
+    if(it.t==='w'){s+=`<path d="${wirePath(it,null)}" stroke="var(--sel)" stroke-width="${4/k}" stroke-opacity=".35" fill="none" pointer-events="none"/>`;
+      it.pts.forEach((p,j)=>s+=`<rect data-h="${j}" data-wid="${it.id}" x="${p[0]-4/k}" y="${p[1]-4/k}" width="${8/k}" height="${8/k}" fill="#fff" stroke="var(--sel)" stroke-width="${sw}" style="cursor:move"/>`);}
+    else{const b=bbox(it);s+=`<rect x="${b[0]-4}" y="${b[1]-4}" width="${b[2]-b[0]+8}" height="${b[3]-b[1]+8}" fill="none" stroke="var(--sel)" stroke-width="${sw}" stroke-dasharray="${4/k} ${3/k}" pointer-events="none"/>`}}
+  if(tool==='wire'||placing){cur().items.forEach(i=>{if(i.t==='s')symPins(i).forEach(p=>s+=`<circle cx="${p.x}" cy="${p.y}" r="${2.2/k+0.6}" fill="none" stroke="#e0533d" stroke-width="${1/k}" pointer-events="none"/>`)})}
+  if(hoverPin)s+=`<circle cx="${hoverPin.x}" cy="${hoverPin.y}" r="${6/k}" fill="none" stroke="#e0533d" stroke-width="${2/k}" pointer-events="none"/>`;
+  if(placing){const g=mkSym(placing.id,snap(cursor.x),snap(cursor.y),{rot:placing.rot,mir:placing.mir});s+=`<g opacity=".55" pointer-events="none">${symSVG(g,true)}</g>`}
+  if(draft){const pts=[...draft.pts,...route(draft.pts[draft.pts.length-1],wpt(cursor),draft.mode)];
+    s+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${wireColor}" stroke-width="1.6" stroke-dasharray="${5/k} ${3/k}" pointer-events="none"/>`}
+  if(drag&&drag.kind==='marq'){const a=drag.p0,b=drag.p1,x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);const cross=b.x<a.x;
+    s+=`<rect x="${x}" y="${y}" width="${Math.abs(b.x-a.x)}" height="${Math.abs(b.y-a.y)}" fill="${cross?'rgba(30,160,90,.08)':'rgba(20,120,212,.08)'}" stroke="${cross?'#1ea05a':'var(--sel)'}" stroke-width="${sw}"${cross?` stroke-dasharray="${5/k} ${3/k}"`:''} pointer-events="none"/>`}
+  if(drag&&drag.kind==='shape'&&drag.preview)s+=`<g opacity=".7" pointer-events="none">${shapeSVG(drag.preview,true)}</g>`;
+  return s}
+
+let saveTimer=null;
+function render(){const pg=cur();const [W,H]=SIZES[pg.size];
+  vp.setAttribute('transform',`translate(${r2(view.x)},${r2(view.y)}) scale(${view.k})`);
+  vp.innerHTML=`<rect x="0" y="0" width="${W}" height="${H}" fill="#fff" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,.25))"/>`+
+    (opt.grid?`<rect x="20" y="20" width="${W-40}" height="${H-40}" fill="url(#gridp)" pointer-events="none"/>`:'')+
+    frameSVG(pg,pi,doc.pages.length)+itemsSVG(pg,false)+`<g>${overlaySVG()}</g>`;
+  $('#zl').textContent=Math.round(view.k*100)+'%';
+  $('#sSel').textContent=sel.size?`已選 ${sel.size}`:`${pg.items.length} 物件`;
+  $('#bUndo').disabled=!undoS.length;$('#bRedo').disabled=!redoS.length;
+  updHint();clearTimeout(saveTimer);saveTimer=setTimeout(autosave,700);}
+function autosave(){try{localStorage.setItem('ckt-editor-doc',JSON.stringify({doc,pi}));$('#sSave').textContent='已自動儲存 '+new Date().toLocaleTimeString().slice(0,5)}catch(e){$('#sSave').textContent=''}}
+
+/* ====================== 歷史 ====================== */
+function mark(){undoS.push(JSON.stringify({doc,pi}));if(undoS.length>200)undoS.shift();redoS=[]}
+function undo(){if(!undoS.length)return;redoS.push(JSON.stringify({doc,pi}));const s=JSON.parse(undoS.pop());doc=s.doc;pi=Math.min(s.pi,doc.pages.length-1);sel.clear();full()}
+function redo(){if(!redoS.length)return;undoS.push(JSON.stringify({doc,pi}));const s=JSON.parse(redoS.pop());doc=s.doc;pi=Math.min(s.pi,doc.pages.length-1);sel.clear();full()}
+function full(){render();renderProps();renderTabs()}
+
+/* ====================== 互動 ====================== */
+const snap=v=>opt.snap?snapU(v):Math.round(v);
+function toW(e){const r=svg.getBoundingClientRect();return{x:(e.clientX-r.left-view.x)/view.k,y:(e.clientY-r.top-view.y)/view.k}}
+function allPins(){const a=[];cur().items.forEach(i=>{if(i.t==='s')a.push(...symPins(i))});return a}
+function nearPin(p,rad){let best=null,bd=rad;for(const q of allPins()){const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<bd){bd=d;best=q}}return best}
+function wpt(p){const q=nearPin(p,10/Math.min(view.k,1.5));return q?[q.x,q.y]:[snap(p.x),snap(p.y)]}
+function route(a,b,mode){if(a[0]===b[0]||a[1]===b[1])return[b];return mode==='vh'?[[a[0],b[1]],b]:[[b[0],a[1]],b]}
+function simplify(pts){const o=[];for(const p of pts){const l=o[o.length-1];if(l&&l[0]===p[0]&&l[1]===p[1])continue;o.push(p)}
+  for(let i=1;i<o.length-1;){const a=o[i-1],b=o[i],c=o[i+1];if((a[0]===b[0]&&b[0]===c[0])||(a[1]===b[1]&&b[1]===c[1])){o.splice(i,1)}else i++}return o}
+function onWireOrPin(p,excludeDraft){if(allPins().some(q=>q.x===p[0]&&q.y===p[1]))return true;
+  for(const s of segs(cur())){const a=s.a,b=s.b;if((a[0]===b[0]&&p[0]===a[0]&&p[1]>=Math.min(a[1],b[1])&&p[1]<=Math.max(a[1],b[1]))||(a[1]===b[1]&&p[1]===a[1]&&p[0]>=Math.min(a[0],b[0])&&p[0]<=Math.max(a[0],b[0])))return true}return false}
+function finishWire(){if(draft){const pts=simplify(draft.pts);if(pts.length>=2){mark();const w={id:uid(),t:'w',pts,color:wireColor,w:1.4,dash:false,label:''};cur().items.push(w)}draft=null;render()}}
+
+function setTool(t){if(draft)finishWire();tool=t;placing=null;document.querySelectorAll('.cell.on').forEach(c=>c.classList.remove('on'));
+  document.querySelectorAll('#tools [data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));
+  svg.classList.toggle('cross',t!=='select');render()}
+function startPlace(id){if(draft)finishWire();placing={id,rot:0,mir:false};tool='place';
+  document.querySelectorAll('#tools [data-tool]').forEach(b=>b.setAttribute('aria-pressed','false'));
+  document.querySelectorAll('.cell').forEach(c=>c.classList.toggle('on',c.dataset.id===id));svg.classList.add('cross');render()}
+function placeAt(id,p,rot=0,mir=false){mark();const lb=LIBM[id];const it=mkSym(id,snap(p.x),snap(p.y),{rot,mir});it.tag=nextTag(lb.pre);cur().items.push(it);sel=new Set([it.id]);render();renderProps();}
+
+function updHint(){const h=$('#hint');let t='';
+  if(tool==='place'&&placing)t=`放置 <b>${esc(LIBM[placing.id].name)}</b>：點擊放置（可連續）· <b>R</b> 旋轉 · <b>M</b> 鏡像 · <b>Esc</b> 結束`;
+  else if(tool==='wire')t=draft?'點擊加入轉折 · 點到接腳 / 導線自動結束 · 雙擊或 <b>Enter</b> 完成 · <b>/</b> 切換先橫 / 先直':'導線：點擊起點（自動吸附元件接腳 <span style="color:#e0533d">○</span>）';
+  else if(tool==='text')t='點擊放置文字，於右側屬性編輯內容';
+  else if(tool==='line'||tool==='rect'||tool==='ellipse')t='拖曳繪製圖形';
+  else t=sel.size?'拖曳移動（相連導線自動跟隨）· <b>R</b> 旋轉 · <b>M</b> 鏡像 · <b>Ctrl+C/V</b> 複製貼上 · 方向鍵微調':'從左側拖曳元件到圖面 · 框選：左→右 全包含、右→左 碰到即選 · 滾輪縮放 · 空白鍵/中鍵拖曳平移';
+  h.innerHTML=t;}
+
+/* ---- 移動（含相連導線跟隨） ---- */
+function moveStart(){const items=selItems();const st={orig:new Map(items.map(i=>[i.id,clone(i)])),att:[]};
+  const pk=new Set();items.forEach(i=>{if(i.t==='s')symPins(i).forEach(p=>pk.add(p.x+','+p.y))});
+  if(pk.size)cur().items.forEach(w=>{if(w.t!=='w'||sel.has(w.id))return;const a=w.pts[0],b=w.pts[w.pts.length-1];const as=pk.has(a+''),ae=pk.has(b+'');
+    if(!as&&!ae)return;if(w.pts.length===2&&!(as&&ae)){if(a[1]===b[1]){const m=snapU((a[0]+b[0])/2);w.pts=[a,[m,a[1]],[m,b[1]],b]}else if(a[0]===b[0]){const m=snapU((a[1]+b[1])/2);w.pts=[a,[a[0],m],[b[0],m],b]}}
+    st.att.push({w,orig:clone(w.pts),as,ae})});
+  return st}
+function moveApply(st,dx,dy){for(const it of selItems()){const o=st.orig.get(it.id);Object.assign(it,clone(o));translate(it,dx,dy)}
+  for(const a of st.att){const p=clone(a.orig);if(a.as&&a.ae)a.w.pts=p.map(q=>[q[0]+dx,q[1]+dy]);else{const me=(i,j)=>{const wasH=p[i][1]===p[j][1],wasV=p[i][0]===p[j][0];p[i]=[p[i][0]+dx,p[i][1]+dy];if(p.length>2){if(wasH&&!wasV)p[j][1]+=dy;else if(wasV&&!wasH)p[j][0]+=dx}};
+    if(a.as)me(0,1);if(a.ae)me(p.length-1,p.length-2);a.w.pts=p}}}
+function moveEnd(st){for(const a of st.att)a.w.pts=simplify(a.w.pts);selItems().forEach(i=>{if(i.t==='w')i.pts=simplify(i.pts)})}
+
+svg.addEventListener('pointerdown',e=>{svg.setPointerCapture(e.pointerId);const p=toW(e);cursor=p;
+  if(e.button===1||spaceDown||(e.button===0&&e.altKey&&tool==='select')){drag={kind:'pan',sx:e.clientX,sy:e.clientY,vx:view.x,vy:view.y};svg.classList.add('pan');return}
+  if(e.button===2)return;
+  if(tool==='place'&&placing){placeAt(placing.id,p,placing.rot,placing.mir);return}
+  if(tool==='wire'){const q=wpt(p);
+    if(!draft){draft={pts:[q],mode:'hv'};render();return}
+    const last=draft.pts[draft.pts.length-1];if(q[0]===last[0]&&q[1]===last[1]){finishWire();return}
+    draft.pts.push(...route(last,q,draft.mode));
+    if(draft.pts.length>1&&onWireOrPin(q))finishWire();else render();return}
+  if(tool==='text'){mark();const t={id:uid(),t:'t',x:snap(p.x),y:snap(p.y),text:'文字',size:12,rot:0,bold:false,anchor:'start',color:'#111111'};cur().items.push(t);sel=new Set([t.id]);setTool('select');renderProps();setTimeout(()=>{const f=$('#pbody [data-k="text"]');if(f){f.focus();f.select()}},30);return}
+  if(tool==='line'||tool==='rect'||tool==='ellipse'){drag={kind:'shape',p0:{x:snap(p.x),y:snap(p.y)},preview:null};return}
+  // select tool
+  const h=e.target.closest('[data-h]');
+  if(h){const w=findIt(h.dataset.wid);drag={kind:'vtx',w,j:+h.dataset.h,orig:clone(w.pts),p0:p,moved:false};return}
+  const g=e.target.closest('[data-id]');
+  if(g){const id=g.dataset.id;const it=findIt(id);
+    if(e.shiftKey||e.ctrlKey||e.metaKey){sel.has(id)?sel.delete(id):sel.add(id);render();renderProps();return}
+    const segEl=e.target.closest('[data-seg]');
+    if(it&&it.t==='w'&&sel.size===1&&sel.has(id)&&segEl){drag={kind:'seg',w:it,i:+segEl.dataset.seg,orig:clone(it.pts),p0:p,moved:false};return}
+    if(!sel.has(id)){sel=new Set([id]);renderProps()}
+    drag={kind:'move',p0:p,st:null,moved:false};render();return}
+  if(sel.size){sel.clear();renderProps()}
+  drag={kind:'marq',p0:p,p1:p,add:e.shiftKey};render();});
+
+svg.addEventListener('pointermove',e=>{const p=toW(e);cursor=p;
+  $('#sXY').textContent=`X ${(p.x/U).toFixed(1)}  Y ${(p.y/U).toFixed(1)} mm`;
+  if(drag){
+    if(drag.kind==='pan'){view.x=drag.vx+e.clientX-drag.sx;view.y=drag.vy+e.clientY-drag.sy;render();return}
+    if(drag.kind==='move'){const dx=snap(p.x-drag.p0.x),dy=snap(p.y-drag.p0.y);if(!drag.moved&&(dx||dy)){mark();drag.st=moveStart();drag.moved=true}if(drag.moved){moveApply(drag.st,dx,dy);render()}return}
+    if(drag.kind==='vtx'){const q=wpt(p);if(!drag.moved){mark();drag.moved=true}const pts=clone(drag.orig);pts[drag.j]=q;drag.w.pts=pts;render();return}
+    if(drag.kind==='seg'){const pts=clone(drag.orig);let i=drag.i;const a=pts[i],b=pts[i+1];const hz=a[1]===b[1];const d=hz?snap(p.y-drag.p0.y):snap(p.x-drag.p0.x);if(!d&&!drag.moved)return;if(!drag.moved){mark();drag.moved=true}
+      if(i===0){pts.unshift([...pts[0]]);i++}if(i+1===pts.length-1)pts.push([...pts[pts.length-1]]);
+      if(hz){pts[i][1]+=d;pts[i+1][1]+=d}else{pts[i][0]+=d;pts[i+1][0]+=d}drag.w.pts=pts;render();return}
+    if(drag.kind==='marq'){drag.p1=p;render();return}
+    if(drag.kind==='shape'){const a=drag.p0,b={x:snap(p.x),y:snap(p.y)};const st={color:'#111111',sw:1.2,dash:tool==='ellipse',fill:'none'};
+      drag.preview=tool==='line'?{t:'l',x1:a.x,y1:a.y,x2:b.x,y2:b.y,...st}:{t:tool==='rect'?'r':'e',x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(b.x-a.x),h:Math.abs(b.y-a.y),...st};render();return}
+    return}
+  if(tool==='wire'||placing){const q=nearPin(p,10/Math.min(view.k,1.5));const changed=(q?q.x+','+q.y:'')!==(hoverPin?hoverPin.x+','+hoverPin.y:'');hoverPin=q;if(draft||placing||changed)render()}
+});
+svg.addEventListener('pointerup',e=>{if(!drag)return;const d=drag;drag=null;svg.classList.remove('pan');
+  if(d.kind==='move'&&d.moved){moveEnd(d.st);render();renderProps()}
+  else if(d.kind==='vtx'||d.kind==='seg'){if(d.moved){d.w.pts=simplify(d.w.pts)}render()}
+  else if(d.kind==='marq'){const a=d.p0,b=d.p1;const x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),y0=Math.min(a.y,b.y),y1=Math.max(a.y,b.y);const cross=b.x<a.x;
+    if(x1-x0>2||y1-y0>2){if(!d.add)sel.clear();cur().items.forEach(it=>{const bb=bbox(it);const inside=bb[0]>=x0&&bb[2]<=x1&&bb[1]>=y0&&bb[3]<=y1;const hit=bb[0]<=x1&&bb[2]>=x0&&bb[1]<=y1&&bb[3]>=y0;if(cross?hit:inside)sel.add(it.id)})}
+    render();renderProps()}
+  else if(d.kind==='shape'&&d.preview){const pv=d.preview;const ok=pv.t==='l'?(pv.x1!==pv.x2||pv.y1!==pv.y2):(pv.w>2&&pv.h>2);if(ok){mark();pv.id=uid();cur().items.push(pv);sel=new Set([pv.id]);renderProps()}render()}
+  else render();});
+svg.addEventListener('dblclick',e=>{if(tool==='wire'){finishWire();return}const g=e.target.closest('[data-id]');if(g&&tool==='select'){const f=$('#pbody [data-k="text"],#pbody [data-k="tag"]');if(f){f.focus();f.select&&f.select()}}});
+svg.addEventListener('contextmenu',e=>{e.preventDefault();if(draft)finishWire();else if(placing)setTool('select')});
+svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect();const sx=e.clientX-r.left,sy=e.clientY-r.top;zoomAt(sx,sy,Math.exp(-e.deltaY*0.0015))},{passive:false});
+function zoomAt(sx,sy,f){const k2=Math.min(8,Math.max(0.15,view.k*f));view.x=sx-(sx-view.x)*k2/view.k;view.y=sy-(sy-view.y)*k2/view.k;view.k=k2;render()}
+function fit(){const r=svg.getBoundingClientRect();const [W,H]=SIZES[cur().size];const k=Math.min((r.width-40)/W,(r.height-40)/H);view.k=Math.max(0.15,k);view.x=(r.width-W*view.k)/2;view.y=(r.height-H*view.k)/2;render()}
+$('#zIn').onclick=()=>{const r=svg.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1.25)};
+$('#zOut').onclick=()=>{const r=svg.getBoundingClientRect();zoomAt(r.width/2,r.height/2,0.8)};
+$('#zFit').onclick=fit;
+
+$('#stage').addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});
+$('#stage').addEventListener('drop',e=>{e.preventDefault();const id=e.dataTransfer.getData('text/plain');if(LIBM[id]){placeAt(id,toW(e));if(tool==='place')setTool('select')}});
+
+/* ---- 編輯指令 ---- */
+function delSel(){if(!sel.size)return;mark();cur().items=cur().items.filter(i=>!sel.has(i.id));sel.clear();render();renderProps()}
+function groupCenter(items){const bs=items.map(bbox);const c=[(Math.min(...bs.map(b=>b[0]))+Math.max(...bs.map(b=>b[2])))/2,(Math.min(...bs.map(b=>b[1]))+Math.max(...bs.map(b=>b[3])))/2];return[snapU(c[0]),snapU(c[1])]}
+function rotSel(){if(placing){placing.rot=(placing.rot+90)%360;render();return}const items=selItems();if(!items.length)return;mark();
+  let c;if(items.length===1&&items[0].t==='s'){const g=geom(items[0]);const pv=pivot(g);c=[items[0].x+pv[0],items[0].y+pv[1]]}else c=groupCenter(items);
+  for(const it of items){
+    if(it.t==='s'){const g=geom(it),pv=pivot(g);const np=rotP([it.x+pv[0],it.y+pv[1]],c);it.x=np[0]-pv[0];it.y=np[1]-pv[1];it.rot=((it.rot||0)+90)%360}
+    else if(it.t==='w')it.pts=it.pts.map(p=>rotP(p,c));
+    else if(it.t==='t'){const np=rotP([it.x,it.y],c);it.x=np[0];it.y=np[1];it.rot=(it.rot||0)===0?270:0}
+    else if(it.t==='l'){const a=rotP([it.x1,it.y1],c),b=rotP([it.x2,it.y2],c);Object.assign(it,{x1:a[0],y1:a[1],x2:b[0],y2:b[1]})}
+    else{const a=rotP([it.x,it.y],c),b=rotP([it.x+it.w,it.y+it.h],c);Object.assign(it,{x:Math.min(a[0],b[0]),y:Math.min(a[1],b[1]),w:Math.abs(a[0]-b[0]),h:Math.abs(a[1]-b[1])})}}
+  render();renderProps()}
+function mirSel(){if(placing){placing.mir=!placing.mir;render();return}const items=selItems();if(!items.length)return;mark();
+  let c;if(items.length===1&&items[0].t==='s'){const pv=pivot(geom(items[0]));c=[items[0].x+pv[0],items[0].y]}else c=groupCenter(items);
+  for(const it of items){
+    if(it.t==='s'){const pv=pivot(geom(it));const np=mirP([it.x+pv[0],0],c);it.x=np[0]-pv[0];it.rot=(360-(it.rot||0))%360;it.mir=!it.mir}
+    else if(it.t==='w')it.pts=it.pts.map(p=>mirP(p,c));
+    else if(it.t==='t'){it.x=2*c[0]-it.x;it.anchor=it.anchor==='start'?'end':it.anchor==='end'?'start':'middle'}
+    else if(it.t==='l'){it.x1=2*c[0]-it.x1;it.x2=2*c[0]-it.x2}
+    else it.x=2*c[0]-it.x-it.w}
+  render();renderProps()}
+function copySel(){const items=selItems();if(!items.length)return;clip=clone(items);pasteN=0;toast(`已複製 ${items.length} 個物件`)}
+function paste(){if(!clip)return;mark();pasteN++;const ids=new Set();
+  for(const o of clip){const it=clone(o);it.id=uid();translate(it,20*pasteN,20*pasteN);
+    if(it.t==='s'&&it.tag){const lb=LIBM[it.s];if(lb&&lb.pre&&allSyms().some(s=>s.tag===it.tag))it.tag=nextTag(lb.pre)}
+    cur().items.push(it);ids.add(it.id)}
+  sel=ids;render();renderProps()}
+function align(mode){const items=selItems();if(items.length<2)return;mark();const bs=items.map(bbox);
+  const X0=Math.min(...bs.map(b=>b[0])),X1=Math.max(...bs.map(b=>b[2])),Y0=Math.min(...bs.map(b=>b[1])),Y1=Math.max(...bs.map(b=>b[3]));
+  if(mode==='dh'||mode==='dv'){const idx=items.map((it,i)=>i).sort((a,b)=>mode==='dh'?bs[a][0]-bs[b][0]:bs[a][1]-bs[b][1]);
+    const tot=idx.reduce((s,i)=>s+(mode==='dh'?bs[i][2]-bs[i][0]:bs[i][3]-bs[i][1]),0);const gap=((mode==='dh'?X1-X0:Y1-Y0)-tot)/(items.length-1);let pos=mode==='dh'?X0:Y0;
+    idx.forEach(i=>{const b=bs[i];const d=snap(pos-(mode==='dh'?b[0]:b[1]));mode==='dh'?translate(items[i],d,0):translate(items[i],0,d);pos+=(mode==='dh'?b[2]-b[0]:b[3]-b[1])+gap})}
+  else items.forEach((it,i)=>{const b=bs[i];let dx=0,dy=0;
+    if(mode==='l')dx=X0-b[0];if(mode==='r')dx=X1-b[2];if(mode==='ch')dx=(X0+X1)/2-(b[0]+b[2])/2;
+    if(mode==='t')dy=Y0-b[1];if(mode==='b')dy=Y1-b[3];if(mode==='cv')dy=(Y0+Y1)/2-(b[1]+b[3])/2;translate(it,snap(dx),snap(dy))});
+  render()}
+function nudge(dx,dy){if(!sel.size)return;mark();const st=moveStart();moveApply(st,dx,dy);moveEnd(st);render()}
+
+window.addEventListener('keydown',e=>{const tg=e.target;const typing=tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.tagName==='SELECT');
+  if(e.key==='Escape'){if($('#dlg').innerHTML){closeDlg();return}if(typing){tg.blur();return}if(draft){finishWire();return}if(placing||tool!=='select'){setTool('select');return}sel.clear();render();renderProps();return}
+  if(typing)return;const k=e.key.toLowerCase(),mod=e.ctrlKey||e.metaKey;
+  if(mod&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+  if(mod&&k==='y'){e.preventDefault();redo();return}
+  if(mod&&k==='c'){e.preventDefault();copySel();return}
+  if(mod&&k==='x'){e.preventDefault();copySel();delSel();return}
+  if(mod&&k==='v'){e.preventDefault();paste();return}
+  if(mod&&k==='d'){e.preventDefault();copySel();paste();return}
+  if(mod&&k==='a'){e.preventDefault();sel=new Set(cur().items.map(i=>i.id));render();renderProps();return}
+  if(mod&&k==='s'){e.preventDefault();saveJSON();return}
+  if(mod)return;
+  if(e.key===' '){spaceDown=true;svg.classList.add('pan');e.preventDefault();return}
+  if(k==='delete'||k==='backspace'){e.preventDefault();delSel();return}
+  if(k==='enter'&&draft){finishWire();return}
+  if(k==='/'&&draft){draft.mode=draft.mode==='hv'?'vh':'hv';render();return}
+  const arrows={arrowleft:[-1,0],arrowright:[1,0],arrowup:[0,-1],arrowdown:[0,1]};
+  if(arrows[k]){e.preventDefault();const s=e.shiftKey?50:10;nudge(arrows[k][0]*s,arrows[k][1]*s);return}
+  const map={v:'select',w:'wire',t:'text',l:'line',b:'rect',e:'ellipse'};
+  if(map[k]){setTool(map[k]);return}
+  if(k==='r'){rotSel();return}if(k==='m'){mirSel();return}if(k==='f'){fit();return}
+  if(k==='+'||k==='='){$('#zIn').click();return}if(k==='-'){$('#zOut').click();return}
+});
+window.addEventListener('keyup',e=>{if(e.key===' '){spaceDown=false;svg.classList.remove('pan')}});
+
+/* ====================== 元件庫面板 ====================== */
+function thumb(lb){const it=mkSym(lb.id,0,0);it.tag=lb.pre?lb.pre+'1':'';const g=geom(it);const b=symBox(it,g);const pad=16;
+  const vb=[b[0]-pad,b[1]-pad-(g.tag==='none'?0:12),b[2]-b[0]+pad*2+(g.tag==='right'?30:0),b[3]-b[1]+pad*2+(g.tag==='none'?0:12)];
+  return `<svg viewBox="${vb.map(r2).join(' ')}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${symSVG(it,true)}</svg>`}
+function renderLib(){const q=$('#q').value.trim().toLowerCase();let s='';
+  for(const c of LIB){const items=c.items.filter(it=>!q||(it.name+it.id+(it.pre||'')+(it.spec||'')).toLowerCase().includes(q));if(!items.length)continue;
+    s+=`<div class="cat" data-cat="${esc(c.cat)}"><button type="button" aria-expanded="true">${esc(c.cat)}<span>${items.length}</span></button><div class="cells">`+
+      items.map(it=>`<div class="cell" draggable="true" data-id="${it.id}" tabindex="0" title="${esc(it.name)}${it.spec?' · '+esc(it.spec):''}">${thumb(it)}<b>${esc(it.name)}</b>${it.pre?`<i>${esc(it.pre)}</i>`:''}</div>`).join('')+'</div></div>'}
+  $('#cats').innerHTML=s||'<p class="note" style="padding:12px">找不到符合的元件</p>';}
+$('#q').addEventListener('input',renderLib);
+$('#cats').addEventListener('click',e=>{const b=e.target.closest('.cat>button');if(b){const c=b.parentElement;c.classList.toggle('closed');b.setAttribute('aria-expanded',!c.classList.contains('closed'));return}
+  const cell=e.target.closest('.cell');if(cell){startPlace(cell.dataset.id);if(innerWidth<=980)$('#lib').classList.remove('open')}});
+$('#cats').addEventListener('keydown',e=>{if(e.key==='Enter'){const c=e.target.closest('.cell');if(c)startPlace(c.dataset.id)}});
+$('#cats').addEventListener('dragstart',e=>{const c=e.target.closest('.cell');if(c){e.dataTransfer.setData('text/plain',c.dataset.id);e.dataTransfer.effectAllowed='copy'}});
+
+/* ====================== 屬性面板 ====================== */
+let pendMark=false;
+const fld=(k,label,v,type='text',extra='')=>`<div class="row"><label for="f_${k.replace(/\W/g,'_')}">${label}</label>${type==='textarea'?`<textarea id="f_${k.replace(/\W/g,'_')}" data-k="${k}" rows="5" ${extra}>${esc(v)}</textarea>`:type==='checkbox'?`<input type="checkbox" id="f_${k.replace(/\W/g,'_')}" data-k="${k}" ${v?'checked':''}>`:`<input type="${type}" id="f_${k.replace(/\W/g,'_')}" data-k="${k}" value="${esc(v)}" ${extra}>`}</div>`;
+const colorBtns=(k,v)=>`<div class="row"><label>顏色</label><div class="colors">${WCOL.map(([c,n])=>`<button type="button" data-color="${c}" data-k="${k}" title="${n}" style="background:${c}" aria-pressed="${(v||'').toLowerCase()===c}"></button>`).join('')}</div></div>`;
+function renderProps(){const pb=$('#pbody');const items=selItems();let s='';
+  if(!items.length){const pg=cur(),m=doc.meta;$('#ptitle').textContent='圖頁 / 圖框';
+    s+=`<div class="sec"><h3>目前圖頁</h3>${fld('pg.name','頁名稱',pg.name)}<div class="row"><label for="f_pgsize">圖紙</label><select id="f_pgsize" data-k="pg.size">${Object.entries(SIZES).map(([k,v])=>`<option value="${k}"${k===pg.size?' selected':''}>${v[2]}</option>`).join('')}</select></div>
+      ${fld('pm.title','圖名',pg.meta.title)}${fld('pm.dwgNo','圖號',pg.meta.dwgNo)}${fld('pm.rev','版次',pg.meta.rev)}</div>
+      <div class="sec"><h3>專案標題欄（全部圖頁）</h3>${fld('m.company','公司',m.company)}${fld('m.project','件名',m.project)}${fld('m.cadNo','CAD NO',m.cadNo)}
+      ${fld('m.designer','設計',m.designer)}${fld('m.checker','檢圖',m.checker)}${fld('m.approver','認可',m.approver)}${fld('m.date','日期',m.date,'date')}</div>
+      <div class="sec"><h3>統計</h3><p class="note">共 ${doc.pages.length} 頁 · 本頁 ${pg.items.length} 物件 · 元件 ${pg.items.filter(i=>i.t==='s').length} · 導線 ${pg.items.filter(i=>i.t==='w').length}</p></div>`;
+  }else if(items.length>1){$('#ptitle').textContent=`已選取 ${items.length} 個物件`;
+    s+=`<div class="sec"><h3>對齊</h3><div class="btns">${[['l','靠左'],['ch','水平置中'],['r','靠右'],['t','靠上'],['cv','垂直置中'],['b','靠下']].map(([k,n])=>`<button class="btn" data-align="${k}">${n}</button>`).join('')}</div>
+      <h3>均分</h3><div class="btns"><button class="btn" data-align="dh">水平均分</button><button class="btn" data-align="dv">垂直均分</button></div></div>
+      <div class="sec"><h3>操作</h3><div class="btns"><button class="btn" data-act="rot">旋轉 90°</button><button class="btn" data-act="mir">鏡像</button><button class="btn" data-act="dup">複製</button><button class="btn danger" data-act="del">刪除</button></div></div>`;
+    const ws=items.filter(i=>i.t==='w');if(ws.length)s+=`<div class="sec"><h3>導線 (${ws.length})</h3>${colorBtns('w.color',ws[0].color)}</div>`;
+  }else{const it=items[0];
+    if(it.t==='s'){const lb=LIBM[it.s];$('#ptitle').textContent=lb.name;
+      s+=`<div class="sec"><h3>標示</h3>${fld('tag','元件代號',it.tag)}${fld('showSpec','標示規格',it.showSpec,'checkbox')}<div class="row"><label>標籤偏移</label><div class="duo"><input type="number" step="2" data-k="tdx" value="${+it.tdx||0}" aria-label="標籤水平偏移"><input type="number" step="2" data-k="tdy" value="${+it.tdy||0}" aria-label="標籤垂直偏移"></div></div></div>`;
+      const pk=Object.keys(it.p||{});
+      if(pk.length)s+=`<div class="sec"><h3>符號參數</h3>${pk.map(k=>{const v=it.p[k];const lab=PLAB[k]||k;
+        if(typeof v==='boolean')return fld('p.'+k,lab,v,'checkbox');if(typeof v==='number')return fld('p.'+k,lab,v,'number','step="10"');
+        if(PMULTI.has(k))return fld('p.'+k,lab,v,'textarea',k==='rows'?'rows="10"':'');return fld('p.'+k,lab,v)}).join('')}
+        ${['left','right','top','bottom','pins','labels'].some(k=>k in it.p)?'<p class="note">腳位以逗號分隔，例如 <code>L,N,FG</code></p>':''}${'rows' in it.p?'<p class="note">每列：左腳位,左定義,右腳位,右定義</p>':''}</div>`;
+      s+=`<div class="sec"><h3>零件資料（零件表 / 估價）</h3>${fld('props.name','名稱',it.props.name)}${fld('props.spec','規格',it.props.spec)}${fld('props.maker','廠商',it.props.maker)}${fld('props.partno','料號',it.props.partno)}
+        <div class="row"><label>數量 / 單價</label><div class="duo"><input type="number" min="0" data-k="props.qty" value="${+it.props.qty||0}" aria-label="數量"><input type="number" min="0" data-k="props.price" value="${+it.props.price||0}" aria-label="單價"></div></div>${fld('props.note','備註',it.props.note)}</div>`;
+      s+=`<div class="sec"><h3>位置</h3><div class="row"><label>X / Y (mm)</label><div class="duo"><input type="number" step="2.5" data-k="x" value="${it.x/U}" aria-label="X"><input type="number" step="2.5" data-k="y" value="${it.y/U}" aria-label="Y"></div></div>
+        <div class="btns"><button class="btn" data-act="rot">旋轉 90°</button><button class="btn" data-act="mir">鏡像</button><button class="btn" data-act="dup">複製</button><button class="btn danger" data-act="del">刪除</button></div>
+        <p class="note">旋轉 ${it.rot||0}° ${it.mir?'· 已鏡像':''}</p></div>`;}
+    else if(it.t==='w'){$('#ptitle').textContent='導線';
+      s+=`<div class="sec">${colorBtns('color',it.color)}${fld('label','線標 / 線色',it.label,'text','placeholder="例：(紅) 0.75mm²"')}
+        <div class="row"><label for="f_ww">線寬</label><select id="f_ww" data-k="w">${[[1,'細'],[1.4,'標準'],[2.2,'粗 (動力)']].map(([v,n])=>`<option value="${v}"${+it.w===v?' selected':''}>${n}</option>`).join('')}</select></div>
+        ${fld('dash','虛線',it.dash,'checkbox')}<p class="note">${it.pts.length} 個節點 · 拖曳線段可平移，拖曳白色方塊可移動節點</p>
+        <div class="btns"><button class="btn danger" data-act="del">刪除導線</button></div></div>`;}
+    else if(it.t==='t'){$('#ptitle').textContent='文字';
+      s+=`<div class="sec">${fld('text','內容',it.text,'textarea','rows="3"')}<div class="row"><label>字高 / 粗體</label><div class="duo"><input type="number" min="6" max="60" data-k="size" value="${it.size}" aria-label="字高"><label class="chk" style="height:28px"><input type="checkbox" data-k="bold" ${it.bold?'checked':''}> 粗體</label></div></div>
+        <div class="row"><label for="f_anc">對齊</label><select id="f_anc" data-k="anchor">${[['start','靠左'],['middle','置中'],['end','靠右']].map(([v,n])=>`<option value="${v}"${it.anchor===v?' selected':''}>${n}</option>`).join('')}</select></div>
+        ${colorBtns('color',it.color)}<div class="btns"><button class="btn" data-act="rot">旋轉 90°</button><button class="btn danger" data-act="del">刪除</button></div></div>`;}
+    else{$('#ptitle').textContent={l:'直線',r:'矩形',e:'橢圓'}[it.t];
+      s+=`<div class="sec">${colorBtns('color',it.color)}<div class="row"><label>線寬</label><input type="number" step="0.2" min="0.4" data-k="sw" value="${it.sw||1.2}"></div>${fld('dash','虛線',it.dash,'checkbox')}
+        <div class="btns"><button class="btn danger" data-act="del">刪除</button></div></div>`;}
+  }
+  pb.innerHTML=s;}
+function setPath(k,v){const items=selItems();
+  if(k.startsWith('pg.')){cur()[k.slice(3)]=v;if(k==='pg.name')renderTabs();if(k==='pg.size')fit();return}
+  if(k.startsWith('pm.')){cur().meta[k.slice(3)]=v;return}
+  if(k.startsWith('m.')){doc.meta[k.slice(2)]=v;return}
+  if(k==='w.color'){items.forEach(i=>{if(i.t==='w')i.color=v});return}
+  const it=items[0];if(!it)return;
+  if(k==='x'||k==='y'){it[k]=snap((+v||0)*U);return}
+  const parts=k.split('.');let o=it;for(let i=0;i<parts.length-1;i++)o=o[parts[i]];o[parts[parts.length-1]]=v;}
+$('#pbody').addEventListener('focusin',()=>{pendMark=true});
+$('#pbody').addEventListener('input',e=>{const t=e.target;const k=t.dataset.k;if(!k)return;if(pendMark){mark();pendMark=false}
+  let v=t.type==='checkbox'?t.checked:t.type==='number'?(t.value===''?0:+t.value):t.value;if(k==='w')v=+v;
+  const it=selItems()[0];if(it&&it.t==='s'&&k.startsWith('p.')&&typeof it.p[k.slice(2)]==='number')v=+v;
+  setPath(k,v);render();});
+$('#pbody').addEventListener('change',e=>{if(e.target.dataset.k==='pg.size')renderProps()});
+$('#pbody').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.color){mark();setPath(b.dataset.k,b.dataset.color);render();renderProps();return}
+  if(b.dataset.align){align(b.dataset.align);return}
+  const a=b.dataset.act;if(a==='rot')rotSel();if(a==='mir')mirSel();if(a==='del')delSel();if(a==='dup'){copySel();paste()}});
+
+/* ====================== 圖頁 ====================== */
+let renaming=-1,delArm=0;
+function renderTabs(){$('#tabs').innerHTML=doc.pages.map((p,i)=>i===renaming?`<div class="tab on"><input id="rn" value="${esc(p.name)}" aria-label="圖頁名稱"></div>`:
+  `<button class="tab${i===pi?' on':''}" role="tab" aria-selected="${i===pi}" data-i="${i}" title="雙擊重新命名"><small>${i+1}</small>${esc(p.name)}</button>`).join('');
+  const rn=$('#rn');if(rn){rn.focus();rn.select();const done=ok=>{if(ok&&rn.value.trim()){mark();doc.pages[renaming].name=rn.value.trim()}renaming=-1;renderTabs();renderProps()};rn.onkeydown=e=>{if(e.key==='Enter')done(true);if(e.key==='Escape')done(false)};rn.onblur=()=>done(true)}
+  const d=$('#pgDel');d.textContent=delArm?'確定刪除？':'刪除';d.disabled=doc.pages.length<2;}
+function goPage(i){if(draft)finishWire();pi=i;sel.clear();full();fit()}
+$('#tabs').addEventListener('click',e=>{const t=e.target.closest('[data-i]');if(t&&+t.dataset.i!==pi)goPage(+t.dataset.i)});
+$('#tabs').addEventListener('dblclick',e=>{const t=e.target.closest('[data-i]');if(t){renaming=+t.dataset.i;renderTabs()}});
+$('#pgAdd').onclick=()=>{mark();const p=newPage('圖頁 '+(doc.pages.length+1));p.size=cur().size;doc.pages.splice(pi+1,0,p);goPage(pi+1)};
+$('#pgDup').onclick=()=>{mark();const p=clone(cur());p.id=uid();p.name+=' (複製)';p.items.forEach(i=>i.id=uid());doc.pages.splice(pi+1,0,p);goPage(pi+1)};
+$('#pgL').onclick=()=>{if(pi<1)return;mark();const p=doc.pages.splice(pi,1)[0];doc.pages.splice(pi-1,0,p);pi--;full()};
+$('#pgR').onclick=()=>{if(pi>=doc.pages.length-1)return;mark();const p=doc.pages.splice(pi,1)[0];doc.pages.splice(pi+1,0,p);pi++;full()};
+$('#pgDel').onclick=()=>{if(doc.pages.length<2)return;if(!delArm){delArm=1;renderTabs();setTimeout(()=>{delArm=0;renderTabs()},3000);return}delArm=0;mark();doc.pages.splice(pi,1);goPage(Math.max(0,pi-1))};
+
+/* ====================== 零件表 ====================== */
+function bomRows(){const g=new Map();
+  doc.pages.forEach((pg,pidx)=>pg.items.forEach(it=>{if(it.t!=='s')return;const q=+it.props.qty||0;if(q<=0)return;const key=(it.props.name||'')+'|'+(it.props.spec||'');
+    if(!g.has(key))g.set(key,{name:it.props.name,spec:it.props.spec,maker:it.props.maker,partno:it.props.partno,price:+it.props.price||0,qty:0,tags:[],refs:[]});
+    const r=g.get(key);r.qty+=q;if(it.tag)r.tags.push(it.tag);r.refs.push([pidx,it.id]);if(!r.maker&&it.props.maker)r.maker=it.props.maker;if(!r.partno&&it.props.partno)r.partno=it.props.partno;if(!r.price&&+it.props.price)r.price=+it.props.price}));
+  return[...g.values()]}
+const money=n=>(+n||0).toLocaleString('zh-TW');
+function bomDialog(){const rows=bomRows();const total=rows.reduce((s,r)=>s+r.qty*r.price,0);
+  openDlg('零件表 / 估價',`<p class="note">由圖面元件自動彙整（名稱＋規格相同者合併）。廠商、料號、單價可直接修改，會同步回所有對應元件。數量為 0 的元件（接點、信號箭頭等）不列入。</p>
+    <div class="tblwrap"><table class="bom"><thead><tr><th>NO</th><th>名稱</th><th>規格</th><th>廠商</th><th>料號</th><th>數量</th><th>單價</th><th>合計</th><th>元件代號</th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr data-r="${i}"><td class="n">${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.spec)}</td><td><input data-f="maker" value="${esc(r.maker)}" aria-label="廠商"></td><td><input data-f="partno" value="${esc(r.partno)}" aria-label="料號"></td><td class="n">${r.qty}</td><td><input data-f="price" type="number" min="0" value="${r.price}" style="text-align:right" aria-label="單價"></td><td class="n" data-sum>${money(r.qty*r.price)}</td><td style="white-space:normal;max-width:220px;font-family:var(--font-mono);font-size:11px">${esc(r.tags.join(', '))}</td></tr>`).join('')||'<tr><td colspan="9">尚無元件</td></tr>'}
+    </tbody><tfoot><tr><td colspan="7" style="text-align:right">總價</td><td class="n" id="bomTot">${money(total)}</td><td></td></tr></tfoot></table></div>`,
+    `<button class="btn" data-x="close">關閉</button><button class="btn primary" data-x="csv">匯出 CSV（Excel）</button>`,true);
+  const body=$('#dlg tbody');let marked=false;
+  body&&body.addEventListener('input',e=>{const t=e.target;const tr=t.closest('[data-r]');if(!tr)return;if(!marked){mark();marked=true}const r=rows[+tr.dataset.r];const f=t.dataset.f;const v=f==='price'?(+t.value||0):t.value;r[f]=v;
+    r.refs.forEach(([p,id])=>{const it=doc.pages[p].items.find(x=>x.id===id);if(it)it.props[f]=v});tr.querySelector('[data-sum]').textContent=money(r.qty*r.price);
+    $('#bomTot').textContent=money(rows.reduce((s,x)=>s+x.qty*x.price,0));autosave()});
+  $('#dlg [data-x="csv"]').onclick=()=>{const head=['NO','名稱','規格','廠商','料號','數量','單價','合計','元件代號'];const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+    const csv='﻿'+[head.map(q).join(','),...bomRows().map((r,i)=>[i+1,r.name,r.spec,r.maker,r.partno,r.qty,r.price,r.qty*r.price,r.tags.join(' ')].map(q).join(','))].join('\r\n');
+    saveFile(fname('零件表','csv'),new Blob([csv],{type:'text/csv'}))};}
+function bomPagesSVG(){const rows=bomRows();const per=26;const pages=[];const base={size:'A4L',meta:{title:'零件表',dwgNo:'',rev:''}};
+  for(let k=0;k<Math.max(1,Math.ceil(rows.length/per));k++){const chunk=rows.slice(k*per,(k+1)*per);const cw=[40,190,220,100,150,60,90,110];const hd=['NO','名稱','規格','廠商','料號','數量','單價','合計'];
+    const X=[50];cw.forEach(w=>X.push(X[X.length-1]+w));let s=`<g font-family="${PF}" font-size="11" fill="${INK}"><text x="50" y="60" font-size="18" font-weight="700">零件表${rows.length>per?` (${k+1})`:''}</text>`;
+    const y0=76,rh=22;s+=`<rect x="${X[0]}" y="${y0}" width="${X[8]-X[0]}" height="${rh}" fill="#e8ecef"/>`;
+    hd.forEach((h,i)=>s+=`<text x="${X[i]+6}" y="${y0+15}" font-weight="700">${h}</text>`);
+    chunk.forEach((r,i)=>{const y=y0+rh*(i+1);const vals=[k*per+i+1,r.name,r.spec,r.maker,r.partno,r.qty,money(r.price),money(r.qty*r.price)];
+      vals.forEach((v,j)=>s+=`<text x="${j>=5?X[j+1]-6:X[j]+6}" y="${y+15}"${j>=5?' text-anchor="end"':''}>${esc(v)}</text>`);s+=`<line x1="${X[0]}" y1="${y+rh}" x2="${X[8]}" y2="${y+rh}" stroke="#bbb" stroke-width=".6"/>`});
+    if(k===Math.ceil(rows.length/per)-1||!rows.length){const y=y0+rh*(chunk.length+1)+18;s+=`<text x="${X[7]-6}" y="${y}" text-anchor="end" font-weight="700">總價</text><text x="${X[8]-6}" y="${y}" text-anchor="end" font-weight="700">${money(rows.reduce((a,r)=>a+r.qty*r.price,0))}</text>`}
+    s+=`<rect x="${X[0]}" y="${y0}" width="${X[8]-X[0]}" height="${rh*(chunk.length+1)}" fill="none" stroke="${INK}" stroke-width=".8"/></g>`;
+    pages.push({page:base,body:s})}
+  return pages}
+
+/* ====================== 匯出 ====================== */
+function fname(kind,ext){const n=(doc.meta.project||'線路圖').replace(/[\\/:*?"<>|]/g,'_').slice(0,60);return`${n}_${kind}.${ext}`}
+function pageSVG(pg,idx,total,body,titleOverride){const [W,H]=SIZES[pg.size];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W/U}mm" height="${H/U}mm" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>${frameSVG(pg,idx,total,titleOverride)}${body??itemsSVG(pg,true)}</svg>`}
+function svgToCanvas(str,W,H,dpi){return new Promise((res,rej)=>{const img=new Image();const sc=dpi/25.4/U;img.onload=()=>{const c=document.createElement('canvas');c.width=Math.round(W*sc);c.height=Math.round(H*sc);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);res(c)};img.onerror=()=>rej(new Error('圖面轉換失敗'));img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(str)})}
+let dlP=null;function dlNS(){if(!dlP)dlP=(window.claude&&typeof window.claude.use==='function')?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);return dlP}
+async function saveFile(name,blob){const ns=await dlNS();
+  if(ns){try{await ns.save({filename:name,data:blob});toast('已儲存 '+name)}catch(e){const c=e&&e.code;toast(c==='declined'?'已取消儲存':c==='rate_limited'?'已有一個儲存視窗開啟中，請稍後再試':'此檢視無法儲存檔案（'+(c||'unavailable')+'）')}return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('已下載 '+name)}
+function saveJSON(){saveFile(fname('專案','json'),new Blob([JSON.stringify(doc,null,1)],{type:'application/json'}))}
+const ex={range:'all',dpi:300,bom:true};
+function exportDlg(){const seg=(k,opts)=>`<div class="seg">${opts.map(([v,n])=>`<button type="button" data-ek="${k}" data-ev="${v}" aria-pressed="${String(ex[k])===String(v)}">${n}</button>`).join('')}</div>`;
+  openDlg('匯出圖面',`<div class="opt"><span>頁面範圍</span>${seg('range',[['all',`全部 ${doc.pages.length} 頁`],['cur','目前頁']])}</div>
+    <div class="opt"><span>解析度</span>${seg('dpi',[[200,'200 dpi'],[300,'300 dpi (建議)'],[400,'400 dpi']])}</div>
+    <div class="opt"><span>零件表</span>${seg('bom',[[true,'附在最後'],[false,'不附']])}</div>
+    <p class="note">PDF 為每頁一張高解析圖面（中文字型完整保留），圖紙尺寸依各頁設定（A4 / A3）。需要向量檔可匯出 SVG，再以 AutoCAD / Inkscape 開啟。</p>
+    <div class="prog" id="eprog" hidden><i></i></div>`,
+    `<button class="btn" data-x="svg">SVG（目前頁）</button><button class="btn" data-x="png">PNG（目前頁）</button><button class="btn primary" data-x="pdf">匯出 PDF</button>`);
+  $('#dlg .body').addEventListener('click',e=>{const b=e.target.closest('[data-ek]');if(!b)return;const k=b.dataset.ek;let v=b.dataset.ev;ex[k]=k==='dpi'?+v:k==='bom'?v==='true':v;b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+  $('#dlg [data-x="pdf"]').onclick=exportPDF;
+  $('#dlg [data-x="png"]').onclick=async()=>{const pg=cur();const [W,H]=SIZES[pg.size];const c=await svgToCanvas(pageSVG(pg,pi,doc.pages.length),W,H,ex.dpi);c.toBlob(b=>saveFile(fname(pg.name,'png'),b),'image/png')};
+  $('#dlg [data-x="svg"]').onclick=()=>{const pg=cur();saveFile(fname(pg.name,'svg'),new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+pageSVG(pg,pi,doc.pages.length)],{type:'image/svg+xml'}))};}
+async function exportPDF(){if(!window.jspdf){toast('PDF 元件尚未載入，請確認網路後重試');return}
+  const btn=$('#dlg [data-x="pdf"]');btn.disabled=true;const prog=$('#eprog');prog.hidden=false;
+  try{const list=[];const total=doc.pages.length;const bp=ex.bom?bomPagesSVG():[];const tot2=total+bp.length;
+    (ex.range==='all'?doc.pages.map((p,i)=>[p,i]):[[cur(),pi]]).forEach(([p,i])=>list.push({pg:p,svg:pageSVG(p,i,tot2)}));
+    bp.forEach((b,k)=>list.push({pg:b.page,svg:pageSVG(b.page,total+k,tot2,b.body,'零件表')}));
+    let pdf=null;
+    for(let k=0;k<list.length;k++){const {pg,svg:s}=list[k];const [W,H]=SIZES[pg.size];const wmm=W/U,hmm=H/U;const ori=wmm>hmm?'landscape':'portrait';
+      const c=await svgToCanvas(s,W,H,ex.dpi);const data=c.toDataURL('image/png');
+      if(!pdf)pdf=new window.jspdf.jsPDF({orientation:ori,unit:'mm',format:[wmm,hmm],compress:true});else pdf.addPage([wmm,hmm],ori);
+      pdf.addImage(data,'PNG',0,0,wmm,hmm,undefined,'FAST');prog.firstElementChild.style.width=((k+1)/list.length*100)+'%';await new Promise(r=>setTimeout(r,0))}
+    pdf.setProperties({title:doc.meta.project||'電氣迴路圖',subject:'電氣迴路圖',creator:'線路圖編輯器'});
+    await saveFile(fname(ex.range==='all'?'電氣迴路圖':cur().name,'pdf'),pdf.output('blob'));closeDlg()}
+  catch(err){toast('匯出失敗：'+err.message)}finally{if(btn.isConnected){btn.disabled=false;prog.hidden=true}}}
+
+/* ====================== 對話框 / 提示 ====================== */
+function openDlg(title,body,foot,wide){$('#dlg').innerHTML=`<div class="mask"><div class="dlg${wide?' wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><h2>${esc(title)}</h2><button class="btn" data-x="close" aria-label="關閉">✕</button></header><div class="body">${body}</div><div class="foot">${foot||''}</div></div></div>`;
+  $('#dlg .mask').addEventListener('click',e=>{if(e.target.classList.contains('mask')||e.target.closest('[data-x="close"]'))closeDlg()})}
+function closeDlg(){$('#dlg').innerHTML='';render()}
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+function helpDlg(){const K=[['V','選取 / 移動'],['W','導線'],['T','文字'],['L','直線'],['B','矩形'],['E','橢圓 / 虛線框'],['R','旋轉 90°'],['M','水平鏡像'],['Del','刪除'],['Ctrl+Z / Ctrl+Y','復原 / 重做'],['Ctrl+C / Ctrl+V','複製 / 貼上'],['Ctrl+D','原地複製'],['Ctrl+A','全選本頁'],['Ctrl+S','儲存專案 .json'],['方向鍵','微調 2.5 mm（Shift 12.5 mm）'],['F','整頁顯示'],['滾輪','以游標為中心縮放'],['空白鍵 / 中鍵 拖曳','平移畫面'],['Enter / 雙擊 / 右鍵','結束導線'],['/','導線切換先橫或先直'],['Esc','取消 / 回到選取']];
+  openDlg('操作說明',`<div class="keys">${K.map(([k,v])=>`<div><span>${v}</span><kbd>${k}</kbd></div>`).join('')}</div>
+   <p class="note"><b>參考市售軟體的做法：</b>元件接腳落在 2.5 mm 格點上（同 EPLAN / AutoCAD Electrical）；導線端點碰到接腳或其他導線即自動連接，T 字分歧自動加黑點，未連接的交叉自動畫跳線弧（同原圖的 R/S/T 匯流排畫法）；移動元件時相連導線會跟著拉伸；框選由左往右為「完全包含」、由右往左為「碰到即選」（同 AutoCAD）。</p>
+   <p class="note">元件代號自動編號（NFB1、MS1、CR1…），零件表由元件屬性自動彙整並可匯出 CSV 或附在 PDF 最後一頁。專案會自動暫存於此瀏覽器，正式保存請按「儲存」下載 .json 檔。</p>`,`<button class="btn primary" data-x="close">知道了</button>`,true)}
+
+/* ====================== 工具列 ====================== */
+document.querySelectorAll('#tools [data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+$('#bUndo').onclick=undo;$('#bRedo').onclick=redo;$('#bRot').onclick=rotSel;$('#bMir').onclick=mirSel;$('#bDel').onclick=delSel;
+$('#bNew').onclick=()=>{mark();doc=blankDoc();pi=0;sel.clear();full();fit();toast('已建立空白專案（可按復原取回）')};
+$('#bSample').onclick=()=>{mark();doc=sampleDoc();pi=0;sel.clear();full();fit();toast('已載入範例（可按復原取回）')};
+$('#bOpen').onclick=()=>$('#fileIn').click();
+$('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||!Array.isArray(d.pages)||!d.pages.length)throw new Error('不是線路圖專案檔');
+  d.meta=d.meta||blankDoc().meta;d.pages.forEach(p=>{p.items=(p.items||[]).filter(i=>i.t!=='s'||LIBM[i.s]);p.size=SIZES[p.size]?p.size:'A4L';p.meta=p.meta||{title:'',dwgNo:'',rev:''}});
+  mark();doc=d;pi=0;sel.clear();full();fit();toast('已開啟 '+f.name)}catch(err){toast('無法開啟：'+err.message)}};r.readAsText(f);e.target.value=''};
+$('#bSave').onclick=saveJSON;$('#bExport').onclick=exportDlg;$('#bBom').onclick=bomDialog;$('#bHelp').onclick=helpDlg;
+$('#oGrid').onchange=e=>{opt.grid=e.target.checked;render()};$('#oSnap').onchange=e=>{opt.snap=e.target.checked};$('#oHop').onchange=e=>{opt.hops=e.target.checked;render()};
+$('#wcol').innerHTML=WCOL.map(([c,n])=>`<option value="${c}">${n}</option>`).join('');$('#wcol').onchange=e=>{wireColor=e.target.value};
+$('#bLib').onclick=()=>{$('#lib').classList.toggle('open');$('#props').classList.remove('open')};
+$('#bProps').onclick=()=>{$('#props').classList.toggle('open');$('#lib').classList.remove('open')};
+window.addEventListener('resize',()=>render());
+
+/* ====================== 啟動 ====================== */
+try{const s=JSON.parse(localStorage.getItem('ckt-editor-doc')||'null');if(s&&s.doc&&Array.isArray(s.doc.pages)&&s.doc.pages.length){doc=s.doc;pi=Math.min(s.pi||0,doc.pages.length-1)}}catch(e){}
+if(!doc)doc=sampleDoc();
+renderLib();setTool('select');full();requestAnimationFrame(fit);
+window.__ckt={get doc(){return doc},exportPDF,pageSVG,bomRows,sampleDoc,computeDots,computeHops};
+})();
+</script>
