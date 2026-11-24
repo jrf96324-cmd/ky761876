@@ -4,6 +4,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
 /* Layout: CAD workbench — toolbar / [symbol library | drawing sheet | properties] / sheet tabs + status */
 :root{
@@ -111,6 +112,7 @@ footer{display:flex;align-items:stretch;gap:8px;background:var(--panel);border-t
 .dlg header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
 .dlg header h2{margin:0;font-size:15px}
 .dlg .body{padding:14px 16px;overflow:auto;display:grid;gap:12px}
+.dlg .foot .sp{flex:1}
 .dlg .foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
 .dlg .foot .btn{border:1px solid var(--line)}
 .opt{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -134,6 +136,7 @@ table.bom tfoot td{font-weight:700}
 .prog i{display:block;height:100%;background:var(--accent);width:0}
 .mob{display:none}
 
+@media (max-width:1680px){#tools .tlabel,.chk .tlabel{display:none}}
 @media (max-width:980px){
   #main{grid-template-columns:1fr}
   #lib,#props{position:absolute;top:0;bottom:0;width:min(300px,86vw);z-index:20;box-shadow:0 0 30px rgba(0,0,0,.25)}
@@ -159,6 +162,10 @@ table.bom tfoot td{font-weight:700}
       <button class="btn" id="bSample" title="載入範例（依上傳電氣迴路圖）">範例</button>
       <button class="btn" id="bOpen" title="開啟 .json 專案檔">開啟</button>
       <button class="btn" id="bSave" title="儲存專案為 .json (Ctrl+S)">儲存</button>
+    </div>
+    <div class="grp">
+      <button class="btn" id="bXlIn" title="匯入 Excel：零件表、IO 表或本編輯器匯出的專案">匯入 Excel</button>
+      <button class="btn" id="bXlOut" title="匯出 Excel：零件表、IO 表、元件清單、接線表、圖面">匯出 Excel</button>
     </div>
     <div class="grp">
       <button class="btn" id="bUndo" title="復原 (Ctrl+Z)"><svg viewBox="0 0 16 16"><path d="M5 3L2 6l3 3M2.5 6H10a4 4 0 010 8H7" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -223,7 +230,8 @@ table.bom tfoot td{font-weight:700}
     <div id="status"><span id="sXY">X 0.0  Y 0.0 mm</span><span id="sSel" class="opt-hide"></span><span id="sSave" class="opt-hide"></span></div>
   </footer>
 </div>
-<input type="file" id="fileIn" accept=".json,application/json" hidden>
+<input type="file" id="fileIn" accept=".json,.xlsx,application/json" hidden>
+<input type="file" id="xlIn" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
 <div id="dlg"></div>
 <div id="toast" hidden></div>
 
@@ -323,7 +331,8 @@ const B={
     return{pins,box:[-2,0,42,cy+r],svg:s}},
   box:p=>{const pit=Math.max(20,ceil10(+p.pitch||20));const Ls=list(p.left),Rs=list(p.right),Ts=list(p.top),Bs=list(p.bottom);
     const nv=Math.max(Ls.length,Rs.length,1),nh=Math.max(Ts.length,Bs.length);
-    let W=ceil10(Math.max(+p.w||100,nh?(nh-1)*pit+40:0));let H=(nv-1)*pit+40;if(nh)H=Math.max(H,60);
+    const tl=Math.max(0,...String(p.title||'').split('\n').map(t=>tw(t,11))),lw=Math.max(0,...Ls.map(t=>tw(t,9))),rw=Math.max(0,...Rs.map(t=>tw(t,9)));
+    let W=ceil10(Math.max(+p.w||100,nh?(nh-1)*pit+40:0,tl+(lw?lw+8:0)+(rw?rw+8:0)+16));let H=(nv-1)*pit+40;if(nh)H=Math.max(H,60);
     let s=R(10,0,W,H,'#fff'),pins=[];
     Ls.forEach((t,i)=>{const y=20+i*pit;pins.push({x:0,y,n:t});s+=L(0,y,10,y)+T(14,y+3.5,t,9,'start');});
     Rs.forEach((t,i)=>{const y=20+i*pit;pins.push({x:W+20,y,n:t});s+=L(W+10,y,W+20,y)+T(W+6,y+3.5,t,9,'end');});
@@ -489,7 +498,7 @@ const cur=()=>doc.pages[pi];
 const findIt=id=>cur().items.find(i=>i.id===id);
 const selItems=()=>cur().items.filter(i=>sel.has(i.id));
 const newPage=(name)=>({id:uid(),name:name||'新圖頁',size:'A4L',meta:{title:name||'電氣迴路圖',dwgNo:'',rev:'A'},items:[]});
-const blankDoc=()=>({v:1,meta:{company:'',project:'',cadNo:'',designer:'',checker:'',approver:'',date:new Date().toISOString().slice(0,10)},pages:[newPage('圖頁 1')]});
+const blankDoc=()=>({v:1,meta:{company:'',project:'',cadNo:'',designer:'',checker:'',approver:'',date:new Date().toISOString().slice(0,10)},extra:[],pages:[newPage('圖頁 1')]});
 
 function mkSym(libId,x,y,extra={}){const lb=LIBM[libId];const it={id:uid(),t:'s',s:libId,x,y,rot:0,mir:false,tag:'',p:clone(lb.p||{}),
   props:{name:lb.name,spec:lb.spec||'',maker:'',partno:'',price:0,qty:lb.bom===0?0:1,note:''},showSpec:false,tdx:0,tdy:0};
@@ -925,21 +934,200 @@ function bomRows(){const g=new Map();
   doc.pages.forEach((pg,pidx)=>pg.items.forEach(it=>{if(it.t!=='s')return;const q=+it.props.qty||0;if(q<=0)return;const key=(it.props.name||'')+'|'+(it.props.spec||'');
     if(!g.has(key))g.set(key,{name:it.props.name,spec:it.props.spec,maker:it.props.maker,partno:it.props.partno,price:+it.props.price||0,qty:0,tags:[],refs:[]});
     const r=g.get(key);r.qty+=q;if(it.tag)r.tags.push(it.tag);r.refs.push([pidx,it.id]);if(!r.maker&&it.props.maker)r.maker=it.props.maker;if(!r.partno&&it.props.partno)r.partno=it.props.partno;if(!r.price&&+it.props.price)r.price=+it.props.price}));
-  return[...g.values()]}
+  const out=[...g.values()];
+  (doc.extra||[]).forEach(e=>out.push({name:e.name,spec:e.spec,maker:e.maker,partno:e.partno,price:+e.price||0,qty:+e.qty||0,tags:[],refs:[],extra:e,note:e.note||''}));
+  return out}
 const money=n=>(+n||0).toLocaleString('zh-TW');
 function bomDialog(){const rows=bomRows();const total=rows.reduce((s,r)=>s+r.qty*r.price,0);
-  openDlg('零件表 / 估價',`<p class="note">由圖面元件自動彙整（名稱＋規格相同者合併）。廠商、料號、單價可直接修改，會同步回所有對應元件。數量為 0 的元件（接點、信號箭頭等）不列入。</p>
-    <div class="tblwrap"><table class="bom"><thead><tr><th>NO</th><th>名稱</th><th>規格</th><th>廠商</th><th>料號</th><th>數量</th><th>單價</th><th>合計</th><th>元件代號</th></tr></thead><tbody>
-    ${rows.map((r,i)=>`<tr data-r="${i}"><td class="n">${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.spec)}</td><td><input data-f="maker" value="${esc(r.maker)}" aria-label="廠商"></td><td><input data-f="partno" value="${esc(r.partno)}" aria-label="料號"></td><td class="n">${r.qty}</td><td><input data-f="price" type="number" min="0" value="${r.price}" style="text-align:right" aria-label="單價"></td><td class="n" data-sum>${money(r.qty*r.price)}</td><td style="white-space:normal;max-width:220px;font-family:var(--font-mono);font-size:11px">${esc(r.tags.join(', '))}</td></tr>`).join('')||'<tr><td colspan="9">尚無元件</td></tr>'}
-    </tbody><tfoot><tr><td colspan="7" style="text-align:right">總價</td><td class="n" id="bomTot">${money(total)}</td><td></td></tr></tfoot></table></div>`,
-    `<button class="btn" data-x="close">關閉</button><button class="btn primary" data-x="csv">匯出 CSV（Excel）</button>`,true);
+  const inp=(f,v,num)=>`<input data-f="${f}"${num?' type="number" min="0" style="text-align:right"':''} value="${esc(v)}" aria-label="${f}">`;
+  openDlg('零件表 / 估價',`<p class="note">圖面元件依「名稱＋規格」自動合併；廠商、料號、單價可直接修改並同步回所有對應元件。標示「其他材料」者（電線、線槽、端子等耗材）來自 Excel 匯入或手動新增，數量可改、可刪除。</p>
+    <div class="tblwrap"><table class="bom"><thead><tr><th>NO</th><th>名稱</th><th>規格</th><th>廠商</th><th>料號</th><th>數量</th><th>單價</th><th>合計</th><th>元件代號</th><th></th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr data-r="${i}"><td class="n">${i+1}</td><td>${r.extra?inp('name',r.name):esc(r.name)}</td><td>${r.extra?inp('spec',r.spec):esc(r.spec)}</td><td>${inp('maker',r.maker)}</td><td>${inp('partno',r.partno)}</td><td class="n">${r.extra?inp('qty',r.qty,1):r.qty}</td><td>${inp('price',r.price,1)}</td><td class="n" data-sum>${money(r.qty*r.price)}</td><td style="white-space:normal;max-width:220px;font-family:var(--font-mono);font-size:11px">${r.extra?'<span class="pill">其他材料</span>':esc(r.tags.join(', '))}</td><td>${r.extra?'<button class="btn danger" data-delx title="刪除此列">✕</button>':''}</td></tr>`).join('')||'<tr><td colspan="10">尚無元件</td></tr>'}
+    </tbody><tfoot><tr><td colspan="7" style="text-align:right">總價</td><td class="n" id="bomTot">${money(total)}</td><td colspan="2"></td></tr></tfoot></table></div>`,
+    `<button class="btn" data-x="addx">＋ 其他材料</button><span class="sp"></span><button class="btn" data-x="close">關閉</button><button class="btn" data-x="csv">匯出 CSV</button><button class="btn primary" data-x="xlsx">匯出 Excel</button>`,true);
   const body=$('#dlg tbody');let marked=false;
-  body&&body.addEventListener('input',e=>{const t=e.target;const tr=t.closest('[data-r]');if(!tr)return;if(!marked){mark();marked=true}const r=rows[+tr.dataset.r];const f=t.dataset.f;const v=f==='price'?(+t.value||0):t.value;r[f]=v;
-    r.refs.forEach(([p,id])=>{const it=doc.pages[p].items.find(x=>x.id===id);if(it)it.props[f]=v});tr.querySelector('[data-sum]').textContent=money(r.qty*r.price);
+  body&&body.addEventListener('input',e=>{const t=e.target;const tr=t.closest('[data-r]');if(!tr)return;if(!marked){mark();marked=true}const r=rows[+tr.dataset.r];const f=t.dataset.f;const v=(f==='price'||f==='qty')?(+t.value||0):t.value;r[f]=v;
+    if(r.extra)r.extra[f]=v;else r.refs.forEach(([p,id])=>{const it=doc.pages[p].items.find(x=>x.id===id);if(it)it.props[f]=v});tr.querySelector('[data-sum]').textContent=money(r.qty*r.price);
     $('#bomTot').textContent=money(rows.reduce((s,x)=>s+x.qty*x.price,0));autosave()});
+  body&&body.addEventListener('click',e=>{const b=e.target.closest('[data-delx]');if(!b)return;const r=rows[+b.closest('[data-r]').dataset.r];mark();doc.extra=doc.extra.filter(x=>x!==r.extra);bomDialog()});
+  $('#dlg [data-x="addx"]').onclick=()=>{mark();(doc.extra=doc.extra||[]).push({id:uid(),name:'新材料',spec:'',maker:'',partno:'',qty:1,price:0,note:''});bomDialog()};
+  $('#dlg [data-x="xlsx"]').onclick=exportXLSX;
   $('#dlg [data-x="csv"]').onclick=()=>{const head=['NO','名稱','規格','廠商','料號','數量','單價','合計','元件代號'];const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-    const csv='﻿'+[head.map(q).join(','),...bomRows().map((r,i)=>[i+1,r.name,r.spec,r.maker,r.partno,r.qty,r.price,r.qty*r.price,r.tags.join(' ')].map(q).join(','))].join('\r\n');
+    const csv='﻿'+[head.map(q).join(','),...bomRows().map((r,i)=>[i+1,r.name,r.spec,r.maker,r.partno,r.qty,r.price,r.qty*r.price,r.extra?'其他材料':r.tags.join(' ')].map(q).join(','))].join('\r\n');
     saveFile(fname('零件表','csv'),new Blob([csv],{type:'text/csv'}))};}
+
+/* ====================== 網路 (Netlist) ====================== */
+function onSegInterior(p,a,b){if(a[1]===b[1]&&p[1]===a[1])return p[0]>Math.min(a[0],b[0])&&p[0]<Math.max(a[0],b[0]);if(a[0]===b[0]&&p[0]===a[0])return p[1]>Math.min(a[1],b[1])&&p[1]<Math.max(a[1],b[1]);return false}
+function netlist(pg){const par=new Map();const f=k=>{while(par.has(k)&&par.get(k)!==k){par.set(k,par.get(par.get(k))||par.get(k));k=par.get(k)}return k};
+  const u=(a,b)=>{if(!par.has(a))par.set(a,a);if(!par.has(b))par.set(b,b);a=f(a);b=f(b);if(a!==b)par.set(a,b)};const K=p=>p[0]+','+p[1];
+  const W=pg.items.filter(i=>i.t==='w'),S=segs(pg);
+  W.forEach(w=>w.pts.forEach(p=>u(K(w.pts[0]),K(p))));
+  const pins=[];pg.items.forEach(s=>{if(s.t==='s')symPins(s).forEach(p=>pins.push({s,p:[p.x,p.y],n:p.n}))});
+  const touch=pt=>{for(const sg of S)if(onSegInterior(pt,sg.a,sg.b))u(K(pt),K(sg.a))};
+  W.forEach(w=>{touch(w.pts[0]);touch(w.pts[w.pts.length-1])});pins.forEach(q=>{if(!par.has(K(q.p)))par.set(K(q.p),K(q.p));touch(q.p)});
+  const nets=new Map();const g=k=>{const r=f(k);if(!nets.has(r))nets.set(r,{wires:[],pins:[]});return nets.get(r)};
+  W.forEach(w=>g(K(w.pts[0])).wires.push(w));pins.forEach(q=>{const r=f(K(q.p));if(nets.has(r))nets.get(r).pins.push(q)});
+  return[...nets.values()]}
+function pinLabel(q){const lb=LIBM[q.s.s];const b=lb&&lb.b;
+  if(b==='arrow_out'||b==='arrow_in')return'→ '+(q.s.p.text||'');if(b==='net')return'['+(q.s.p.text||'')+']';if(b==='gnd'||b==='fg')return'接地';if(b==='dot')return'';
+  return(q.s.tag||lb.name)+':'+q.n}
+function zoneOf(pg,x,y){const [W,H]=SIZES[pg.size];const nc=Math.max(4,Math.round((W-40)/150)),nr=Math.max(3,Math.round((H-40)/150));
+  const c=Math.min(nc,Math.max(1,Math.floor((x-20)/((W-40)/nc))+1)),r=Math.min(nr,Math.max(1,Math.floor((y-20)/((H-40)/nr))+1));return String.fromCharCode(64+r)+c}
+const colorName=c=>(WCOL.find(w=>w[0].toLowerCase()===String(c||'').toLowerCase())||[0,''])[1];
+
+/* ====================== Excel 匯出 ====================== */
+const XLMIME='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+function xlReady(){if(!window.ExcelJS){toast('Excel 元件尚未載入，請確認網路後重試');return false}return true}
+function xlStyleHead(row){row.eachCell(c=>{c.font={bold:true};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFDCE6EC'}};c.alignment={vertical:'middle',horizontal:'center',wrapText:true}})}
+function xlBorder(ws,r0,r1,c0,c1){for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++)ws.getCell(r,c).border={top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'}}}
+const sheetName=(s,used)=>{let n=String(s).replace(/[\[\]:*?\/\\]/g,'_').slice(0,31);let k=2;while(used.has(n)){n=n.slice(0,28)+'_'+k++}used.add(n);return n};
+async function exportXLSX(){if(!xlReady())return;toast('正在產生 Excel…');
+  try{const wb=new ExcelJS.Workbook();wb.creator='線路圖編輯器';wb.created=new Date();const used=new Set();const m=doc.meta;
+  // 1 零件表
+  let ws=wb.addWorksheet(sheetName('零件表',used),{pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  ws.columns=[{width:6},{width:22},{width:24},{width:10},{width:8},{width:10},{width:12},{width:14},{width:28},{width:16}];
+  ws.mergeCells('A1:J1');ws.getCell('A1').value='自製設備電氣零件表';ws.getCell('A1').font={bold:true,size:16};ws.getCell('A1').alignment={horizontal:'center'};
+  ws.getCell('A2').value='件名';ws.getCell('B2').value=m.project||'';ws.getCell('D2').value='CAD NO';ws.getCell('E2').value=m.cadNo||'';ws.getCell('G2').value='日期';ws.getCell('H2').value=m.date||'';
+  ws.getCell('A3').value='設計';ws.getCell('B3').value=m.designer||'';ws.getCell('D3').value='檢圖';ws.getCell('E3').value=m.checker||'';ws.getCell('G3').value='認可';ws.getCell('H3').value=m.approver||'';
+  ['A2','D2','G2','A3','D3','G3'].forEach(a=>ws.getCell(a).font={bold:true,color:{argb:'FF555555'}});
+  const hr=ws.addRow([]);const h=ws.getRow(5);h.values=['NO','名稱','規格','廠商','數量','單價','合計','料號','元件代號','備註'];xlStyleHead(h);
+  const rows=bomRows();rows.forEach((r,i)=>{const n=6+i;const row=ws.getRow(n);row.values=[i+1,r.name,r.spec,r.maker,r.qty,r.price,{formula:`E${n}*F${n}`,result:r.qty*r.price},r.partno,r.extra?'其他材料':r.tags.join(', '),r.note||''];
+    row.getCell(6).numFmt='#,##0.##';row.getCell(7).numFmt='#,##0';row.getCell(9).alignment={wrapText:true}});
+  const tr=6+rows.length;ws.getCell(`F${tr}`).value='總價';ws.getCell(`F${tr}`).font={bold:true};ws.getCell(`G${tr}`).value={formula:`SUM(G6:G${Math.max(6,tr-1)})`,result:rows.reduce((s,r)=>s+r.qty*r.price,0)};ws.getCell(`G${tr}`).numFmt='#,##0';ws.getCell(`G${tr}`).font={bold:true};
+  xlBorder(ws,5,tr,1,10);ws.views=[{state:'frozen',ySplit:5}];ws.autoFilter={from:'A5',to:`J${Math.max(5,tr-1)}`};
+  // 2 IO表
+  ws=wb.addWorksheet(sheetName('IO表',used));ws.columns=[{header:'位址',width:9},{header:'類型',width:8},{header:'註解',width:24},{header:'連接元件',width:30},{header:'圖頁',width:22},{header:'區域',width:8}];xlStyleHead(ws.getRow(1));
+  const io=[];doc.pages.forEach((pg,pidx)=>{const nl=netlist(pg);pg.items.forEach(s=>{if(s.t!=='s'||LIBM[s.s].b!=='plc')return;const g=geom(s);const pins=symPins(s,g);const notes=String(s.p.notes||'').split('\n');
+    pins.forEach((p,k)=>{if(k===pins.length-1)return;const net=nl.find(n=>n.pins.some(q=>q.s===s&&q.n===p.n));const others=net?net.pins.filter(q=>q.s!==s).map(pinLabel).filter(Boolean):[];
+      io.push([p.n,/^Y/i.test(p.n)?'輸出':'輸入',notes[k]||'',others.join(', '),`${pidx+1}. ${pg.name}`,zoneOf(pg,p.x,p.y)])})})});
+  const av=a=>{const mm=/^([A-Z]+)(\d+)$/i.exec(a);return mm?[mm[1].toUpperCase(),parseInt(mm[2],8)]:[a,0]};
+  io.sort((a,b)=>{const x=av(a[0]),y=av(b[0]);return x[0]<y[0]?-1:x[0]>y[0]?1:x[1]-y[1]});io.forEach(r=>ws.addRow(r));xlBorder(ws,1,io.length+1,1,6);ws.views=[{state:'frozen',ySplit:1}];
+  // 3 元件清單
+  ws=wb.addWorksheet(sheetName('元件清單',used));ws.columns=[{header:'元件代號',width:12},{header:'名稱',width:20},{header:'規格',width:22},{header:'廠商',width:10},{header:'料號',width:14},{header:'單價',width:10},{header:'圖頁',width:22},{header:'區域',width:8},{header:'備註',width:20}];xlStyleHead(ws.getRow(1));
+  let cnt=1;doc.pages.forEach((pg,pidx)=>pg.items.forEach(s=>{if(s.t!=='s'||!s.tag)return;const b=symBox(s);ws.addRow([s.tag,s.props.name,s.props.spec,s.props.maker,s.props.partno,+s.props.price||0,`${pidx+1}. ${pg.name}`,zoneOf(pg,(b[0]+b[2])/2,(b[1]+b[3])/2),s.props.note]);cnt++}));
+  xlBorder(ws,1,cnt,1,9);ws.views=[{state:'frozen',ySplit:1}];ws.autoFilter={from:'A1',to:`I${cnt}`};
+  // 4 接線表
+  ws=wb.addWorksheet(sheetName('接線表',used));ws.columns=[{header:'圖頁',width:22},{header:'線號',width:12},{header:'線色',width:8},{header:'線標',width:14},{header:'連接點',width:70}];xlStyleHead(ws.getRow(1));
+  let wc=1;doc.pages.forEach((pg,pidx)=>{netlist(pg).forEach((n,k)=>{const labs=n.wires.map(w=>w.label).filter(Boolean);const name=labs.find(l=>!/^\(/.test(l))||`W${pidx+1}-${String(k+1).padStart(2,'0')}`;
+    const pts=[...new Set(n.pins.map(pinLabel).filter(Boolean))];ws.addRow([`${pidx+1}. ${pg.name}`,name,colorName(n.wires[0].color),[...new Set(labs.filter(l=>/^\(/.test(l)))].join(' '),pts.join('  —  ')]);wc++})});
+  xlBorder(ws,1,wc,1,5);ws.views=[{state:'frozen',ySplit:1}];
+  // 5 圖面
+  for(let i=0;i<doc.pages.length;i++){const pg=doc.pages[i];const [W,H]=SIZES[pg.size];const c=await svgToCanvas(pageSVG(pg,i,doc.pages.length),W,H,150);
+    const id=wb.addImage({base64:c.toDataURL('image/png'),extension:'png'});const w2=wb.addWorksheet(sheetName(`圖${i+1} ${pg.name}`,used),{pageSetup:{paperSize:pg.size.startsWith('A3')?8:9,orientation:W>H?'landscape':'portrait',fitToPage:true,fitToWidth:1,fitToHeight:1},views:[{showGridLines:false}]});
+    const dw=W>H?1120:800;w2.addImage(id,{tl:{col:0,row:0},ext:{width:dw,height:Math.round(dw*H/W)}})}
+  // 6 專案資料（供本編輯器重新開啟）
+  ws=wb.addWorksheet('_project',{state:'veryHidden'});const js=JSON.stringify(doc);for(let k=0;k*30000<js.length;k++)ws.getCell(k+1,1).value=js.slice(k*30000,(k+1)*30000);
+  const buf=await wb.xlsx.writeBuffer();await saveFile(fname('電氣圖','xlsx'),new Blob([buf],{type:XLMIME}))}
+  catch(err){toast('Excel 匯出失敗：'+err.message)}}
+
+/* ====================== Excel 匯入 ====================== */
+const cval=v=>{if(v==null)return'';if(v instanceof Date)return v.toISOString().slice(0,10);if(typeof v==='object'){if('result' in v)return v.result??'';if(v.richText)return v.richText.map(t=>t.text).join('');if('text' in v)return v.text;return''}return v};
+const nrm=s=>String(s??'').replace(/\s+/g,'');
+function wsRows(ws){const rows=[];ws.eachRow({includeEmpty:false},(r,i)=>{const a=[];r.eachCell({includeEmpty:false},(c,j)=>{a[j]=cval(c.value)});rows.push({i,a})});return rows}
+function findHeader(rows,spec){for(const r of rows.slice(0,40)){const cols={};for(const [k,re] of Object.entries(spec)){if(k==='__need')continue;const j=r.a.findIndex(v=>v!==undefined&&re.test(nrm(v)));if(j>=0)cols[k]=j}
+  if(spec.__need.every(k=>k in cols))return{row:r.i,cols}}return null}
+const PART_H={name:/^(名稱|品名|元件名稱|零件名稱)$/,spec:/^(規格|型號|型式)$/,maker:/^(廠商|供應商|品牌)$/,qty:/^(數量|qty)$/i,price:/^(單價|價格)$/,partno:/^(料號|品號)$/,tag:/^(元件代號|代號)$/,note:/^(備註|說明)$/};
+const IO_H={addr:/^(位址|地址|address|i\/?o|點位|io位址)$/i,cmt:/^(註解|說明|功能|名稱|comment|信號名稱)$/i,dev:/^(元件|元件類型|類型|device)$/i,tag:/^(元件代號|代號|tag)$/i};
+const CONSUM=/電線|線材|線槽|端子|鋁軌|軌道|座$|座\(|束帶|配線|螺絲|套管|標籤|銅板|扎線|線號|膠帶|熱縮/;
+function mapPart(name,spec){const s=name+' '+spec;if(CONSUM.test(name))return null;
+  const R=[[/無熔絲|NFB|斷路器|BREAKER/i,()=>/1P/i.test(spec)?'nfb1':/2P/i.test(spec)?'nfb2':'nfb3'],[/過載|積熱|熱動|TR-?ON|TH-/i,'ol3'],[/電磁開關|電磁接觸器|接觸器|SC-\d|MC-/i,'ms3'],
+    [/計時器|TIMER/i,'tcoil'],[/繼電器|RELAY|RJ\dS|MY\d/i,'coil'],[/電源供應器|POWER\s*SUPPLY|MDR-|EDR-|NDR-|DRP-/i,'psu'],[/人機|HMI|MT\d{4}/i,'hmi'],[/類比|-AD|4AD/i,'ad4'],
+    [/輸入輸出模塊|擴充模組|擴充模塊|C32ET|I\/O模/i,'box'],[/PLC|CPU|主機/i,'plc_cpu'],[/驅動器|DRIVE|ASD-/i,'drv'],[/伺服馬達|ECM|SERVO\s*MOTOR/i,'servo'],[/馬達|MOTOR/i,'motor'],
+    [/緊急|EMG|急停/i,'emg'],[/選擇開關|切換開關|SELECT/i,'sel2'],[/按鈕|PUSH|PB\b/i,'pb_no'],[/極限|LIMIT/i,'ls_no'],[/近接|PROXIMITY|PROX/i,'prox'],[/光電|PHOTO/i,'prox'],
+    [/指示燈|LAMP|PILOT/i,'lamp'],[/蜂鳴|BUZZER/i,'buzzer'],[/電磁閥|VALVE/i,'sol'],[/保險絲|FUSE/i,'fuse'],[/濾波|FILTER/i,'nf'],[/變壓器|TRANS/i,'trans'],[/手輪|MPG/i,'mpg'],[/感測器|SENSOR/i,'sensor'],[/端子台/,'tb50']];
+  for(const [re,id] of R)if(re.test(s))return typeof id==='function'?id():id;return null}
+function analyzeWB(wb){const res={project:null,parts:null,io:null,meta:{}};
+  for(const ws of wb.worksheets){
+    if(ws.name==='_project'){let s='';ws.eachRow((r,i)=>{s+=String(cval(r.getCell(1).value)||'')});try{const d=JSON.parse(s);if(d&&Array.isArray(d.pages))res.project=d}catch(e){}continue}
+    const rows=wsRows(ws);
+    if(!res.parts){const hd=findHeader(rows,{...PART_H,__need:['name','spec']});if(hd){const c=hd.cols;const items=[];
+      rows.filter(r=>r.i>hd.row).forEach(r=>{const name=String(r.a[c.name]??'').trim();if(!name||/總價|合計|追加清單|小計/.test(name))return;const g=k=>c[k]!==undefined?r.a[c[k]]:'';
+        items.push({name,spec:String(g('spec')??'').trim(),maker:String(g('maker')??'').trim(),qty:+g('qty')||1,price:+g('price')||0,partno:String(g('partno')??'').trim(),tag:String(g('tag')??'').trim(),note:String(g('note')??'').trim()})});
+      items.forEach(it=>it.lib=mapPart(it.name,it.spec));if(items.length)res.parts={sheet:ws.name,items};
+      rows.slice(0,hd.row).forEach(r=>r.a.forEach((v,j)=>{const k=nrm(v);const next=()=>{for(let q=j+1;q<r.a.length;q++)if(r.a[q]!==undefined&&nrm(r.a[q])!==k&&nrm(r.a[q]))return String(r.a[q]).trim();return''};
+        if(k==='件名'&&!res.meta.project)res.meta.project=next();if((k==='製表'||k==='設計')&&!res.meta.designer){const rr=rows.find(x=>x.i===r.i+1);if(rr&&rr.a[j]&&nrm(rr.a[j])!==k)res.meta.designer=String(rr.a[j]).trim()}}));
+      continue}}
+    if(!res.io){const hd=findHeader(rows,{...IO_H,__need:['addr']});if(hd){const c=hd.cols;const items=[];
+      rows.filter(r=>r.i>hd.row).forEach(r=>{const a=nrm(r.a[c.addr]).toUpperCase();if(!/^[XY]\d+$/.test(a))return;const g=k=>c[k]!==undefined?String(r.a[c[k]]??'').trim():'';items.push({addr:a,cmt:g('cmt'),dev:g('dev'),tag:g('tag')})});
+      if(items.length)res.io={sheet:ws.name,items}}}}
+  return res}
+function placeParts(items,withNew){const made=[];let pg=null,x=60,y=0,rowH=0;const X1=1120,Y1=680;
+  const newPg=n=>{pg=newPage('Excel 匯入元件'+(n>1?' ('+n+')':''));pg.meta.title='匯入元件（請拖曳排列）';doc.pages.push(pg);made.push(pg);x=60;y=70;rowH=0};
+  newPg(1);
+  for(const it of items){if(!it.lib)continue;const lb=LIBM[it.lib];const n=Math.min(40,Math.max(1,Math.round(it.qty)||1));
+    for(let k=0;k<n;k++){const s=mkSym(it.lib,0,0,{showSpec:true,props:{name:it.name,spec:it.spec,maker:it.maker,partno:it.partno,price:it.price,qty:1,note:it.note}});
+      if(lb.b==='box'){if(it.lib==='drv')s.p.title='伺服驅動器\n'+it.spec;else if(it.lib==='box'){s.p.title=it.name+'\n'+it.spec;s.p.left='';s.p.right='';s.p.w=140}else if(it.lib!=='prox'&&it.spec)s.p.title=it.spec}
+      if(it.lib==='mpg')s.p.title=it.name;
+      s.tag=(n===1&&it.tag)?it.tag:nextTag(lb.pre);
+      const b=symBox(s);const gg=geom(s);let w=b[2]-b[0];const h=b[3]-b[1]+34;if(gg.tag==='right')w+=tw(s.tag+'('+(s.props.spec||'')+')',11)+12;
+      if(x+w>X1){x=60;y+=rowH;rowH=0}if(y+h>Y1){newPg(made.length+1)}
+      s.x=snapU(x-b[0]);s.y=snapU(y+24-b[1]);pg.items.push(s);x+=w+50;rowH=Math.max(rowH,h+16)}}
+  if(!made[0].items.length){doc.pages.splice(doc.pages.indexOf(made[0]),1);made.shift()}
+  return made}
+function guessDev(kind,cmt){const c=cmt||'';if(kind==='X'){if(/緊急|EMG|急停/i.test(c))return'emg';if(/停止|STOP/i.test(c))return'pb_nc';if(/限|LIMIT|原點|感測|近接|SENSOR/i.test(c))return'ls_no';return'pb_no'}
+  if(/燈|LAMP|LED/i.test(c))return'lamp';if(/閥|缸|VALVE|SV/i.test(c))return'sol';if(/蜂鳴|BUZZ/i.test(c))return'buzzer';return'coil'}
+function devFromCol(v,kind,cmt){const s=String(v||'').trim();if(s){const hit=LIBM[s]||Object.values(LIBM).find(l=>l.name===s||l.name.includes(s)||(s.length>1&&s.includes(l.name)));
+  if(hit){const g=B[hit.b](hit.p||{});if(g.pins.length===2&&g.pins[1].x===40&&g.pins[1].y===0)return hit.id}}return guessDev(kind,cmt)}
+function buildIOPages(items){const made=[];const groups=new Map();
+  items.forEach(it=>{const k=it.addr[0],v=parseInt(it.addr.slice(1),8);if(isNaN(v))return;const g=k+Math.floor(v/8);if(!groups.has(g))groups.set(g,{k,g:Math.floor(v/8),slots:[]});groups.get(g).slots[v%8]=it});
+  [...groups.values()].sort((a,b)=>a.k<b.k?-1:a.k>b.k?1:a.g-b.g).forEach(G=>{const k=G.k,o=(G.g*8).toString(8);const lo=k+o.padStart(2,'0'),hi=k+(G.g*8+7).toString(8).padStart(2,'0');
+    const pg=newPage(`${lo}-${hi} ${k==='X'?'輸入':'輸出'}`);pg.meta.title=`${k==='X'?'INPUT':'OUTPUT'} ${lo}~${hi}`;doc.pages.push(pg);made.push(pg);const it=pg.items;
+    const red={id:uid(),t:'w',color:'#d12a1f',w:1.4,dash:false,label:''};const wire=(pts,c)=>({...red,id:uid(),pts,color:c||'#111111'});
+    it.push(mkSym('arrow_in',160,60,{p:{text:k==='X'?'P1 (+24V)':'P2 (+24V)'}}));let last=60;
+    for(let i=0;i<8;i++){const s=G.slots[i];if(!s)continue;const y=80+i*40;last=y;const id=devFromCol(s.dev,k,s.cmt);const lb=LIBM[id];
+      it.push(wire([[160,y],[320,y]],'#d12a1f'),mkSym(id,320,y,{tag:s.tag||nextTag(lb.pre),props:{note:s.cmt}}),wire([[360,y],[700,y]]))}
+    it.push(wire([[160,60],[160,last]],'#d12a1f'));
+    const notes=[];for(let i=0;i<8;i++)notes.push(G.slots[i]?G.slots[i].cmt:'');
+    it.push(mkSym(k==='X'?'plc_in':'plc_out',700,60,{tag:'PLC1',p:{base:k+(G.g?o:'0'),notes:notes.join('\n'),model:`${k==='X'?'INPUT':'OUTPUT'} ${lo}~${hi}`}}));
+    it.push(wire([[700,400],[600,400]],'#1f4fd1'),mkSym('arrow_in',600,400,{p:{text:'N1 (0V)'}}))});
+  return made}
+let xlPending=null;
+function excelImportDlg(){openDlg('匯入 Excel',`<p class="note">可匯入三種內容（同一個活頁簿可同時包含）：</p>
+  <div class="sec"><h3>1. 零件表</h3><p class="note">表頭需有「名稱」「規格」，可另含 廠商、數量、單價、料號、元件代號、備註（相容現有「自製設備電氣零件表」格式）。可對應的電氣元件會依數量自動放到新圖頁供拖曳排列；電線、線槽、端子等耗材列入零件表「其他材料」。</p></div>
+  <div class="sec"><h3>2. IO 表</h3><p class="note">表頭需有「位址」，可另含 註解、元件、元件代號。位址如 X0、X17、Y20（8 進位）。每 8 點自動產生一頁 PLC 輸入 / 輸出圖，元件依註解判斷（限 → 極限開關、停止 → b 接點按鈕、燈 → 指示燈、閥 / 缸 → 電磁閥…），也可在「元件」欄指定。</p></div>
+  <div class="sec"><h3>3. 本編輯器匯出的 Excel</h3><p class="note">內含完整專案資料，可原樣還原所有圖頁。</p></div>`,
+  `<button class="btn" data-x="tpl">下載 Excel 範本</button><span class="sp"></span><button class="btn" data-x="close">取消</button><button class="btn primary" data-x="pick">選擇 Excel 檔…</button>`);
+  $('#dlg [data-x="tpl"]').onclick=templateXLSX;$('#dlg [data-x="pick"]').onclick=()=>$('#xlIn').click()}
+async function readExcel(file){if(!xlReady())return;try{const wb=new ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());const res=analyzeWB(wb);xlPending=res;showAnalysis(file.name,res)}
+  catch(err){toast('無法讀取 Excel：'+err.message)}}
+function showAnalysis(fn,res){const P=res.parts,I=res.io;let s='';
+  if(res.project)s+=`<div class="sec"><h3>完整專案</h3><p class="note">偵測到本編輯器匯出的專案資料：${res.project.pages.length} 頁。</p><label class="chk"><input type="checkbox" id="xoProj" checked> 還原專案（取代目前內容，可按復原取回）</label></div>`;
+  if(P){const m=P.items.filter(i=>i.lib),x=P.items.filter(i=>!i.lib);
+    s+=`<div class="sec"><h3>零件表：工作表「${esc(P.sheet)}」· ${P.items.length} 項</h3>
+    <div class="tblwrap" style="max-height:260px"><table class="bom"><thead><tr><th>名稱</th><th>規格</th><th>數量</th><th>單價</th><th>對應</th></tr></thead><tbody>
+    ${P.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.spec)}</td><td class="n">${i.qty}</td><td class="n">${money(i.price)}</td><td>${i.lib?`<span class="pill">${esc(LIBM[i.lib].name)}</span>`:'<span class="note">其他材料</span>'}</td></tr>`).join('')}</tbody></table></div>
+    <label class="chk"><input type="checkbox" id="xoPlace" ${m.length?'checked':'disabled'}> 自動放置 ${m.reduce((a,i)=>a+Math.min(40,Math.round(i.qty)||1),0)} 個元件到新圖頁</label>
+    <label class="chk"><input type="checkbox" id="xoExtra" ${x.length?'checked':'disabled'}> ${x.length} 項耗材加入零件表「其他材料」</label>
+    ${res.meta.project?`<label class="chk"><input type="checkbox" id="xoMeta" checked> 標題欄件名設為「${esc(res.meta.project)}」${res.meta.designer?`、設計「${esc(res.meta.designer)}」`:''}</label>`:''}</div>`}
+  if(I){const nx=I.items.filter(i=>i[0]==='X'||i.addr[0]==='X').length,ny=I.items.length-nx;
+    s+=`<div class="sec"><h3>IO 表：工作表「${esc(I.sheet)}」</h3><p class="note">輸入 ${nx} 點、輸出 ${ny} 點。</p><label class="chk"><input type="checkbox" id="xoIO" checked> 自動產生 PLC 輸入 / 輸出圖頁</label></div>`}
+  if(!s)s=`<p>在「${esc(fn)}」中找不到可匯入的零件表或 IO 表。</p><p class="note">零件表表頭需有「名稱」「規格」；IO 表表頭需有「位址」。可下載範本對照格式。</p>`;
+  openDlg('匯入 Excel：'+fn,s,`<button class="btn" data-x="tpl">下載範本</button><span class="sp"></span><button class="btn" data-x="close">取消</button>${(res.project||P||I)?'<button class="btn primary" data-x="go">匯入</button>':''}`,true);
+  $('#dlg [data-x="tpl"]').onclick=templateXLSX;const go=$('#dlg [data-x="go"]');if(go)go.onclick=applyImport}
+function applyImport(){const res=xlPending;if(!res)return;const ck=id=>{const e=$('#'+id);return e&&e.checked};mark();
+  if(res.project&&ck('xoProj')){const d=res.project;d.meta=d.meta||blankDoc().meta;d.extra=d.extra||[];d.pages.forEach(p=>{p.items=(p.items||[]).filter(i=>i.t!=='s'||LIBM[i.s]);p.size=SIZES[p.size]?p.size:'A4L';p.meta=p.meta||{title:'',dwgNo:'',rev:''}});doc=d;pi=0;sel.clear();closeDlg();full();fit();toast('已還原專案');return}
+  let first=-1,msg=[];const mark1=()=>{if(first<0)first=doc.pages.length};
+  if(res.parts){if(ck('xoMeta')){doc.meta.project=res.meta.project;if(res.meta.designer)doc.meta.designer=res.meta.designer}
+    if(ck('xoPlace')){mark1();const pgs=placeParts(res.parts.items);msg.push(`放置元件 ${pgs.reduce((a,p)=>a+p.items.length,0)} 個`)}
+    if(ck('xoExtra')){doc.extra=doc.extra||[];res.parts.items.filter(i=>!i.lib).forEach(i=>doc.extra.push({id:uid(),name:i.name,spec:i.spec,maker:i.maker,partno:i.partno,qty:i.qty,price:i.price,note:i.note}));msg.push('其他材料 '+res.parts.items.filter(i=>!i.lib).length+' 項')}}
+  if(res.io&&ck('xoIO')){mark1();const pgs=buildIOPages(res.io.items);msg.push(`產生 IO 圖 ${pgs.length} 頁`)}
+  if(first>=0&&first<doc.pages.length)pi=first;sel.clear();closeDlg();full();fit();toast('匯入完成：'+(msg.join('、')||'已更新標題欄'))}
+async function templateXLSX(){if(!xlReady())return;const wb=new ExcelJS.Workbook();
+  let ws=wb.addWorksheet('零件表');ws.columns=[{header:'NO',width:6},{header:'名稱',width:20},{header:'規格',width:22},{header:'廠商',width:10},{header:'數量',width:8},{header:'單價',width:10},{header:'合計',width:12},{header:'料號',width:14},{header:'元件代號',width:12},{header:'備註',width:16}];
+  [['人機介面','MT8102iE','怡振',1,9500,'G02I000378'],['PLC主機(電晶體)','FX5UC-32MT/DS-TS','怡振',1,8300,'G02I000118'],['無熔絲開關','BW32AAG-3P15A','廣富',1,450,'S015000353'],['電磁開關','SC-0 AC220V','廣富',3,380,'S015000357'],['電磁開關過載保護','TR-ON(4~6A)','廣富',3,190,'S802000055'],['電源供應器','MDR-60-24','廣富',1,450,'S005000336'],['繼電器','RJ2S-CL-D24','廣富',4,80,'S005001887'],['電線','0.75*20C','廣富',100,65,'S005000387'],['線槽','45MM*65MM','廣富',7,130,'S005001902']]
+   .forEach((r,i)=>{const n=i+2;ws.addRow([i+1,r[0],r[1],r[2],r[3],r[4],{formula:`E${n}*F${n}`,result:r[3]*r[4]},r[5],'','']);});xlStyleHead(ws.getRow(1));
+  ws=wb.addWorksheet('IO表');ws.columns=[{header:'位址',width:8},{header:'註解',width:22},{header:'元件',width:16},{header:'元件代號',width:12}];xlStyleHead(ws.getRow(1));
+  [['X0','原點復歸','按鈕 a 接點','PB1'],['X1','啟動','',''],['X2','停止','',''],['X3','X 前限','',''],['X4','X 後限','',''],['X5','門檢知','近接開關 PNP',''],['X7','緊急停止','',''],['X10','手動選擇 X','選擇開關 2 段',''],
+   ['Y0','servo1 SON','',''],['Y1','servo2 SON','',''],['Y2','氣壓缸上升','',''],['Y3','運轉指示燈','',''],['Y4','蜂鳴器','','']].forEach(r=>ws.addRow(r));
+  ws=wb.addWorksheet('說明');ws.getColumn(1).width=100;
+  ['【零件表】表頭需有「名稱」「規格」，其餘欄位可省略；數量決定自動放置的元件個數。電線、線槽、端子、鋁軌、繼電器座等耗材不畫符號，列入零件表「其他材料」。',
+   '【IO表】位址採三菱 8 進位（X0~X7、X10~X17…），每 8 點產生一頁；「元件」欄可填元件庫名稱，空白時依註解判斷：',
+   '　輸入：含「緊急」→ 緊急停止；含「停止」→ 按鈕 b 接點；含「限 / 原點 / 感測 / 近接」→ 極限開關；其他 → 按鈕 a 接點',
+   '　輸出：含「燈」→ 指示燈；含「閥 / 缸」→ 電磁閥；含「蜂鳴」→ 蜂鳴器；其他 → 繼電器線圈',
+   '　可指定的兩端子元件：'+Object.values(LIBM).filter(l=>{const g=B[l.b](l.p||{});return g.pins.length===2&&g.pins[1].x===40&&g.pins[1].y===0}).map(l=>l.name).join('、'),
+   '【還原】由本編輯器「匯出 Excel」產生的檔案含完整專案，匯入即可原樣還原。'].forEach(t=>{const r=ws.addRow([t]);r.getCell(1).alignment={wrapText:true}});
+  const buf=await wb.xlsx.writeBuffer();await saveFile('線路圖_Excel範本.xlsx',new Blob([buf],{type:XLMIME}))}
+
 function bomPagesSVG(){const rows=bomRows();const per=26;const pages=[];const base={size:'A4L',meta:{title:'零件表',dwgNo:'',rev:''}};
   for(let k=0;k<Math.max(1,Math.ceil(rows.length/per));k++){const chunk=rows.slice(k*per,(k+1)*per);const cw=[40,190,220,100,150,60,90,110];const hd=['NO','名稱','規格','廠商','料號','數量','單價','合計'];
     const X=[50];cw.forEach(w=>X.push(X[X.length-1]+w));let s=`<g font-family="${PF}" font-size="11" fill="${INK}"><text x="50" y="60" font-size="18" font-weight="700">零件表${rows.length>per?` (${k+1})`:''}</text>`;
@@ -996,7 +1184,7 @@ let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;
 function helpDlg(){const K=[['V','選取 / 移動'],['W','導線'],['T','文字'],['L','直線'],['B','矩形'],['E','橢圓 / 虛線框'],['R','旋轉 90°'],['M','水平鏡像'],['Del','刪除'],['Ctrl+Z / Ctrl+Y','復原 / 重做'],['Ctrl+C / Ctrl+V','複製 / 貼上'],['Ctrl+D','原地複製'],['Ctrl+A','全選本頁'],['Ctrl+S','儲存專案 .json'],['方向鍵','微調 2.5 mm（Shift 12.5 mm）'],['F','整頁顯示'],['滾輪','以游標為中心縮放'],['空白鍵 / 中鍵 拖曳','平移畫面'],['Enter / 雙擊 / 右鍵','結束導線'],['/','導線切換先橫或先直'],['Esc','取消 / 回到選取']];
   openDlg('操作說明',`<div class="keys">${K.map(([k,v])=>`<div><span>${v}</span><kbd>${k}</kbd></div>`).join('')}</div>
    <p class="note"><b>參考市售軟體的做法：</b>元件接腳落在 2.5 mm 格點上（同 EPLAN / AutoCAD Electrical）；導線端點碰到接腳或其他導線即自動連接，T 字分歧自動加黑點，未連接的交叉自動畫跳線弧（同原圖的 R/S/T 匯流排畫法）；移動元件時相連導線會跟著拉伸；框選由左往右為「完全包含」、由右往左為「碰到即選」（同 AutoCAD）。</p>
-   <p class="note">元件代號自動編號（NFB1、MS1、CR1…），零件表由元件屬性自動彙整並可匯出 CSV 或附在 PDF 最後一頁。專案會自動暫存於此瀏覽器，正式保存請按「儲存」下載 .json 檔。</p>`,`<button class="btn primary" data-x="close">知道了</button>`,true)}
+   <p class="note"><b>Excel：</b>「匯入 Excel」可讀取零件表（自動放置元件、耗材列入其他材料）、IO 表（每 8 點自動產生 PLC 圖頁）或本編輯器匯出的檔案（完整還原）；「匯出 Excel」產生零件表（含公式）、IO 表、元件清單、接線表及各頁圖面。</p><p class="note">元件代號自動編號（NFB1、MS1、CR1…），零件表由元件屬性自動彙整並可匯出 CSV 或附在 PDF 最後一頁。專案會自動暫存於此瀏覽器，正式保存請按「儲存」下載 .json 檔。</p>`,`<button class="btn primary" data-x="close">知道了</button>`,true)}
 
 /* ====================== 工具列 ====================== */
 document.querySelectorAll('#tools [data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
@@ -1004,8 +1192,10 @@ $('#bUndo').onclick=undo;$('#bRedo').onclick=redo;$('#bRot').onclick=rotSel;$('#
 $('#bNew').onclick=()=>{mark();doc=blankDoc();pi=0;sel.clear();full();fit();toast('已建立空白專案（可按復原取回）')};
 $('#bSample').onclick=()=>{mark();doc=sampleDoc();pi=0;sel.clear();full();fit();toast('已載入範例（可按復原取回）')};
 $('#bOpen').onclick=()=>$('#fileIn').click();
-$('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||!Array.isArray(d.pages)||!d.pages.length)throw new Error('不是線路圖專案檔');
-  d.meta=d.meta||blankDoc().meta;d.pages.forEach(p=>{p.items=(p.items||[]).filter(i=>i.t!=='s'||LIBM[i.s]);p.size=SIZES[p.size]?p.size:'A4L';p.meta=p.meta||{title:'',dwgNo:'',rev:''}});
+$('#xlIn').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)readExcel(f)};
+$('#bXlIn').onclick=excelImportDlg;$('#bXlOut').onclick=exportXLSX;
+$('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;if(/\.xlsx$/i.test(f.name)){e.target.value='';readExcel(f);return}const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||!Array.isArray(d.pages)||!d.pages.length)throw new Error('不是線路圖專案檔');
+  d.meta=d.meta||blankDoc().meta;d.extra=d.extra||[];d.pages.forEach(p=>{p.items=(p.items||[]).filter(i=>i.t!=='s'||LIBM[i.s]);p.size=SIZES[p.size]?p.size:'A4L';p.meta=p.meta||{title:'',dwgNo:'',rev:''}});
   mark();doc=d;pi=0;sel.clear();full();fit();toast('已開啟 '+f.name)}catch(err){toast('無法開啟：'+err.message)}};r.readAsText(f);e.target.value=''};
 $('#bSave').onclick=saveJSON;$('#bExport').onclick=exportDlg;$('#bBom').onclick=bomDialog;$('#bHelp').onclick=helpDlg;
 $('#oGrid').onchange=e=>{opt.grid=e.target.checked;render()};$('#oSnap').onchange=e=>{opt.snap=e.target.checked};$('#oHop').onchange=e=>{opt.hops=e.target.checked;render()};
@@ -1018,7 +1208,7 @@ window.addEventListener('resize',()=>render());
 try{const s=JSON.parse(localStorage.getItem('ckt-editor-doc')||'null');if(s&&s.doc&&Array.isArray(s.doc.pages)&&s.doc.pages.length){doc=s.doc;pi=Math.min(s.pi||0,doc.pages.length-1)}}catch(e){}
 if(!doc)doc=sampleDoc();
 renderLib();setTool('select');full();requestAnimationFrame(fit);
-window.__ckt={get doc(){return doc},exportPDF,pageSVG,bomRows,sampleDoc,computeDots,computeHops};
+window.__ckt={get doc(){return doc},exportXLSX,netlist,analyzeWB,applyImport,readExcel,exportPDF,pageSVG,bomRows,sampleDoc,computeDots,computeHops};
 })();
 </script>
 

@@ -6,8 +6,10 @@
 - 2.5 mm 格點吸附、正交導線、自動 T 接黑點、交叉跳線弧、移動元件時導線跟隨
 - 多頁圖面、A4/A3 圖框與標題欄、元件代號自動編號
 - 零件表（估價）自動彙整，可匯出 CSV 或附在 PDF 最後一頁
+- Excel 匯入：零件表（自動放置可對應元件、耗材列入其他材料，相容「自製設備電氣零件表」格式）、IO 表（每 8 點自動產生 PLC 輸入/輸出圖頁）、本編輯器匯出的檔案（完整還原）；附範本下載
+- Excel 匯出：零件表（含合計公式）、IO 表、元件清單、接線表、各頁圖面圖片
 - 匯出 PDF（200/300/400 dpi）、PNG、SVG；專案以 .json 儲存/開啟
 
-`線路圖編輯器_單機版.html` 為完全離線的單機版（已內嵌 jsPDF，不需網路即可匯出 PDF），複製到任何電腦用 Chrome / Edge 開啟即可。
+`線路圖編輯器_單機版.html` 為完全離線的單機版（已內嵌 jsPDF 與 ExcelJS，不需網路即可匯出 PDF / Excel），複製到任何電腦用 Chrome / Edge 開啟即可。
 
-`editor.html` 為發佈到 claude.ai Artifact 的版本，`index.html` 為本機開啟版（PDF 匯出需連網載入 jsPDF）。
+`editor.html` 為發佈到 claude.ai Artifact 的版本，`index.html` 為本機開啟版（PDF / Excel 功能需連網載入 jsPDF / ExcelJS）。
