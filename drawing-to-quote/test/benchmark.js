@@ -23,9 +23,11 @@ const CASES = [
   { name: "分流塊 掃描PDF", input: () => fx("scan_E10_ocr.json"), truth: { 圖號: "0202501-E10", 材料: "SUS304", 數量: "2", 外形: "block", 長L: 120, 寬W: 80, 高H: 50, 孔數: 6, 攻牙數: 8, PT牙數: 4, 公差: "嚴", 粗糙度: "Ra0.8" } },
   { name: "感測器支架 掃描PDF(轉90°)", input: () => fx("scan_E12_rot_ocr.json"), truth: { 圖號: "0202501-E12", 材料: "SPCC", 數量: "10", 外形: "sheet", 長L: 180, 寬W: 60, 板厚T: 2, 孔數: 4, 攻牙數: 2, 折彎數: 2, 表面處理: "烤漆" } },
   { name: "心軸座 q603（法蘭）", input: () => fx("cad_q603_pdftext.json"), truth: { 圖號: "2002224-25", 零件名稱: "心軸座", 材料: "S50C", 數量: "1", 外形: "round", 外徑OD: 130, 內徑ID: 40, 孔數: 6, 公差: "中等", 表面處理: "染黑" } },
-  { name: "傳動軸 r854（軸）", input: () => fx("shaft_r854_pdftext.json"), truth: { 圖號: "2002507-A02", "CAD NO": "R854-A02", 零件名稱: "傳動軸", 材料: "SCM440", 外形: "round", 外徑OD: 46, 長L: 561, 公差: "嚴", 外螺紋數: 1 } },
+  { name: "傳動軸 r854（軸）", input: () => fx("shaft_r854_pdftext.json"), truth: { 圖號: "2002507-A02", "CAD NO": "R854-A02", 零件名稱: "傳動軸", 材料: "SCM440", 外形: "round", 外徑OD: 46, 長L: 561, 公差: "嚴", 外螺紋數: 1, 內直角數: "" } },
   { name: "支撐塊 n763（方塊＋Ø凹弧）", input: () => fx("block_n763_pdftext.json"), truth: { 圖號: "7101731-R10", "CAD NO": "N763-R10", 零件名稱: "支撐塊", 材料: "S50C", 外形: "block", 長L: 18, 孔數: 2, "寬W/高H": "11/14.5" } },
-  { name: "滾輪座 r151（U 型座）", input: () => fx("roller_r151_pdftext.json"), truth: { 圖號: "1002303-14", "CAD NO": "R151-14", 零件名稱: "滾輪座", 材料: "SUS304", 數量: "4", 外形: "block", 長L: 130, "寬W/高H": "50/85", 攻牙數: 10 } },
+  { name: "滾輪座 r151（U 型座）", input: () => fx("roller_r151_pdftext.json"), truth: { 圖號: "1002303-14", "CAD NO": "R151-14", 零件名稱: "滾輪座", 材料: "SUS304", 數量: "4", 外形: "block", 長L: 130, "寬W/高H": "50/85", 攻牙數: 10, 內直角數: "" } },
+  { name: "墊片（薄片 t0.5，側視標厚）", input: () => fx("thin_shim_pdftext.json"), truth: { 零件名稱: "墊片", 材料: "SUS304", 數量: "2", 外形: "sheet", 長L: 60, 寬W: 40, 板厚T: 0.5, 孔數: 2 } },
+  { name: "彈片（薄片 t=1.0 註記）", input: () => fx("thin_spring_pdftext.json"), truth: { 零件名稱: "彈片", 材料: "SUS301", 數量: "10", 外形: "sheet", 長L: 80, 寬W: 20, 板厚T: 1, 孔數: 2 } },
 ];
 
 function runOnce() {

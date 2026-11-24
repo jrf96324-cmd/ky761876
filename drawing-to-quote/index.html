@@ -48,6 +48,12 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 button.primary { background: var(--accent); color: var(--panel); border-color: var(--accent); font-weight: 700; }
 button.primary:hover { color: var(--panel); filter: brightness(1.1); }
+button.danger { border-color: var(--hi); color: var(--hi); }
+button.danger.armed { background: var(--hi); color: var(--panel); font-weight: 700; }
+#cmpTable td, #cmpTable th { font-size: 12.5px; white-space: nowrap; }
+#cmpTable td.top { background: var(--pick-soft); font-weight: 700; }
+#cmpTable tbody tr:nth-child(even) td:not(.top) { background: var(--bg); }
+#cmpTable .feat { white-space: normal; min-width: 150px; }
 button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 6px; }
 .spacer { flex: 1; }
 #toast { font-size: 13px; color: var(--lo); }
@@ -181,6 +187,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     <button id="btnCsv" type="button">下載零件 CSV</button>
     <label class="btn" for="fileCsv">匯入 CSV<input id="fileCsv" type="file" accept=".csv,text/csv" hidden></label>
     <button id="btnSample" type="button">載入範例</button>
+    <button id="btnNew" type="button" class="danger">清空全部・建立新案</button>
     <span id="toast" role="status"></span>
     <span class="spacer"></span>
     <small class="muted" id="dbVer"></small>
@@ -210,6 +217,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     <button role="tab" data-tab="recog" aria-selected="true">圖面辨識</button>
     <button role="tab" data-tab="parts">零件輸入</button>
     <button role="tab" data-tab="routes">多元製程估價</button>
+    <button role="tab" data-tab="compare">工序比對</button>
     <button role="tab" data-tab="costdown">降本建議</button>
     <button role="tab" data-tab="stats">統計</button>
     <button role="tab" data-tab="rfq">詢價單</button>
@@ -245,6 +253,11 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     <div class="toolbar"><h2>各零件多元製程路線比較</h2><span class="spacer"></span>
       <div class="legend"><span style="--c:var(--bar1)">材料</span><span style="--c:var(--bar2)">加工</span><span style="--c:var(--bar3)">委外表處/熱處理</span><span style="--c:var(--bar4)">管銷利潤</span></div></div>
     <div class="cards" id="routeCards"></div>
+  </section>
+
+  <section class="panel" data-pane="compare" hidden>
+    <div class="toolbar"><h2>各件加工步驟與特性比對</h2><span class="spacer"></span><small class="muted">每件一列；工序金額為推薦路線的估價／件，底色＝該件最大成本項目；滑鼠移到金額可看包含哪些步驟</small></div>
+    <div class="scroll"><table id="cmpTable"></table></div>
   </section>
 
   <section class="panel" data-pane="costdown" hidden>
@@ -307,8 +320,8 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     ["0202501-E15","S067-E15","導桿","SUJ2",4,"round",250,"","",20,"","","","",0,2,0,0,0,0,0,0,0,1,2,"","","","嚴","Ra0.4","鍍硬鉻","高周波",""],
   ].map((r) => Object.fromEntries(E.CSV_HEADERS.map((h, i) => [h, r[i] ?? ""])));
   let parts = store.get("d2q.parts");
-  let isSample = !parts || !parts.length;
-  if (isSample) parts = JSON.parse(JSON.stringify(SAMPLE));
+  let isSample = !store.get("d2q.cleared") && (!parts || !parts.length); // 清空過的新案不再自動帶入範例
+  if (isSample) parts = JSON.parse(JSON.stringify(SAMPLE)); else parts = parts || [];
 
   // ── column definitions for input grid ──
   const opt = (arr) => ["", ...arr];
@@ -358,7 +371,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     parts.splice(+d.dataset.del, 1); store.set("d2q.parts", parts); renderPartsTable(); compute();
   });
   $("#btnAdd").onclick = () => { parts.push(Object.fromEntries(E.CSV_HEADERS.map((h) => [h, h === "數量" ? 1 : h === "公差" ? "一般" : h === "粗糙度" ? "Ra3.2" : h === "表面處理" || h === "熱處理" ? "無" : ""]))); renderPartsTable(); const last = document.querySelector(`#c-${parts.length - 1}-0`); last && last.focus(); };
-  $("#btnSample").onclick = () => { parts = JSON.parse(JSON.stringify(SAMPLE)); isSample = true; store.set("d2q.parts", null); renderPartsTable(); compute(); toast("已載入範例資料"); };
+  $("#btnSample").onclick = () => { store.set("d2q.cleared", false); parts = JSON.parse(JSON.stringify(SAMPLE)); isSample = true; store.set("d2q.parts", null); renderPartsTable(); compute(); toast("已載入範例資料"); };
 
   // ── compute & render results ──
   function compute() {
@@ -368,7 +381,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     $("#sFair").innerHTML = `${nt(s.total)}<div class="k" style="font-family:var(--f-body)">可信區間 ${n0(s.rangeLow)}–${n0(s.rangeHigh)}　可信度 高${s.relCount["高"]}／中${s.relCount["中"]}／低${s.relCount["低"]}</div>`; $("#sLow").textContent = nt(s.totalLow); $("#sRush").textContent = nt(s.totalRush);
     $("#sSave").textContent = `${nt(s.potential)}`;
     $("#sRisk").innerHTML = ["高", "中", "低"].map((k) => `<span class="pill ${k}">${k} ${s.riskCount[k]}</span>`).join(" ");
-    renderRoutes(); renderCostDown(); renderStats(); $("#rfqText").value = window.Report.rfqText(est, project());
+    renderRoutes(); renderCompare(); renderCostDown(); renderStats(); $("#rfqText").value = window.Report.rfqText(est, project());
   }
 
   function stack(pr) {
@@ -436,6 +449,35 @@ dialog form { display: flex; justify-content: space-between; align-items: center
     store.set("d2q.db", db); clearTimeout(timer); timer = setTimeout(compute, 250);
   });
   $("#btnRtReset").onclick = () => { db.ratio = { overall: 1, material: 1, machining: 1, outsource: 1 }; db.markup.overhead = 0; db.markup.profitFair = 0; store.set("d2q.db", db); renderRatios(); renderDb(); compute(); toast("已恢復 100%、不加價"); };
+
+  function renderCompare() {
+    const ct = window.Report.compareTable(est);
+    if (!ct.rows.length) { $("#cmpTable").innerHTML = '<tbody><tr><td class="muted">尚無零件。到「圖面辨識」加入圖面，或在「零件輸入」新增。</td></tr></tbody>'; return; }
+    const head = `<thead><tr><th>圖號</th><th>零件</th><th>外形</th><th>材料</th><th class="n">數量</th><th>成品尺寸</th><th>取料尺寸</th><th>加工特徵</th><th>公差／粗糙度</th><th>表處＋熱處理</th><th>推薦製程</th>${ct.cats.map((c) => `<th class="n">${c}</th>`).join("")}<th class="n">估價/件</th><th class="n">小計</th><th>可信度</th></tr></thead>`;
+    const body = ct.rows.map((x) => {
+      const top = Math.max(...ct.cats.map((c) => x.by[c] || 0));
+      return `<tr><td class="mono">${esc(x.p.drawingNo)}</td><td>${esc(x.p.name)}</td><td>${esc(x.r.shapeLabel)}</td><td>${esc(x.p.material)}</td><td class="n">${x.p.qty}</td><td class="mono">${esc(x.r.geometry.outline)}</td><td>${esc(x.r.geometry.stock || "")}</td><td class="feat">${esc(x.feats || "—")}</td><td>${esc(x.quality)}</td><td>${esc(x.finish)}</td><td>${esc(x.r.best.name)}</td>` +
+        ct.cats.map((c) => x.by[c] ? `<td class="n${x.by[c] === top ? " top" : ""}" title="${esc(x.steps[c].join("、"))}">${n0(x.by[c])}</td>` : `<td class="n muted">—</td>`).join("") +
+        `<td class="n"><b>${n0(x.r.best.price.fair)}</b></td><td class="n">${n0(x.r.lineTotal)}</td><td><span class="pill ${{ 高: "低", 中: "中", 低: "高" }[x.r.reliability.level]}">${x.r.reliability.level} ${x.r.reliability.score}</span></td></tr>`;
+    }).join("");
+    const foot = `<tfoot><tr><td colspan="11"><b>合計（× 數量）</b></td>${ct.cats.map((c) => `<td class="n"><b>${n0(ct.rows.reduce((a, x) => a + (x.by[c] || 0) * x.p.qty, 0))}</b></td>`).join("")}<td></td><td class="n"><b>${n0(est.summary.total)}</b></td><td></td></tr></tfoot>`;
+    $("#cmpTable").innerHTML = head + `<tbody>${body}</tbody>` + foot;
+  }
+
+  // ── 清空全部・建立新案（兩段確認；單價設定保留）──
+  let newArmed = null;
+  $("#btnNew").onclick = () => {
+    const b = $("#btnNew");
+    if (!newArmed) { b.classList.add("armed"); b.textContent = "確定清空？再按一次"; newArmed = setTimeout(() => { newArmed = null; b.classList.remove("armed"); b.textContent = "清空全部・建立新案"; }, 4000); return; }
+    clearTimeout(newArmed); newArmed = null; b.classList.remove("armed"); b.textContent = "清空全部・建立新案";
+    parts = []; isSample = false; recogs.length = 0; jobs.length = 0; caseGen++;
+    store.set("d2q.parts", []); store.set("d2q.cleared", true);
+    ["#pjName", "#pjDue", "#pjDeadline"].forEach((k) => { $(k).value = ""; store.set("d2q." + k, ""); });
+    if ($("#viewer").open) $("#viewer").close();
+    renderPartsTable(); renderRecog(); compute();
+    history.replaceState(null, "", "#recog"); showTab("recog");
+    toast("已清空全部零件與辨識資料，可建立新案（單價設定保留）");
+  };
 
   function renderCostDown() {
     const rows = [];
@@ -528,7 +570,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   // ── 2D 圖面辨識 ──
   const RFIELDS = [["圖號"], ["零件名稱"], ["圖名說明"], ["材料", "mat"], ["數量"], ["外形", "shape"], ["長L"], ["寬W"], ["高H"], ["外徑OD"], ["內徑ID"], ["板厚T"], ["孔數"], ["攻牙數"], ["PT牙數"],
     ["深孔數"], ["交叉孔數"], ["折彎數"], ["外螺紋數"], ["加工面數"], ["公差", "tol"], ["粗糙度", "ra"], ["表面處理", "surf"], ["熱處理", "heat"], ["CAD NO"]];
-  let recogs = []; let rid = 0; let busy = false; const jobs = [];
+  let recogs = []; let rid = 0; let busy = false; const jobs = []; let caseGen = 0; // caseGen：清空新案後，舊批次的結果一律丟棄
   if (window.DrawingReader && DrawingReader.isFileProtocol()) $("#fileBanner").hidden = false;
   const drop = $("#drop");
   ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
@@ -543,10 +585,10 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   async function pump() {
     if (busy) return; busy = true;
     while (jobs.length) {
-      const { r, f } = jobs.shift(); r.status = "辨識中"; renderRecog();
+      const { r, f } = jobs.shift(); const myGen = caseGen; r.status = "辨識中"; renderRecog();
       try {
         const pages = await DrawingReader.readFile(f, { langs: $("#optChi").checked ? "eng+chi_tra" : "eng", ocrPdf: $("#optOcrPdf").checked }, (msg) => { r.status = msg; const m = msg.match(/(\d+)%/); r.progress = m ? +m[1] : r.progress; updateStatus(r); });
-        const idx = recogs.indexOf(r); const made = pages.map((pg, i) => {
+        if (myGen !== caseGen || !recogs.includes(r)) continue; const idx = recogs.indexOf(r); const made = pages.map((pg, i) => {
           const rec = DrawingParser.recognize(pg.input);
           // 穩定性：同一份資料辨識＋估價兩次，結果必須完全相同
           const rec2 = DrawingParser.recognize(pg.input);

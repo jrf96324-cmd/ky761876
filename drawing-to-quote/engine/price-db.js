@@ -59,6 +59,14 @@
       "PEEK":    { name: "PEEK 工程塑膠",      density: 1.31, pricePerKg: 6500, machinability: 0.80, cutFee: 20, group: "plastic" },
       "SPCC":    { name: "SPCC 冷軋鋼板",      density: 7.85, pricePerKg: 38,   machinability: 0.50, cutFee: 0,  group: "steel" },
       "SECC":    { name: "SECC 電鋅板",        density: 7.85, pricePerKg: 42,   machinability: 0.50, cutFee: 0,  group: "steel" },
+      // 薄片／彈片常用材（2026Q4 南部參考，未取得公開報價，請以實際詢價校正）
+      "SUS301":  { name: "SUS301 彈簧不鏽鋼",  density: 7.93, pricePerKg: 165,  machinability: 0.20, cutFee: 0,  group: "sus" },
+      "SUS430":  { name: "SUS430 不鏽鋼",      density: 7.70, pricePerKg: 95,   machinability: 0.30, cutFee: 0,  group: "sus" },
+      "SK85":    { name: "SK85(SK5) 彈簧鋼",   density: 7.85, pricePerKg: 70,   machinability: 0.30, cutFee: 0,  group: "steel" },
+      "SPHC":    { name: "SPHC 熱軋鋼板",      density: 7.85, pricePerKg: 34,   machinability: 0.50, cutFee: 0,  group: "steel" },
+      "SGCC":    { name: "SGCC 鍍鋅鋼板",      density: 7.85, pricePerKg: 44,   machinability: 0.50, cutFee: 0,  group: "steel" },
+      "A1050":   { name: "A1050 純鋁板",       density: 2.71, pricePerKg: 195,  machinability: 0.90, cutFee: 0,  group: "al" },
+      "C5191":   { name: "C5191 磷青銅",       density: 8.80, pricePerKg: 480,  machinability: 0.50, cutFee: 0,  group: "cu" },
     },
 
     // 常用材料別名（圖面上常見寫法）
@@ -66,6 +74,7 @@
       "AL5052": "A5052", "AL6061": "A6061", "6061": "A6061", "5052": "A5052", "7075": "A7075", "6063": "A6063",
       "SUS-304": "SUS304", "304": "SUS304", "316": "SUS316", "S45": "S45C", "45#": "S45C", "S50": "S50C",
       "SKD-11": "SKD11", "DC53": "SKD11", "黃銅": "C3604", "BRASS": "C3604", "銅": "C1100", "塑鋼": "POM",
+"SK5": "SK85", "SK-5": "SK85", "磷青銅": "C5191", "PBS": "C5191", "鍍鋅鋼板": "SGCC", "GI": "SGCC", "1050": "A1050", "熱軋": "SPHC", "彈簧鋼": "SK85",
       "鐵": "SS400", "A3": "SS400", "SS41": "SS400", "尼龍": "MC尼龍", "MC": "MC尼龍",
     },
 

@@ -45,7 +45,7 @@
     round: "圓件/軸件/環件",
     block: "方塊/治具/分流塊",
     plate: "厚板件/外形輪廓",
-    sheet: "薄板金 (含折彎)",
+    sheet: "薄板／鈑金件",
     frame: "架構件/焊接件",
   };
   const SHAPE_ALIAS = { "圓": "round", "軸": "round", "環": "round", "輪": "round", "方": "block", "塊": "block", "治具": "block",

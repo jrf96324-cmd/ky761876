@@ -11,6 +11,39 @@
     return route.price.lines.filter((l) => l.type !== "material").map((l) => l.process).join(" → ");
   }
 
+  // ── 工序類別：把每個加工步驟歸到固定欄位，方便各零件並排比對 ──
+  const CATS = ["材料", "切割下料", "車削", "銑削", "鑽孔攻牙", "折彎", "沖壓", "焊接", "線割放電", "研磨", "去毛邊清洗", "組裝", "表面處理", "熱處理", "其他"];
+  function catOf(l) {
+    const t = `${l.process} ${l.machine || ""}`;
+    if (l.type === "material" || /^材料/.test(l.process)) return "材料";
+    if (/表處/.test(t)) return "表面處理";
+    if (/熱處理|退火/.test(t)) return "熱處理";
+    if (/雷射|水刀|下料|鋸切/.test(t)) return "切割下料";
+    if (/車床|車削|車銑|走心/.test(t)) return "車削";
+    if (/線切割|線割|放電/.test(t)) return "線割放電";
+    if (/研磨/.test(t)) return "研磨";
+    if (/折彎/.test(t)) return "折彎";
+    if (/沖壓/.test(t)) return "沖壓";
+    if (/焊/.test(t)) return "焊接";
+    if (/攻牙|鑽孔|壓鉚/.test(t) && !/CNC|三軸|五軸/.test(t)) return "鑽孔攻牙";
+    if (/三軸|五軸|銑/.test(t)) return "銑削";
+    if (/去毛邊|鉗工|清洗/.test(t)) return "去毛邊清洗";
+    if (/組裝|鋁擠|鎖附/.test(t)) return "組裝";
+    return "其他";
+  }
+  /** 每件一列：外形、尺寸、取料、加工特徵、各工序金額（推薦路線，估價/件） */
+  function compareTable(est) {
+    const rows = est.results.map((r) => {
+      const p = r.part, by = {}, steps = {};
+      r.best.price.lines.forEach((l) => { const c = catOf(l); by[c] = (by[c] || 0) + l.unitCost; (steps[c] = steps[c] || []).push(l.process); });
+      const feats = [p.holes && `孔×${p.holes}`, p.taps && `牙×${p.taps}`, p.ptTaps && `PT×${p.ptTaps}`, p.slots && `槽×${p.slots}`, p.pockets && `口袋×${p.pockets}`,
+        p.deepHoles && `深孔×${p.deepHoles}`, p.extThreads && `外牙×${p.extThreads}`, p.bends && `折×${p.bends}`, p.sharpCorners && `清角×${p.sharpCorners}`].filter(Boolean).join(" ");
+      return { p, r, by, steps, feats, quality: `${p.tolerance}／${p.roughness}`, finish: [p.surface !== "無" && p.surface, p.heat !== "無" && p.heat].filter(Boolean).join("＋") || "—" };
+    });
+    const used = CATS.filter((c) => rows.some((x) => x.by[c]));
+    return { rows, cats: used };
+  }
+
   function buildSheets(est, project = {}, db = DB_DEFAULT) {
     const { results, summary } = est;
     const tiers = results[0]?.tierBest.map((t) => t.qty) || db.qtyTiers;
@@ -65,6 +98,16 @@
       sp.push([]);
     });
     sheets.push({ name: "02B_加工步驟明細", freeze: 1, colWidths: [16, 14, 6, 26, 7, 40, 10, 10, 8, 11, 11, 11, 9, 11, 7, 12], rows: sp });
+
+    // 02C 工序特性比對（每件一列，工序分欄）
+    {
+      const ct = compareTable(est);
+      const head = ["圖號", "零件名稱", "外形", "材料", "數量", "成品尺寸", "取料尺寸", "加工特徵", "公差／粗糙度", "表處＋熱處理", "推薦製程", "步驟數", ...ct.cats.map((c) => c + "/件"), "估價/件", "小計", "可信度"].map(H);
+      const body = ct.rows.map((x) => [x.p.drawingNo, x.p.name, x.r.shapeLabel, x.p.material, { v: x.p.qty, s: "n0" }, x.r.geometry.outline, x.r.geometry.stock || "", x.feats || "—", x.quality, x.finish, x.r.best.name,
+        { v: x.r.best.price.lines.length, s: "n0" }, ...ct.cats.map((c) => (x.by[c] ? { v: R0(x.by[c]), s: "n" } : "")), { v: R0(x.r.best.price.fair), s: "nb" }, { v: R0(x.r.lineTotal), s: "nb" }, `${x.r.reliability.level} ${x.r.reliability.score}`]);
+      const tot = ["合計", "", "", "", "", "", "", "", "", "", "", "", ...ct.cats.map((c) => ({ v: R0(ct.rows.reduce((a, x) => a + (x.by[c] || 0) * x.p.qty, 0)), s: "nb" })), "", { v: R0(summary.total), s: "nb" }, ""];
+      sheets.push({ name: "02C_工序特性比對", freeze: 1, colWidths: [15, 12, 14, 9, 6, 20, 30, 22, 13, 14, 26, 6, ...ct.cats.map(() => 10), 10, 11, 9], rows: [head, ...body, tot] });
+    }
 
     // 03 多元製程比較
     const cmp = [["圖號", "零件名稱", "路線", "製程路線", "材料/件", "加工/件", "委外表處/件", "架模總額", "合理單價", "與推薦差異", "適用性", "說明"].map(H)];
@@ -159,6 +202,6 @@
     ].join("\n");
   }
 
-  const API = { buildSheets, rfqText };
+  const API = { buildSheets, rfqText, compareTable, catOf, CATS };
   if (isNode) module.exports = API; else root.Report = API;
 })(typeof globalThis !== "undefined" ? globalThis : this);

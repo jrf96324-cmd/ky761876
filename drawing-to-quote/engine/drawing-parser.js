@@ -218,7 +218,9 @@
     const crossKw = /(交叉孔|流道|貫穿交叉|CROSS\s*HOLE)/i.test(allText);
     if (deep) set("深孔數", deep, "mid", "孔深 ≥ 5D");
     if (crossKw) set("交叉孔數", /流道/.test(allText) ? 2 : 1, "low", "註記：交叉孔/流道");
-    if (/(清角|銳角|內直角|R\s*0(?![.\d]))/.test(allText)) set("內直角數", (allText.match(/清角|銳角|內直角/g) || [1]).length, "low", "註記：清角/銳角");
+    // 內直角／清角：只認要求「保留銳角、清角」的註記；「未標示銳角皆以 C1 去除」是去毛邊倒角，不算
+    const cornerLines = all.filter((l) => /(清角|內直角|銳角|R\s*0(?![.\d]))/.test(l) && !/(去除|倒角|倒圓|C\s*\d|去毛邊|R\s*0\.\d)/.test(l));
+    if (cornerLines.length) set("內直角數", cornerLines.length, "low", "註記：" + cornerLines.slice(0, 2).join("、"));
     if (/(焊接|滿焊|點焊|WELD)/i.test(allText)) { const m = allText.match(/焊道\s*(\d+)/); set("焊道長mm", m ? +m[1] : "", m ? "mid" : "low", "註記：焊接"); }
     if (/(展開|折彎|BEND|鈑金)/i.test(allText) && !bends) bends = (allText.match(/折彎線|BEND LINE/gi) || []).length || 1;
     if (bends) set("折彎數", bends, "low", "註記：折彎/UP/DOWN");
@@ -295,7 +297,7 @@
         if (input.source === "ocr") { // OCR：逐詞檢查，只收乾淨的尺寸字串（如 600、Ø80 g6、120±0.01）
           for (const tok of it.s.split(/\s+(?![a-hA-H]\d\b|±)/)) {
             const m = tok.trim().match(/^([ØR]?)\s*(\d{1,4}(?:\.\d{1,3})?)(\s*±.*|\s*[a-hA-H]\d{1,2}.*|\s*[+\-]\s*0?\.\d.*)?$/);
-            if (!m || !(+m[2] >= 1 && +m[2] <= 6000) || (it.conf ?? 90) < 60) continue;
+            if (!m || !(+m[2] <= 6000 && (+m[2] >= 1 || (+m[2] >= 0.1 && /^0?\.\d{1,2}$/.test(tok.trim())))) || (it.conf ?? 90) < 60) continue;
             dims.push({ kind: m[1] === "Ø" ? "diameter" : m[1] === "R" ? "radius" : "linear", v: +m[2], text: tok, x: it.x, y: it.y, h: it.h, vertical: !!it.vertical, conf: it.conf ?? 90 });
           }
           continue;
@@ -304,7 +306,9 @@
         if (/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d+\s*:\s*\d+|HRC|Ra|M\d|PT|\b[A-Z]{2,}\d{3}/i.test(it.s) || /通|深|沉頭|孔|DP|THRU|倒角|\bC\d|UP|DOWN|處|M\d|PT/i.test(it.line ? it.line.s : it.s)) continue; // 註記內的數字不是外形尺寸
         for (const m of it.s.matchAll(/(\d+\s*[-xX×]\s*)?(Ø|R)?\s*(\d{1,4}(?:\.\d{1,3})?)(?![\d/°.]|\s*°)/g)) {
           if (m[1]) continue; // 4-Ø6 這類是孔，不當外形
-          const v = +m[3]; if (!(v >= 1 && v <= 6000)) continue;
+          const v = +m[3];
+          // < 1 mm 只收「單獨一個小數」的標註（薄片板厚 0.5、0.8）；±0.05、C0.5、R0.2、Ra0.8 都已排除
+          if (!(v <= 6000 && (v >= 1 || (v >= 0.1 && /^0?\.\d{1,2}$|^0\.\d{1,2}$/.test(it.s.trim()))))) continue;
           dims.push({ kind: m[2] === "Ø" ? "diameter" : m[2] === "R" ? "radius" : "linear", v, text: m[0] + (/[a-hA-H]\d\b|±/.test(it.s) ? " " + it.s : ""), x: it.x, y: it.y, h: it.h, vertical: !!it.vertical, conf: it.conf ?? 90 });
         }
       }
@@ -371,7 +375,7 @@
     // （與前兩者同列／同欄的尺寸是連鎖或分段，不當外形）
     let orthoEv = "";
     if (!chainW && !shaftEv) {
-      const pts = dims.filter((d) => d.kind === "linear" && d.x != null && d.v >= 1);
+      const pts = dims.filter((d) => d.kind === "linear" && d.x != null && d.v >= 0.1);
       const H0 = pts.filter((d) => !d.vertical), V0 = pts.filter((d) => d.vertical);
       if (H0.length && V0.length && pts.length >= 3) {
         const clusterOf = (arr) => { const cl = []; for (const d of arr) { const hit = cl.filter((c) => c.some((o) => Math.hypot(o.x - d.x, o.y - d.y) < 10 * Math.max(o.h, d.h))); if (!hit.length) cl.push([d]); else { hit[0].push(d); for (const o of hit.slice(1)) { hit[0].push(...o); cl.splice(cl.indexOf(o), 1); } } } return cl; };
@@ -403,6 +407,7 @@
     const prismatic = !!maxD && !shaftEv && linD.filter((d) => !d.vertical).length >= 2 && linD.filter((d) => d.vertical).length >= 2;
     if (prismatic) shapeNote = `水平／直書直線尺寸皆有（${[...new Set(linD.map((d) => d.v))].sort((a, b) => b - a).slice(0, 4).join("、")}），Ø${maxD} 判為凹槽或孔特徵`;
     if (shape) { /* 已判定 */ }
+    else if (overall[2] && overall[2] <= 6 && overall[2] <= overall[1] * 0.15 && !shaftEv && (!maxD || prismatic)) { shape = "sheet"; shapeNote = `第三向尺寸 ${overall[2]}mm 遠小於長寬，判為薄片（板厚 ${overall[2]}）`; set("板厚T", overall[2], "mid", "側視圖厚度尺寸"); }
     else if (prismatic) shape = (overall[2] && overall[2] < overall[1] * 0.25) ? "plate" : "block";
     else if (maxD && maxD >= maxL * 0.25 && lin.length <= 8 + dia.length * 2 && (!overall[1] || maxD >= overall[1] * 0.8)) shape = "round";
     else if (shaftEv) shape = "round";
