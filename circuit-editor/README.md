@@ -8,4 +8,6 @@
 - 零件表（估價）自動彙整，可匯出 CSV 或附在 PDF 最後一頁
 - 匯出 PDF（200/300/400 dpi）、PNG、SVG；專案以 .json 儲存/開啟
 
-`editor.html` 為發佈到 claude.ai Artifact 的版本（不含 `<html>` 外殼），`index.html` 為本機獨立開啟的版本，兩者內容相同。PDF 匯出需連網載入 jsPDF（cdnjs）。
+`線路圖編輯器_單機版.html` 為完全離線的單機版（已內嵌 jsPDF，不需網路即可匯出 PDF），複製到任何電腦用 Chrome / Edge 開啟即可。
+
+`editor.html` 為發佈到 claude.ai Artifact 的版本，`index.html` 為本機開啟版（PDF 匯出需連網載入 jsPDF）。
