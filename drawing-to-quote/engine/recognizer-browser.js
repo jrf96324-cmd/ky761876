@@ -425,42 +425,61 @@ return of(u,o);};})();\n`;
    */
   async function pdfGeometry(page, lib, pageH) {
     const OPS = lib.OPS, ol = await page.getOperatorList();
-    const segs = [], circles = [];
-    let ctm = [1, 0, 0, 1, 0, 0]; const stack = [];
+    // segs：全部直線（含線寬 w、是否虛線 dash）；arcs：開放曲線（圓弧）；arrows：小型填滿三角形（尺度線箭頭）
+    const segs = [], circles = [], arcs = [], arrows = [];
+    let gs = { ctm: [1, 0, 0, 1, 0, 0], lw: 1, dash: false }; const stack = [];
+    let pending = [];  // constructPath 之後由 stroke / fill 決定樣式
     const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
-    const P = (x, y) => ({ x: ctm[0] * x + ctm[2] * y + ctm[4], y: pageH - (ctm[1] * x + ctm[3] * y + ctm[5]) });
-    const finish = (sub) => {
+    const P = (x, y) => { const m = gs.ctm; return { x: m[0] * x + m[2] * y + m[4], y: pageH - (m[1] * x + m[3] * y + m[5]) }; };
+    const lwNow = () => gs.lw * Math.sqrt(Math.abs(gs.ctm[0] * gs.ctm[3] - gs.ctm[1] * gs.ctm[2])) || 0.1;
+    const emit = (sub, mode) => {
       if (sub.pts.length < 2) return;
-      const pts = sub.pts, closed = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 0.5 || sub.closed;
+      const pts = sub.pts, w = lwNow(), dash = gs.dash;
+      const closed = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 0.5 || sub.closed;
+      if (mode === "fill") { // 填滿的小三角形／四邊形 → 箭頭
+        const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y), bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);
+        if (!sub.curves && pts.length <= 6 && Math.max(bw, bh) < 12 && Math.max(bw, bh) > 0.8) arrows.push({ x: xs.reduce((a, v) => a + v, 0) / xs.length, y: ys.reduce((a, v) => a + v, 0) / ys.length, s: Math.max(bw, bh) });
+        return;
+      }
       if (closed && (sub.curves >= 2 || pts.length >= 12)) {
         let on = sub.curves ? sub.on : pts; // 貝茲曲線只用曲線上的端點（控制點不在圓上）
         if (on.length > 2 && Math.hypot(on[0].x - on[on.length - 1].x, on[0].y - on[on.length - 1].y) < 0.5) on = on.slice(0, -1); // 起終點重複只算一次
         const cx = on.reduce((a, p) => a + p.x, 0) / on.length, cy = on.reduce((a, p) => a + p.y, 0) / on.length;
         const rs = on.map((p) => Math.hypot(p.x - cx, p.y - cy)), r = rs.reduce((a, b) => a + b, 0) / rs.length;
         const sd = Math.sqrt(rs.reduce((a, b) => a + (b - r) ** 2, 0) / rs.length);
-        if (r > 0.2 && sd / r < 0.06) { circles.push({ x: cx, y: cy, r }); return; }
+        if (r > 0.2 && sd / r < 0.06) { circles.push({ x: cx, y: cy, r, w, dash }); return; }
       }
-      if (!sub.curves) for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], len = Math.hypot(b.x - a.x, b.y - a.y); if (len > 0.3) segs.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, len }); }
+      if (sub.curves) { arcs.push({ pts: sub.on.slice(), w, dash }); return; }
+      for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b2 = pts[i], len = Math.hypot(b2.x - a.x, b2.y - a.y); if (len > 0.3) segs.push({ x1: a.x, y1: a.y, x2: b2.x, y2: b2.y, len, w, dash }); }
     };
+    const paint = (mode) => { for (const sub of pending) emit(sub, mode); pending = []; };
+    const STROKE = new Set([OPS.stroke, OPS.closeStroke, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke].filter((x) => x !== undefined));
+    const FILL = new Set([OPS.fill, OPS.eoFill].filter((x) => x !== undefined));
     for (let i = 0; i < ol.fnArray.length && segs.length < 200000; i++) {
       const fn = ol.fnArray[i], args = ol.argsArray[i];
-      if (fn === OPS.save) stack.push(ctm);
-      else if (fn === OPS.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
-      else if (fn === OPS.transform) ctm = mul(ctm, args);
-      else if (fn === OPS.paintFormXObjectBegin) { stack.push(ctm); if (args[0]) ctm = mul(ctm, args[0]); }
-      else if (fn === OPS.paintFormXObjectEnd) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      if (fn === OPS.save) stack.push({ ...gs });
+      else if (fn === OPS.restore) gs = stack.pop() || { ctm: [1, 0, 0, 1, 0, 0], lw: 1, dash: false };
+      else if (fn === OPS.transform) gs.ctm = mul(gs.ctm, args);
+      else if (fn === OPS.setLineWidth) gs.lw = args[0];
+      else if (fn === OPS.setDash) gs.dash = Array.isArray(args[0]) && args[0].length > 0 && args[0].some((v) => v > 0);
+      else if (fn === OPS.setGState) { for (const [k, v] of args[0] || []) { if (k === "LW") gs.lw = v; if (k === "D") gs.dash = Array.isArray(v) && Array.isArray(v[0]) && v[0].length > 0; } }
+      else if (fn === OPS.paintFormXObjectBegin) { stack.push({ ...gs }); if (args[0]) gs.ctm = mul(gs.ctm, args[0]); }
+      else if (fn === OPS.paintFormXObjectEnd) gs = stack.pop() || gs;
       else if (fn === OPS.constructPath) {
         const ops = args[0], co = args[1]; let k = 0, sub = { pts: [], on: [], curves: 0 };
         for (const op of ops) {
-          if (op === OPS.moveTo) { finish(sub); const p0 = P(co[k], co[k + 1]); sub = { pts: [p0], on: [p0], curves: 0 }; k += 2; }
+          if (op === OPS.moveTo) { if (sub.pts.length) pending.push(sub); const p0 = P(co[k], co[k + 1]); sub = { pts: [p0], on: [p0], curves: 0 }; k += 2; }
           else if (op === OPS.lineTo) { const q = P(co[k], co[k + 1]); sub.pts.push(q); sub.on.push(q); k += 2; }
           else if (op === OPS.curveTo) { const q = P(co[k + 4], co[k + 5]); sub.pts.push(P(co[k], co[k + 1]), P(co[k + 2], co[k + 3]), q); sub.on.push(q); sub.curves++; k += 6; }
           else if (op === OPS.curveTo2 || op === OPS.curveTo3) { const q = P(co[k + 2], co[k + 3]); sub.pts.push(P(co[k], co[k + 1]), q); sub.on.push(q); sub.curves++; k += 4; }
           else if (op === OPS.closePath) { sub.closed = true; }
-          else if (op === OPS.rectangle) { finish(sub); const x = co[k], y = co[k + 1], w = co[k + 2], h = co[k + 3]; sub = { pts: [P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h), P(x, y)], on: [], curves: 0 }; finish(sub); sub = { pts: [], on: [], curves: 0 }; k += 4; }
+          else if (op === OPS.rectangle) { if (sub.pts.length) pending.push(sub); const x = co[k], y = co[k + 1], w = co[k + 2], h = co[k + 3]; pending.push({ pts: [P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h), P(x, y)], on: [], curves: 0, closed: true }); sub = { pts: [], on: [], curves: 0 }; k += 4; }
         }
-        finish(sub);
+        if (sub.pts.length) pending.push(sub);
       }
+      else if (STROKE.has(fn)) paint("stroke");
+      else if (FILL.has(fn)) paint("fill");
+      else if (fn === OPS.endPath) pending = [];
     }
     // 共線且相接的水平／垂直線段合併成一段（軸的多段外形、分段畫的外框）→ 用來量測全長
     const spans = [];
@@ -478,7 +497,7 @@ return of(u,o);};})();\n`;
         if (b - a > 1) spans.push(b - a);
       }
     }
-    return { segs, circles, spans };
+    return { segs, circles, spans, arcs, arrows };
   }
 
   /** 以線條畫出的 Ø：數字前方約半個字高處，有「小圓 + 穿過圓心的斜線」→ 在數字前補上 Ø */
@@ -533,7 +552,7 @@ return of(u,o);};})();\n`;
           items = r.items.map((i) => ({ ...i, x: i.x / scale, y: i.y / scale, h: i.h / scale })); source = "ocr";
           view = thumb(r.view, { sx: scale * r.k, ox: 0, sy: scale * r.k, oy: 0 }); // 顯示校正後（轉正、去傾斜）的圖 note = `掃描 PDF，OCR 信心 ${Math.round(r.meanConf)}%${r.rotation ? `，已轉正 ${r.rotation}°` : ""}${Math.abs(r.skew) > 0.15 ? `，校正傾斜 ${r.skew.toFixed(1)}°` : ""}`;
         }
-        out.push({ fileName: pdf.numPages > 1 ? `${name.replace(/\.pdf$/i, "")}_p${n}.pdf` : name, page: n, source, ...view, input: { source, fileName: name, items, dims: [], circles: [], geom: source === "pdf" ? { segs: [...geom.segs.map((g) => g.len), ...(geom.spans || [])], circles: geom.circles.filter((c) => c.r >= 1.2), pageW: vp.width, pageH: vp.height } : null }, note: note + (vecDia ? `；線條 Ø 符號 ${vecDia} 處` : "") });
+        out.push({ fileName: pdf.numPages > 1 ? `${name.replace(/\.pdf$/i, "")}_p${n}.pdf` : name, page: n, source, ...view, input: { source, fileName: name, items, dims: [], circles: [], geom: source === "pdf" ? { lines: geom.segs.slice(0, 30000).map((g) => [+g.x1.toFixed(2), +g.y1.toFixed(2), +g.x2.toFixed(2), +g.y2.toFixed(2), +g.w.toFixed(3), g.dash ? 1 : 0]), arcs: (geom.arcs || []).slice(0, 5000).map((a) => ({ p: a.pts.map((q) => [+q.x.toFixed(2), +q.y.toFixed(2)]), w: +a.w.toFixed(3), d: a.dash ? 1 : 0 })), arrows: (geom.arrows || []).map((a) => [+a.x.toFixed(2), +a.y.toFixed(2)]), segs: [...geom.segs.map((g) => g.len), ...(geom.spans || [])], circles: geom.circles.filter((c) => c.r >= 1.2), pageW: vp.width, pageH: vp.height } : null }, note: note + (vecDia ? `；線條 Ø 符號 ${vecDia} 處` : "") });
       }
       return out;
     }

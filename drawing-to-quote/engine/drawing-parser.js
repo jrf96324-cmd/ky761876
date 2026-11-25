@@ -456,6 +456,41 @@
     const notes = all.filter((l) => /(注意|備註|技術要求|NOTE|未註|去毛邊|倒角|清洗|洩漏|氣密|同心|平行|垂直|HRC)/i.test(l) && l.length < 60).slice(0, 4);
     if (notes.length) set("備註", notes.join("；"), "mid", "圖面註記");
 
+    // 7.5) 依 CNS 線型從圖形讀出外形（向量 PDF）
+    const outline = readOutline(input.geom, doc, dims, allText);
+    // 採用條件：至少一個外形量測值與圖上尺寸數字吻合（確認比例）；或標題欄有比例且有 ≥2 個對齊視圖
+    // 線寬無粗細差異時（尺度線、指線可能混入輪廓），所有量測值都須與尺寸數字吻合才採用
+    const outlineOK = outline && (outline.thickMode
+      ? (outline.confirmed >= 1 || (outline.fromTitle && outline.nViews >= 2))
+      : (outline.confirmed >= 2 && [outline.size.L, outline.size.H, outline.size.W].filter(Boolean).every((x) => x.exact)) || (outline.round && outline.round.od.exact));
+    if (outline && !outlineOK) ev["圖形外形"] = `圖形外形僅供核對（線寬無粗細區分、量測與尺寸數字吻合 ${outline.confirmed} 項）`;
+    if (outlineOK) {
+      const o = outline, src = `圖形外形量測（CNS ${o.thickMode ? "粗實線" : "實線"}輪廓、${o.nViews} 視圖、${o.fNote}）`;
+      const fmt = (x) => x && `${x.v}${x.exact ? "" : "（量測值）"}`;
+      ev["圖形外形"] = `${src}：前視 ${fmt(o.size.L)} × ${fmt(o.size.H)}${o.size.W ? `、深度 ${fmt(o.size.W)}` : ""}${o.round ? `；端視圖為圓 Ø${o.round.od.v}` : ""}${o.iso ? `；排除立體圖 ${o.iso} 個` : ""}`;
+      const textMax = Math.max(0, ...dims.filter((d) => d.kind === "linear").map((d) => d.v));
+      if (o.round && o.round.od.exact) {
+        if (fields["外形"] !== "round") set("外形", "round", "high", "圖形：端視圖為圓");
+        set("外徑OD", o.round.od.v, "high", `圖形量測 Ø${o.round.od.v}`);
+        if (o.round.id && o.round.id.v < o.round.od.v * 0.95 && conf["內徑ID"] !== "high") set("內徑ID", o.round.id.v, o.round.id.exact ? "high" : "mid", `圖形量測內孔 Ø${o.round.id.v}`);
+        if (o.round.len && !(textMax > o.round.len.v * 1.05 && fields["長L"] > o.round.len.v)) set("長L", o.round.len.v, o.round.len.exact ? "high" : "mid", `圖形量測長度 ${o.round.len.v}`);
+        delete fields["寬W"]; delete fields["高H"]; delete fields["板厚T"];
+      } else if (fields["外形"] !== "round" && o.size.W) {
+        const tri = [o.size.L, o.size.H, o.size.W].sort((a, b) => b.v - a.v);
+        // 斷裂視圖保護：圖上有比量測更長的尺寸數字時，保留文字尺寸
+        if (!(textMax > tri[0].v * 1.05)) {
+          const thin = tri[2].v <= 6 && tri[2].v <= tri[1].v * 0.15;
+          if (thin && fields["外形"] !== "sheet") set("外形", "sheet", "mid", `圖形：厚度 ${tri[2].v} 遠小於長寬，判為薄片`);
+          if (!thin && ["sheet"].includes(fields["外形"]) && !fields["折彎數"] && tri[2].v > 6) set("外形", tri[2].v < tri[1].v * 0.25 ? "plate" : "block", "mid", "圖形：三向尺寸");
+          set("長L", tri[0].v, tri[0].exact ? "high" : "mid", "圖形外形（最長向）");
+          set("寬W", tri[1].v, tri[1].exact ? "high" : "mid", "圖形外形（次長向）");
+          if (fields["外形"] === "sheet" || fields["外形"] === "plate") { set("板厚T", tri[2].v, tri[2].exact ? "high" : "mid", "圖形外形（厚度）"); delete fields["高H"]; }
+          else set("高H", tri[2].v, tri[2].exact ? "high" : "mid", "圖形外形（第三向）");
+          if (fields["外形"] === "round") delete fields["外徑OD"];
+        } else ev["圖形外形"] += "；圖上有更長尺寸，可能為斷裂視圖，保留尺寸數字";
+      }
+    }
+
     // 8) 圖面量測驗證（向量 PDF）：尺寸值 ÷ 比例 應等於圖上某條線長或某個圓的直徑
     const verify = verifyByGeometry(input.geom, fields, dims, allText);
     if (verify) {
@@ -478,7 +513,115 @@
     const weights = { 圖號: 2, 零件名稱: 2, 材料: 3, 數量: 2, 外形: 1, 長L: 2, 寬W: 1, 外徑OD: 2, 表面處理: 1, 公差: 1 };
     let got = 0, tot = 0;
     for (const [k, w] of Object.entries(weights)) { if (k === "寬W" && shape === "round") continue; if (k === "外徑OD" && shape !== "round") continue; tot += w; got += w * ({ high: 1, mid: 0.7, low: 0.3 }[conf[k]] || 0); }
-    return { fields, conf, evidence: ev, score: Math.round(got / tot * 100), lines: all };
+    return { fields, conf, evidence: ev, score: Math.round(got / tot * 100), lines: all, outline: outline ? { views: outline.views, f: outline.f } : null };
+  }
+
+  /**
+   * 依 CNS 製圖規範從向量線條讀出工件外形（不靠尺寸文字）
+   *  1. 線型分類：粗實線＝可見輪廓；細實線＝尺度線／尺度界線／剖面線；虛線＝隱藏線；鏈線＝中心線
+   *     （線寬無差異時：去除兩端帶箭頭的尺度線及接在尺度線端點的尺度界線）
+   *  2. 去除圖框、標題欄、一般公差表、等角立體圖（30° 斜線為主）
+   *  3. 輪廓線依相連關係分群＝各視圖；依第三角法排列找出前視／上視／側視
+   *  4. 量測（mm）× 比例 ＝ 實際外形，並對齊圖上最接近的尺寸數字
+   */
+  function readOutline(geom, doc, dims, allText) {
+    if (!geom || !geom.lines || (!geom.lines.length && !(geom.arcs || []).length)) return null;
+    const PT = 25.4 / 72, pageW = geom.pageW || 595, pageH = geom.pageH || 842;
+    // ── 1. 線型 ──
+    const L = geom.lines.map(([x1, y1, x2, y2, w, d]) => ({ x1, y1, x2, y2, w, dash: !!d, len: Math.hypot(x2 - x1, y2 - y1) }));
+    const A = (geom.arcs || []).map((a) => ({ pts: a.p.map(([x, y]) => ({ x, y })), w: a.w, dash: !!a.d }));
+    const C = (geom.circles || []).map((c) => ({ ...c, dash: !!c.dash }));
+    const solid = L.filter((l) => !l.dash);
+    const wsum = {}; solid.forEach((l) => { const k = Math.round(l.w * 100) / 100; wsum[k] = (wsum[k] || 0) + l.len; });
+    const ws = Object.keys(wsum).map(Number).filter((w) => wsum[w] > 30).sort((a, b) => a - b);
+    const thickMode = ws.length >= 2 && ws[ws.length - 1] / ws[0] >= 1.4;
+    const thr = thickMode ? Math.sqrt(ws[0] * ws[ws.length - 1]) : 0;
+    const isOutline = (o) => !o.dash && (!thickMode || (o.w || 0) >= thr * 0.98);
+    let lines = solid.filter(isOutline), arcs = A.filter(isOutline), circles = C.filter((c) => !c.dash && (!thickMode || (c.w || 0) >= thr * 0.98));
+    const arrows = geom.arrows || [];
+    if (!thickMode && arrows.length) { // 尺度線：端點旁有箭頭；尺度界線：端點落在尺度線端點附近且與其垂直
+      const near = (x, y, r) => arrows.some(([ax, ay]) => Math.hypot(ax - x, ay - y) < r);
+      const dimLines = lines.filter((l) => near(l.x1, l.y1, 6) || near(l.x2, l.y2, 6));
+      const ends = dimLines.flatMap((l) => [[l.x1, l.y1], [l.x2, l.y2]]);
+      const ext = lines.filter((l) => !dimLines.includes(l) && ends.some(([ex, ey]) => (Math.hypot(l.x1 - ex, l.y1 - ey) < 10 || Math.hypot(l.x2 - ex, l.y2 - ey) < 10) && l.len > 2));
+      const drop = new Set([...dimLines, ...ext]);
+      lines = lines.filter((l) => !drop.has(l));
+    }
+    // ── 2. 排除區：圖框、標題欄、公差表、等角圖 ──
+    const labels = doc.items.filter((it) => Object.values(LABELS).some((re) => re.test(it.s)) || /Grade|[≤≧>]\s*\d|CAD\s*NO|DWG|Title|Scale|比例|個\s*\/\s*台/i.test(it.s));
+    const zones = [];
+    if (labels.length) {
+      const grp = []; for (const it of labels) { const g = grp.find((G) => G.some((o) => Math.hypot(o.x - it.x, o.y - it.y) < 60)); if (g) g.push(it); else grp.push([it]); }
+      for (const g of grp) if (g.length >= 2) zones.push({ x0: Math.min(...g.map((i) => i.x)) - 25, x1: Math.max(...g.map((i) => i.x)) + 120, y0: Math.min(...g.map((i) => i.y)) - 25, y1: Math.max(...g.map((i) => i.y)) + 25 });
+    }
+    const inZone = (x, y) => zones.some((z) => x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1);
+    const frame = (l) => (l.len > pageW * 0.5 || l.len > pageH * 0.5) || Math.min(l.x1, l.x2) < 8 || Math.max(l.x1, l.x2) > pageW - 8 || Math.min(l.y1, l.y2) < 8 || Math.max(l.y1, l.y2) > pageH - 8;
+    // ── 3. 分群（端點／邊框相距 < 1.5pt 視為相連） ──
+    const prims = [
+      ...lines.filter((l) => !frame(l)).map((l) => ({ x0: Math.min(l.x1, l.x2), y0: Math.min(l.y1, l.y2), x1: Math.max(l.x1, l.x2), y1: Math.max(l.y1, l.y2), ang: Math.atan2(l.y2 - l.y1, l.x2 - l.x1), len: l.len })),
+      ...arcs.map((a) => { const xs = a.pts.map((p) => p.x), ys = a.pts.map((p) => p.y); return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }; }),
+      ...circles.map((c) => ({ x0: c.x - c.r, y0: c.y - c.r, x1: c.x + c.r, y1: c.y + c.r, circle: c })),
+    ].filter((p) => !inZone((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2));
+    if (prims.length < 3) return null;
+    const par = prims.map((_, i) => i), find = (i) => (par[i] === i ? i : (par[i] = find(par[i])));
+    const order = prims.map((p, i) => i).sort((a, b) => prims[a].x0 - prims[b].x0), tol = 1.5;
+    for (let a = 0; a < order.length; a++) {
+      const P = prims[order[a]];
+      for (let b = a + 1; b < order.length; b++) {
+        const Q = prims[order[b]]; if (Q.x0 > P.x1 + tol) break;
+        if (Q.y0 <= P.y1 + tol && Q.y1 >= P.y0 - tol) par[find(order[a])] = find(order[b]);
+      }
+    }
+    const groups = {}; prims.forEach((p, i) => { (groups[find(i)] = groups[find(i)] || []).push(p); });
+    let views = Object.values(groups).map((g) => {
+      const v = { x0: Math.min(...g.map((p) => p.x0)), y0: Math.min(...g.map((p) => p.y0)), x1: Math.max(...g.map((p) => p.x1)), y1: Math.max(...g.map((p) => p.y1)), n: g.length };
+      const ls = g.filter((p) => p.ang !== undefined && p.len > 3), tot = ls.reduce((a, p) => a + p.len, 0) || 1;
+      v.iso = ls.filter((p) => { const d = Math.abs(((p.ang * 180 / Math.PI) % 180 + 180) % 180); return Math.abs(d - 30) < 4 || Math.abs(d - 150) < 4; }).reduce((a, p) => a + p.len, 0) / tot > 0.3;
+      v.circ = g.filter((p) => p.circle).map((p) => p.circle);
+      v.w = v.x1 - v.x0; v.h = v.y1 - v.y0; return v;
+    }).filter((v) => Math.max(v.w, v.h) * PT >= 4 && v.n >= 2);
+    if (!views.length) return null;
+    const big = Math.max(...views.map((v) => v.w * v.h));
+    views = views.filter((v) => v.w * v.h >= big * 0.03 || Math.max(v.w, v.h) >= Math.sqrt(big) * 0.5);
+    const iso = views.filter((v) => v.iso); views = views.filter((v) => !v.iso);
+    if (!views.length) return null;
+    // ── 4. 第三角法排列 ──
+    const F = [...views].sort((a, b) => b.w * b.h - a.w * a.h)[0];
+    const ov = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+    const T = views.filter((v) => v !== F && ov(v.x0, v.x1, F.x0, F.x1) >= 0.6 * Math.min(v.w, F.w) && (v.y1 <= F.y0 + 2 || v.y0 >= F.y1 - 2)).sort((a, b) => b.w * b.h - a.w * a.h)[0];
+    // 第三角法：上下排列的兩視圖中，下方為前視圖、上方為上視圖；側視圖在前視圖左右且高度對齊
+    const front = T && T.y0 > F.y0 ? T : F, top = T ? (front === F ? T : F) : null;
+    const sideOf = (base) => views.filter((v) => v !== F && v !== T && ov(v.y0, v.y1, base.y0, base.y1) >= 0.6 * Math.min(v.h, base.h) && (v.x0 >= base.x1 - 2 || v.x1 <= base.x0 + 2)).sort((a, b) => b.w * b.h - a.w * a.h)[0];
+    const S = sideOf(front) || sideOf(F);
+    // ── 比例 ──
+    const vals = [...new Set(dims.filter((d) => d.v >= 0.3).map((d) => +d.v))];
+    const sm = allText.match(/(?:比\s*例|SCALE)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*[\/:：]\s*(\d+(?:\.\d+)?)/i);
+    const meas = [front.w, front.h, top && top.h, S && S.w].filter(Boolean).map((x) => x * PT);
+    const hit = (m, f) => vals.some((v) => Math.abs(m * f - v) <= Math.max(0.3, v * 0.02));
+    let f = sm ? +sm[2] / +sm[1] : 0, fNote = sm ? `標題欄比例 ${sm[1]}/${sm[2]}` : "";
+    if (!f) { let best = -1; for (const c of [1, 2, 5, 10, 0.5, 1.5, 2.5, 4, 20, 0.2]) { const k = meas.filter((m) => hit(m, c)).length; if (k > best) { best = k; f = c; } } fNote = `比例推定 1/${f}（外形量測與尺寸數字吻合 ${best} 項）`; }
+    const linVals = [...new Set(dims.filter((d) => d.v >= 0.3 && d.kind === "linear").map((d) => +d.v))], diaVals = [...new Set(dims.filter((d) => d.kind === "diameter").map((d) => +d.v))];
+    // 方形外形只對齊直線尺寸、圓形外形只對齊直徑尺寸（避免 Ø20 碰巧對上量測 20）
+    const snap = (mm, pool = linVals) => { const r = mm * f, v = pool.filter((x) => Math.abs(x - r) <= Math.max(0.3, r * 0.025)).sort((a, b) => Math.abs(a - r) - Math.abs(b - r))[0]; return { v: v != null ? v : Math.round(r * 2) / 2, exact: v != null }; };
+    const fw = snap(front.w * PT), fh = snap(front.h * PT); // 長、高＝前視圖
+    // 深度＝上視圖高與側視圖寬取大者（外形包絡；兩視圖可能各自只看到部分）
+    const depth = top || S ? snap(Math.max(top ? top.h : 0, S ? S.w : 0) * PT) : null;
+    // 圓形端視圖：視圖本身是圓（寬≈高≈圓徑）
+    const roundOf = (v) => { const c = [...(v.circ || [])].sort((a, b) => b.r - a.r)[0]; return c && Math.abs(2 * c.r - v.w) < v.w * 0.06 && Math.abs(2 * c.r - v.h) < v.h * 0.06 ? { c, inner: v.circ.filter((o) => o !== c && Math.hypot(o.x - c.x, o.y - c.y) < c.r * 0.05).sort((a, b) => a.r - b.r)[0] } : null; };
+    let round = null;
+    for (const [cv, other, axis] of [[F, S || T, S ? "w" : "h"], [S, F, "w"], [T, F, "h"]]) {
+      if (!cv) continue; const rc = roundOf(cv); if (!rc) continue;
+      const od = snap(2 * rc.c.r * PT, diaVals.length ? diaVals : vals), id = rc.inner ? snap(2 * rc.inner.r * PT, diaVals.length ? diaVals : vals) : null;
+      const len = other ? snap((axis === "w" ? other.w : other.h) * PT) : null;
+      round = { od, id, len }; break;
+    }
+    const views3 = [F, T, S].filter(Boolean);
+    return {
+      f, fNote, fromTitle: !!sm, thickMode, round, iso: iso.length,
+      size: { L: fw, H: fh, W: depth }, nViews: views3.length,
+      views: [...views3.map((v) => ({ x0: v.x0, y0: v.y0, x1: v.x1, y1: v.y1, role: v === S ? "側視圖" : v === top ? "上視圖" : v === front ? "前視圖" : "主視圖", rw: snap(v.w * PT).v, rh: snap(v.h * PT).v })), ...iso.map((v) => ({ x0: v.x0, y0: v.y0, x1: v.x1, y1: v.y1, role: "立體圖（不量測）" }))],
+      confirmed: [fw, fh, depth].filter((x) => x && x.exact).length,
+    };
   }
 
   /**

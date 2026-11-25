@@ -27,6 +27,10 @@ const CASES = [
   { name: "支撐塊 n763（方塊＋Ø凹弧）", input: () => fx("block_n763_pdftext.json"), truth: { 圖號: "7101731-R10", "CAD NO": "N763-R10", 零件名稱: "支撐塊", 材料: "S50C", 外形: "block", 長L: 18, 孔數: 2, "寬W/高H": "11/14.5" } },
   { name: "滾輪座 r151（U 型座）", input: () => fx("roller_r151_pdftext.json"), truth: { 圖號: "1002303-14", "CAD NO": "R151-14", 零件名稱: "滾輪座", 材料: "SUS304", 數量: "4", 外形: "block", 長L: 130, "寬W/高H": "50/85", 攻牙數: 10, 內直角數: "" } },
   { name: "墊片（薄片 t0.5，側視標厚）", input: () => fx("thin_shim_pdftext.json"), truth: { 零件名稱: "墊片", 材料: "SUS304", 數量: "2", 外形: "sheet", 長L: 60, 寬W: 40, 板厚T: 0.5, 孔數: 2 } },
+  { name: "CNS-A 固定座（三視圖＋立體圖）", input: () => fx("cns_A_block_pdftext.json"), truth: { 零件名稱: "固定座", 材料: "S45C", 數量: "2", 外形: "block", 長L: 100, 寬W: 60, 高H: 40, 孔數: 2 } },
+  { name: "CNS-B 軸套（端視圖為圓）", input: () => fx("cns_B_bush_pdftext.json"), truth: { 零件名稱: "軸套", 材料: "C3604", 數量: "4", 外形: "round", 外徑OD: 50, 內徑ID: 30, 長L: 40 } },
+  { name: "CNS-C 擋片（板厚只畫不標）", input: () => fx("cns_C_thin_pdftext.json"), truth: { 零件名稱: "擋片", 材料: "SUS304", 外形: "sheet", 長L: 80, 寬W: 50, 板厚T: 1.5, 孔數: 2 } },
+  { name: "CNS-D 底板座（無總尺寸，比例1/2）", input: () => fx("cns_D_nooverall_pdftext.json"), truth: { 零件名稱: "底板座", 材料: "SS400", 外形: "block", 長L: 120, 寬W: 70, 高H: 25, 孔數: 2 } },
   { name: "彈片（薄片 t=1.0 註記）", input: () => fx("thin_spring_pdftext.json"), truth: { 零件名稱: "彈片", 材料: "SUS301", 數量: "10", 外形: "sheet", 長L: 80, 寬W: 20, 板厚T: 1, 孔數: 2 } },
 ];
 
@@ -60,6 +64,6 @@ console.log(`兩次執行結果${same ? "完全相同 ✔" : "不一致 ✘"}`);
 if (!same) {
   run1.forEach((r, i) => { if (JSON.stringify(r) !== JSON.stringify(run2[i])) console.log("  差異：", r.name); });
 }
-const MIN = +(process.env.BENCH_MIN || 0.95);
+const MIN = +(process.env.BENCH_MIN || 1); // 預設：所有基準欄位必須全對（不允許退步）
 if (!same || ok / tot < MIN) { console.log(`✘ 不可發佈（需兩次相同且正確率 ≥ ${MIN * 100}%）`); process.exit(1); }
 console.log("✔ 可發佈");

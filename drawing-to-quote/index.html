@@ -163,6 +163,9 @@ dialog img { display: block; width: 100%; height: auto; }
 .ovw svg .bx text { font: 700 28px var(--f-mono); paint-order: stroke; stroke: #fff; stroke-width: 6px; }
 .ovw svg .k-field rect { stroke: #d92d20; stroke-width: 2.5; fill: rgba(217, 45, 32, .08); } .ovw svg .k-field text { fill: #d92d20; }
 .ovw svg .k-callout rect { stroke: #c26a00; stroke-width: 2.5; fill: rgba(194, 106, 0, .08); } .ovw svg .k-callout text { fill: #c26a00; }
+.ovw svg .vw rect { fill: rgba(122, 43, 217, .05); stroke: #7a2bd9; stroke-width: 2; stroke-dasharray: 8 5; vector-effect: non-scaling-stroke; }
+.ovw svg .vw text { fill: #7a2bd9; font: 700 24px var(--f-body); paint-order: stroke; stroke: #fff; stroke-width: 5px; }
+.ovw svg .vw.iso rect { stroke: #8a94a6; } .ovw svg .vw.iso text { fill: #8a94a6; }
 .ovw svg .k-title rect { stroke: #1d7a46; } .ovw svg .k-num rect { stroke: #1f6fd1; stroke-dasharray: 4 3; }
 #viewer .ovw svg { pointer-events: auto; } #viewer .ovw svg .bx { cursor: pointer; } #viewer .ovw svg .bx rect { pointer-events: all; } #viewer .ovw svg .bx:hover rect { stroke-width: 4; fill: rgba(31, 111, 209, .15); }
 #viewer .ovw svg .bx.sel rect { stroke: #7a2bd9; stroke-width: 4; fill: rgba(122, 43, 217, .15); }
@@ -295,7 +298,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
 <script src="engine/recognizer-browser.js"></script>
 <dialog id="viewer">
   <div class="vbar"><b class="mono" id="viewerName"></b>
-    <span class="lg"><i style="--c:#d92d20"></i>已採用尺寸</span><span class="lg"><i style="--c:#c26a00"></i>孔／牙標註</span><span class="lg"><i style="--c:#1d7a46"></i>標題欄</span><span class="lg"><i style="--c:#1f6fd1"></i>其他數字</span>
+    <span class="lg"><i style="--c:#d92d20"></i>已採用尺寸</span><span class="lg"><i style="--c:#c26a00"></i>孔／牙標註</span><span class="lg"><i style="--c:#1d7a46"></i>標題欄</span><span class="lg"><i style="--c:#1f6fd1"></i>其他數字</span><span class="lg"><i style="--c:#7a2bd9"></i>圖形外形（視圖）</span>
     <span class="spacer"></span><span id="assignBar" class="muted">點圖上的框可把數字指定為尺寸</span>
     <form method="dialog"><button type="submit">關閉</button></form></div>
   <div class="vscroll"><div class="ovw" id="viewerWrap"></div></div>
@@ -594,7 +597,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
           const rec2 = DrawingParser.recognize(pg.input);
           const p1 = Estimator.estimatePart({ ...rec.fields }, db).best.price.fair, p2 = Estimator.estimatePart({ ...rec2.fields }, db).best.price.fair;
           const stable = JSON.stringify(rec.fields) === JSON.stringify(rec2.fields) && Math.abs(p1 - p2) < 1e-6;
-          return { id: i ? ++rid : r.id, fileName: pg.fileName, source: pg.source, preview: pg.preview, previewMap: pg.previewMap, previewSize: pg.previewSize, items: pg.input.items, dims: pg.input.dims, note: pg.note, status: "完成", fields: rec.fields, conf: rec.conf, evidence: rec.evidence, score: rec.score, stable };
+          return { id: i ? ++rid : r.id, fileName: pg.fileName, source: pg.source, preview: pg.preview, previewMap: pg.previewMap, previewSize: pg.previewSize, items: pg.input.items, dims: pg.input.dims, note: pg.note, status: "完成", fields: rec.fields, conf: rec.conf, evidence: rec.evidence, score: rec.score, stable, outline: rec.outline };
         });
         recogs.splice(idx, 1, ...made);
         if ($("#optAuto").checked) made.forEach(addToParts);
@@ -672,7 +675,12 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   function overlaySvg(r) {
     if (!r.previewSize) return "";
     const fs = Math.max(14, r.previewSize.w / 50);
-    return `<svg viewBox="0 0 ${r.previewSize.w} ${r.previewSize.h}" preserveAspectRatio="none" aria-hidden="true">${overlayBoxes(r).map((b) => `<g class="bx k-${b.kind}" data-bi="${b.i}"${b.rot ? ` transform="rotate(${b.rot} ${b.x + b.w / 2} ${b.y + b.h / 2})"` : ""}><rect x="${b.x.toFixed(1)}" y="${b.y.toFixed(1)}" width="${b.w.toFixed(1)}" height="${b.h.toFixed(1)}" rx="3"/>${b.label ? `<text x="${(b.x + b.w + 3).toFixed(1)}" y="${(b.y + fs * 0.9).toFixed(1)}" style="font-size:${fs.toFixed(0)}px">${esc(b.label)}</text>` : ""}<title>${esc(b.s)}</title></g>`).join("")}</svg>`;
+    const m = r.previewMap, vb = (r.outline?.views || []).map((v) => {
+      const x = v.x0 * m.sx + m.ox, y = v.y0 * m.sy + m.oy, w = (v.x1 - v.x0) * m.sx, h = (v.y1 - v.y0) * m.sy;
+      const lab = `${v.role}${v.rw ? ` ${v.rw}×${v.rh}` : ""}`;
+      return `<g class="vw${/立體/.test(v.role) ? " iso" : ""}"><rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"/><text x="${x.toFixed(1)}" y="${(y - fs * 0.35).toFixed(1)}" style="font-size:${(fs * 0.9).toFixed(0)}px">${esc(lab)}</text></g>`;
+    }).join("");
+    return `<svg viewBox="0 0 ${r.previewSize.w} ${r.previewSize.h}" preserveAspectRatio="none" aria-hidden="true">${vb}${overlayBoxes(r).map((b) => `<g class="bx k-${b.kind}" data-bi="${b.i}"${b.rot ? ` transform="rotate(${b.rot} ${b.x + b.w / 2} ${b.y + b.h / 2})"` : ""}><rect x="${b.x.toFixed(1)}" y="${b.y.toFixed(1)}" width="${b.w.toFixed(1)}" height="${b.h.toFixed(1)}" rx="3"/>${b.label ? `<text x="${(b.x + b.w + 3).toFixed(1)}" y="${(b.y + fs * 0.9).toFixed(1)}" style="font-size:${fs.toFixed(0)}px">${esc(b.label)}</text>` : ""}<title>${esc(b.s)}</title></g>`).join("")}</svg>`;
   }
   let viewing = null;
   function openViewer(r) {
