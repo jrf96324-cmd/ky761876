@@ -583,6 +583,18 @@
     if (!views.length) return null;
     const big = Math.max(...views.map((v) => v.w * v.h));
     views = views.filter((v) => v.w * v.h >= big * 0.03 || Math.max(v.w, v.h) >= Math.sqrt(big) * 0.5);
+    // 表格排除：框內含標題欄／公差表文字（圖號、材料、Grade、≤10、±0.1…）的整群線條不是工件
+    const TABLEWORD = /^(圖\s*號|圖\s*名|品\s*名|材\s*料|數\s*量|比\s*例|個\s*\/\s*台|CAD\s*NO|DWG|Title|Scale|Grade|Material|Pieces|設\s*計|製\s*圖|校\s*正|審\s*核)|^[≤≦≥≧<>]\s*\d|^±\s*0?\.\d/i;
+    const inside = (v, it, pad = 0) => it.x >= v.x0 - pad && it.x <= v.x1 + pad && it.y >= v.y0 - pad && it.y <= v.y1 + pad;
+    const tableLike = (v) => doc.items.filter((it) => TABLEWORD.test(it.s.trim()) && inside(v, it, 2)).length >= 2;
+    // 視圖須有尺寸數字在旁（15mm 內）；表格、圖框、標記符號旁沒有尺寸
+    const dimNear = (v) => dims.some((d) => d.x != null && inside(v, d, 42));
+    const ovl = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+    const anchored = views.filter((v) => !v.iso && !tableLike(v) && dimNear(v));
+    const aligned = (v) => anchored.some((a) => a !== v && (ovl(v.x0, v.x1, a.x0, a.x1) >= 0.6 * Math.min(v.x1 - v.x0, a.x1 - a.x0) || ovl(v.y0, v.y1, a.y0, a.y1) >= 0.6 * Math.min(v.y1 - v.y0, a.y1 - a.y0)));
+    // 保留：旁邊有尺寸數字的視圖，或與其對齊（第三角法同列／同欄）的視圖（例如只畫不標的側視圖）
+    const dropped = views.filter((v) => !v.iso && (tableLike(v) || !(dimNear(v) || aligned(v))));
+    views = views.filter((v) => !dropped.includes(v));
     const iso = views.filter((v) => v.iso); views = views.filter((v) => !v.iso);
     if (!views.length) return null;
     // ── 4. 第三角法排列 ──

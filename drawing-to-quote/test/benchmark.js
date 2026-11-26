@@ -31,6 +31,7 @@ const CASES = [
   { name: "CNS-B 軸套（端視圖為圓）", input: () => fx("cns_B_bush_pdftext.json"), truth: { 零件名稱: "軸套", 材料: "C3604", 數量: "4", 外形: "round", 外徑OD: 50, 內徑ID: 30, 長L: 40 } },
   { name: "CNS-C 擋片（板厚只畫不標）", input: () => fx("cns_C_thin_pdftext.json"), truth: { 零件名稱: "擋片", 材料: "SUS304", 外形: "sheet", 長L: 80, 寬W: 50, 板厚T: 1.5, 孔數: 2 } },
   { name: "CNS-D 底板座（無總尺寸，比例1/2）", input: () => fx("cns_D_nooverall_pdftext.json"), truth: { 零件名稱: "底板座", 材料: "SS400", 外形: "block", 長L: 120, 寬W: 70, 高H: 25, 孔數: 2 } },
+  { name: "擋片 1002303-24（粗線標題欄／公差表）", input: () => fx("stopplate_1002303-24_pdftext.json"), truth: { 圖號: "1002303-24", "CAD NO": "R151-24", 零件名稱: "擋片", 材料: "SUS304", 數量: "8", 外形: "sheet", 長L: 50, 寬W: 40, 板厚T: 5, 孔數: 2 } },
   { name: "彈片（薄片 t=1.0 註記）", input: () => fx("thin_spring_pdftext.json"), truth: { 零件名稱: "彈片", 材料: "SUS301", 數量: "10", 外形: "sheet", 長L: 80, 寬W: 20, 板厚T: 1, 孔數: 2 } },
 ];
 
