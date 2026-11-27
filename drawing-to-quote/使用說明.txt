@@ -7,7 +7,11 @@ Drawing-to-Quote 製作圖製程審查與多元估價（離線單機版）
   瀏覽器會自動開啟 http://localhost:8765/index.html
   ※ 也可以直接雙擊 index.html，所有功能（含掃描圖 / 照片 OCR）都能用；第一次 OCR 需載入約 10 MB 字庫，稍等數秒
   ※ 直接雙擊 index.html 時，中文字型的 CAD PDF 也能讀文字層（字型對照表已內嵌於 vendor/pdfjs/cmaps-inline.js）
-  ※ 本程式不會修改 Windows 的 PDF 預設開啟程式；若在檔案總管雙擊 PDF 打不開，請右鍵 → 開啟檔案 → 選擇其他應用程式 → 勾選「一律使用此應用程式」
+  ※ 本程式不會修改 Windows 的 PDF 預設開啟程式（不寫登錄檔、不改檔案關聯）。
+    若電腦上的 PDF 都打不開：
+      1. 執行 tools\check-pdf-windows.bat（只讀取、不修改），產生 pdf-check.txt 並開啟「預設應用程式」設定
+      2. 在「預設應用程式」搜尋 .pdf → 選 Adobe Acrobat Reader 或 Microsoft Edge
+      3. 或在任一 PDF 上按右鍵 → 開啟檔案 → 選擇其他應用程式 → 選閱讀器並勾選「一律使用此應用程式開啟 .pdf 檔案」
 
 【操作流程】
   1. 「圖面辨識」頁：一次拖曳多張製作圖（DXF / PDF / PNG / JPG）

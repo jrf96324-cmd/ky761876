@@ -6,7 +6,7 @@ const fs = require("fs"), path = require("path"), zlib = require("zlib");
 const root = path.resolve(__dirname, "..");
 const out = path.resolve(process.argv[2] || path.join(root, "dist", "Drawing-to-Quote-離線版.zip"));
 const TOP = "Drawing-to-Quote";
-const INCLUDE = ["index.html", "README.md", "使用說明.txt", "START-Windows.bat", "start-mac-linux.sh", "cli.js", "package.json", "engine", "vendor", "samples", "tools/serve.ps1", "tools/serve.js", "test"];
+const INCLUDE = ["index.html", "README.md", "使用說明.txt", "START-Windows.bat", "start-mac-linux.sh", "cli.js", "package.json", "engine", "vendor", "samples", "tools/serve.ps1", "tools/serve.js", "tools/check-pdf-windows.bat", "test"];
 
 function walk(p, list) {
   const st = fs.statSync(p);
