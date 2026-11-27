@@ -12,9 +12,11 @@
   }
 
   // ── 工序類別：把每個加工步驟歸到固定欄位，方便各零件並排比對 ──
-  const CATS = ["材料", "切割下料", "車削", "銑削", "鑽孔攻牙", "折彎", "沖壓", "焊接", "線割放電", "研磨", "去毛邊清洗", "組裝", "表面處理", "熱處理", "其他"];
+  const CATS = ["材料", "切割下料", "車削", "銑削", "鑽孔攻牙", "折彎", "沖壓", "焊接", "線割放電", "研磨", "去毛邊清洗", "組裝", "品檢", "表面處理", "熱處理", "其他"];
   function catOf(l) {
+    if (l.group && CATS.includes(l.group)) return l.group; // 估價引擎已標明的工序類別（同一機台拆成多步時）
     const t = `${l.process} ${l.machine || ""}`;
+    if (/品檢|量測|檢驗/.test(t)) return "品檢";
     if (l.type === "material" || /^材料/.test(l.process)) return "材料";
     if (/表處/.test(t)) return "表面處理";
     if (/熱處理|退火/.test(t)) return "熱處理";
@@ -89,7 +91,7 @@
     results.forEach((r) => {
       const pr = r.best.price, q = r.part.qty;
       pr.lines.forEach((l) => sp.push([r.part.drawingNo, r.part.name, { v: l.step, s: "n0" }, l.process, cat[l.cat],
-        { v: l.runMin != null ? `${l.runMin.toFixed(1)} min × ${l.rate}/hr${l.setupMin ? `，架模 ${l.setupMin} min ÷ ${q} 件` : ""}` : (l.detail || "") + (l.note ? `（${l.note}）` : ""), s: "wrap" },
+        { v: l.runMin != null ? `${l.runMin.toFixed(1)} min × ${l.rate}/hr${l.setupMin ? `，架模 ${l.setupMin} min ÷ ${q} 件` : ""}${l.detail ? `（${l.detail}）` : ""}` : (l.detail || "") + (l.note ? `（${l.note}）` : ""), s: "wrap" },
         l.runMin != null ? +l.runMin.toFixed(1) : "", l.rate || "", l.setupMin != null ? l.setupMin : "",
         { v: +l.runPer.toFixed(1), s: "n" }, { v: +l.setupPer.toFixed(1), s: "n" }, { v: +l.cost.toFixed(1), s: "n" }, { v: l.factor, s: "p" },
         { v: +l.unitCost.toFixed(1), s: "n" }, { v: q, s: "n0" }, { v: R0(l.unitCost * q), s: "n" }]));

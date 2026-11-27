@@ -431,7 +431,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
   const CAT = { material: "材料", machining: "加工", outsource: "委外" };
   function stepsTable(pr, qty) {
     const rows = pr.lines.map((l) => `<tr><td class="n">${l.step}</td><td>${esc(l.process)} <span class="cat">${CAT[l.cat]}</span></td>
-      <td class="muted">${l.runMin != null ? `${l.runMin.toFixed(1)} min × ${l.rate}/hr${l.setupMin ? `＋架模 ${l.setupMin} min ÷ ${qty} 件` : ""}` : esc(l.detail || "")}${l.note ? ` <span class="pill 中">${esc(l.note)}</span>` : ""}</td>
+      <td class="muted">${l.runMin != null ? `${l.runMin.toFixed(1)} min × ${l.rate}/hr${l.setupMin ? `＋架模 ${l.setupMin} min ÷ ${qty} 件` : ""}${l.detail ? `<br><small>${esc(l.detail)}</small>` : ""}` : esc(l.detail || "")}${l.note ? ` <span class="pill 中">${esc(l.note)}</span>` : ""}</td>
       <td class="n">${n0(l.runPer)}</td><td class="n">${n0(l.setupPer)}</td><td class="n">${n0(l.cost)}</td><td class="n">${Math.abs(l.factor - 1) < 1e-9 ? "100%" : `<b>${Math.round(l.factor * 100)}%</b>`}</td><td class="n"><b>${n0(l.unitCost)}</b></td><td class="n">${n0(l.unitCost * qty)}</td></tr>`).join("");
     const profit = pr.fair - pr.direct - pr.overhead;
     const addRow = (label, v) => `<tr><td></td><td>${label}</td><td></td><td></td><td></td><td></td><td></td><td class="n">${n0(v)}</td><td class="n">${n0(v * qty)}</td></tr>`;
@@ -516,6 +516,7 @@ dialog form { display: flex; justify-content: space-between; align-items: center
       tbl("機台費率", ["機台", "NT$/hr", "架模 min"], Object.entries(db.machines).map(([k, m]) => `<tr><td>${esc(m.name)}</td><td class="n">${field(`machines.${k}.rate`, m.rate, 10)}</td><td class="n">${field(`machines.${k}.setupMin`, m.setupMin, 5)}</td></tr>`)) +
       tbl("表面處理（委外）", ["項目", "單價", "每批最低"], Object.entries(db.surfaces).filter(([, s]) => s.unit !== "none").map(([k, s]) => `<tr><td>${esc(s.name)} <small class="muted">/${s.unit === "dm2" ? "dm²" : "kg"}</small></td><td class="n">${field(`surfaces.${k}.price`, s.price)}</td><td class="n">${field(`surfaces.${k}.lotMin`, s.lotMin, 50)}</td></tr>`)) +
       tbl("熱處理（委外）", ["項目", "NT$/kg", "每批最低"], Object.entries(db.heatTreats).filter(([, s]) => s.unit !== "none").map(([k, s]) => `<tr><td>${esc(s.name)}</td><td class="n">${field(`heatTreats.${k}.price`, s.price)}</td><td class="n">${field(`heatTreats.${k}.lotMin`, s.lotMin, 50)}</td></tr>`)) +
+      tbl("特徵標準工時（分鐘／個，A6061 基準，實際 × √難切係數）", ["項目", "min"], Object.entries(db.ops || {}).map(([k, o]) => `<tr><td>${esc(o.name)}</td><td class="n">${field(`ops.${k}.min`, o.min, 0.1)}</td></tr>`)) +
       tbl("計長/計件加工", ["項目", "值"], [
         ["雷切 基本 NT$/m", "laser.basePerM", 1], ["雷切 最低 NT$/m", "laser.minPerM", 1], ["雷切 每mm板厚 NT$/m", "laser.perMmPerM", 0.5], ["雷切 穿孔 NT$/孔", "laser.pierce", 0.5],
         ["快走絲 NT$/mm²", "wireEdm.fast.perMm2", 0.005], ["慢走絲 NT$/mm²", "wireEdm.slow.perMm2", 0.01], ["折彎 NT$/折", "bending.perBend", 1],

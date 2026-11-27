@@ -27,7 +27,7 @@
     if (db.materials[key]) return key;
     for (const k of Object.keys(db.materials)) if (k.toUpperCase() === key) return k;
     if (db.materialAlias[key]) return db.materialAlias[key];
-    for (const [a, k] of Object.entries(db.materialAlias)) if (key.includes(a)) return k;
+    for (const [a, k] of Object.entries(db.materialAlias).sort((x, y) => y[0].length - x[0].length)) if (key.includes(a.toUpperCase())) return k; // 長的別名先比（「鑄鐵」優先於「鐵」）
     for (const k of Object.keys(db.materials)) if (key.includes(k.toUpperCase())) return k;
     return null;
   }
@@ -68,7 +68,7 @@
       slots: num(raw.slots ?? raw["槽數"]), pockets: num(raw.pockets ?? raw["口袋數"]),
       deepHoles: num(raw.deepHoles ?? raw["深孔數"]), crossHoles: num(raw.crossHoles ?? raw["交叉孔數"]),
       sharpCorners: num(raw.sharpCorners ?? raw["內直角數"]), extThreads: num(raw.extThreads ?? raw["外螺紋數"]),
-      grooves: num(raw.grooves ?? raw["退刀槽數"]), faces: num(raw.faces ?? raw["加工面數"]),
+      grooves: num(raw.grooves ?? raw["退刀槽數"]), faces: num(raw.faces ?? raw["加工面數"]), reamHoles: num(raw.reamHoles ?? raw["精度孔數"]),
       bends: num(raw.bends ?? raw["折彎數"]), weldMm: num(raw.weldMm ?? raw["焊道長mm"]),
       cutMm: num(raw.cutMm ?? raw["雷切周長mm"]),
       tolerance: String(raw.tolerance ?? raw["公差"] ?? "一般").trim() || "一般",
@@ -145,9 +145,10 @@
       g.stock = `圓棒 Ø${g.stockD} × ${g.stockL}`;
     } else if (p.shape === "sheet") {
       const t = p.T;
-      // 折彎成形的盒／罩（高H 遠大於板厚）：以展開尺寸下料 (長+2高)×(寬+2高)
-      const formed = p.H > Math.max(3 * t, 6);
-      const bl = formed ? round(p.L + 2 * p.H, 1) : p.L, bw = formed ? round(p.W + 2 * p.H, 1) : p.W;
+      // 折彎成形件（高H 遠大於板厚）：依折數估展開尺寸 —— 1 折 L 型：長×(寬+高)；2 折 U 型：長×(寬+2高)；
+      // ≥3 折盒／罩：(長+2高)×(寬+2高)（未扣折彎伸長量，偏保守）
+      const formed = p.H > Math.max(3 * t, 6), nb = p.bends || 4;
+      const bl = formed && nb >= 3 ? round(p.L + 2 * p.H, 1) : p.L, bw = formed ? round(p.W + (nb >= 2 ? 2 : 1) * p.H, 1) : p.W;
       g.blank = { L: bl, W: bw };
       g.stockVol = bl * bw * t / 1000 / 0.8; // 排版利用率 80%
       g.partVol = bl * bw * t / 1000 * p.solidity;
@@ -205,10 +206,33 @@
     return { tol: db.tolerance[p.tolerance].factor, ra: db.roughness[p.roughness] };
   }
 
-  function featureMin(p, mc) {
-    // 每個特徵的標準工時 (min)，乘以材料難切係數 mc
-    return (p.holes * 0.8 + p.taps * 1.2 + p.ptTaps * 2.5 + p.slots * 4 + p.pockets * 8 + p.deepHoles * 6
-      + p.crossHoles * 5 + p.extThreads * 3 + p.grooves * 1.5) * mc;
+  // 特徵標準工時（分鐘／個）：優先取單價資料庫 ops，缺項用內建值
+  const OPS_DEF = { drill: 0.8, tap: 1.2, pt: 2.5, slot: 4, pocket: 8, deepHole: 6, crossHole: 5, extThread: 3, groove: 1.5, reamHole: 3,
+    chamferPerM: 4, fixturePerSetup: 6, inspectBase: 8, keyway: 12, knurl: 3, marking: 1.5, gearPerTooth: 0.6 };
+  const opMin = (db, k) => (db.ops && db.ops[k] && Number.isFinite(db.ops[k].min) ? db.ops[k].min : OPS_DEF[k]);
+  /** 每個特徵一列（鑽孔、攻牙、銑槽…），乘以材料難切係數 k；group＝工序比對欄位 */
+  function featureParts(p, k, db, opts = {}) {
+    const P = [];
+    const f = (n, key, label, group) => { if (n > 0) P.push({ label: `${label} ×${n}`, min: n * opMin(db, key) * k, group, detail: `${n} 處 × ${opMin(db, key)} 分 × 難切係數 ${round(k, 2)}` }); };
+    f(p.holes, "drill", "鑽孔", "鑽孔攻牙");
+    f(p.reamHoles, "reamHole", "精度孔 鉸孔/搪孔", "鑽孔攻牙");
+    f(p.taps, "tap", "攻牙", "鑽孔攻牙");
+    f(p.ptTaps, "pt", "管牙 PT/NPT", "鑽孔攻牙");
+    f(p.deepHoles, "deepHole", "深孔啄鑽", "鑽孔攻牙");
+    f(p.crossHoles, "crossHole", "交叉孔", "鑽孔攻牙");
+    f(p.slots, "slot", "銑槽", "銑削");
+    f(p.pockets, "pocket", "口袋/凹槽", "銑削");
+    if (!opts.noTurn) { f(p.extThreads, "extThread", "車外牙", "車削"); f(p.grooves, "groove", "退刀槽/溝槽", "車削"); }
+    return P;
+  }
+  const sumMin = (P) => P.reduce((a, x) => a + x.min, 0);
+  function featureMin(p, mc, db = DB_DEFAULT, opts) { return sumMin(featureParts(p, mc, db, opts)); }
+  /** 同一機台的工時拆成多個步驟列出（架模只算在第一列），合計與整段計算相同 */
+  function machineSteps(db, key, parts, setupMin, scale = 1, prefix) {
+    const m = db.machines[key], ps = parts.filter((x) => x.min > 0.005);
+    if (!ps.length) ps.push({ label: "加工", min: 0.5 });
+    return ps.map((x, i) => ({ ...hr(db, key, x.min * scale, i === 0 ? (setupMin ?? m.setupMin) : 0, `${prefix || m.name}：${x.label}`),
+      group: x.group, detail: x.detail ? x.detail + (scale !== 1 ? `，× ${round(scale, 2)}（此路線效率）` : "") : undefined }));
   }
 
   function surfaceAndHeat(p, g, db) {
@@ -247,44 +271,76 @@
     const mat = db.materials[p.material];
     const mc = 1 / mat.machinability;            // 難切係數
     const { tol, ra } = finishFactors(p, db);
-    const feat = featureMin(p, Math.sqrt(mc));
+    const feat = featureMin(p, Math.sqrt(mc), db);
     const post = surfaceAndHeat(p, g, db);
     const grind = grindingOps(p, g, db, mat.machinability);
-    const deburr = hr(db, "bench", 2 + (p.crossHoles + p.deepHoles) * 3 + (p.ptTaps ? 2 : 0), 0, "去毛邊/清洗");
+    // 去毛邊／倒角：圖面「未標示銳角皆以 C 去除」→ 依外形邊長計（每公尺 chamferPerM 分）
+    const edgeM = (p.shape === "round" ? Math.PI * (2 * p.OD + (p.ID ? 2 * p.ID : 0)) : p.shape === "sheet" ? 2 * ((g.blank ? g.blank.L : p.L) + (g.blank ? g.blank.W : p.W)) : p.shape === "frame" ? 0 : 4 * (p.L + p.W + (p.H || p.T || 0))) / 1000;
+    const chamMin = edgeM * opMin(db, "chamferPerM") * Math.sqrt(mc) * (p.shape === "sheet" ? 0.5 : 1);
+    const deburr = { ...hr(db, "bench", 2 + (p.crossHoles + p.deepHoles) * 3 + (p.ptTaps ? 2 : 0) + chamMin, 0, `去毛邊/倒角去銳角/清洗（邊長 ${round(edgeM, 2)} m）`), group: "去毛邊清洗",
+      detail: `基本 2 分 + 交叉/深孔 ${(p.crossHoles + p.deepHoles) * 3} 分 + 倒角 ${round(edgeM, 2)} m × ${opMin(db, "chamferPerM")} 分/m` };
+    // 品檢：中等公差逐項量測、嚴公差三次元量測
+    const nFeat = p.holes + p.taps + p.ptTaps + p.slots + p.pockets + (p.reamHoles || 0);
+    const inspMin = p.tolerance === "嚴" ? opMin(db, "inspectBase") * 2 + nFeat * 1 : p.tolerance === "中等" ? opMin(db, "inspectBase") + nFeat * 0.5 : 0;
+    const inspect = inspMin ? [{ ...hr(db, "inspect", inspMin, 10, p.tolerance === "嚴" ? `品檢：三次元量測（${nFeat} 特徵）` : `品檢：尺寸檢驗（${nFeat} 特徵）`), group: "品檢" }] : [];
+    // 備註／品名關鍵字帶出的附加工序：鍵槽、滾齒、刻字（滾花併入車削）
+    const NT = `${p.notes} ${p.name} ${p.desc}`;
+    const kw = /鍵槽|KEYWAY|KEY\s*SEAT/i.test(NT) ? (+(NT.match(/(\d+)\s*[-xX×]?\s*(?:處)?\s*鍵槽/) || [])[1] || 1) : 0;
+    const gm = NT.match(/(?:齒數|Z\s*[=＝])\s*(\d{1,3})/i), gearT = gm ? +gm[1] : /齒輪|GEAR|模數|MODULE/i.test(NT) ? 20 : 0;
+    const knurl = /滾花|KNURL/i.test(NT) ? 1 : 0, mark = /刻字|打印|雷雕|打標|刻印|LASER\s*MARK/i.test(NT) ? 1 : 0;
+    const extra = [
+      ...(kw ? [{ ...hr(db, "keyseat", kw * opMin(db, "keyway") * Math.sqrt(mc), null, `插床/拉床：鍵槽 ×${kw}`), group: "銑削" }] : []),
+      ...(gearT ? [{ ...hr(db, "gear_hob", gearT * opMin(db, "gearPerTooth") * Math.sqrt(mc) + 5, null, `滾齒機：滾齒 Z${gearT}`), group: "其他", detail: gm ? "" : "未讀到齒數，暫以 20 齒估" }] : []),
+      ...(mark ? [{ ...hr(db, "laser_mark", opMin(db, "marking"), null, "雷射刻字/打印"), group: "其他" }] : []),
+    ];
     const R = [];
-    const add = (id, name, desc, ops, opts = {}) => R.push({ id, name, desc, ops: [...ops, ...post], ...opts });
+    const add = (id, name, desc, ops, opts = {}) => R.push({ id, name, desc, ops: [...ops, ...extra, ...inspect, ...post], ...opts });
     const edmOps = p.sharpCorners > 0 ? [hr(db, "edm_sink", p.sharpCorners * 25 * Math.sqrt(mc), 60, `放電清角 ×${p.sharpCorners}`)] : [];
 
     if (p.shape === "round") {
       const roughMin = g.removeVol / (db.mrr.turnRough * mat.machinability);
       const finMin = g.finishTurnCm2 / db.mrr.finishTurnCm2PerMin * tol * ra / Math.sqrt(mat.machinability);
-      const turnMin = roughMin + finMin + p.grooves * 1.5 + p.extThreads * 3 * Math.sqrt(mc) + 2 * p.faces / 2 + 1.5;
-      const offAxis = p.holes + p.taps + p.ptTaps + p.slots + p.pockets + p.crossHoles;
-      const millMin = offAxis ? featureMin({ ...p, grooves: 0, extThreads: 0 }, Math.sqrt(mc)) + 4 : 0;
+      const turnParts = [
+        { label: `粗車（移除 ${round(g.removeVol, 1)} cm³）`, min: roughMin, group: "車削", detail: `${round(g.removeVol, 1)} cm³ ÷ (${db.mrr.turnRough} cm³/min × 切削性 ${mat.machinability})` },
+        { label: `精車外徑/內孔/端面（${round(g.finishTurnCm2)} cm²）`, min: finMin, group: "車削", detail: `${round(g.finishTurnCm2)} cm² ÷ ${db.mrr.finishTurnCm2PerMin} × 公差 ${tol} × 粗糙度 ${ra}` },
+        ...(p.grooves ? [{ label: `退刀槽/溝槽 ×${p.grooves}`, min: p.grooves * opMin(db, "groove"), group: "車削" }] : []),
+        ...(p.extThreads ? [{ label: `車外牙 ×${p.extThreads}`, min: p.extThreads * opMin(db, "extThread") * Math.sqrt(mc), group: "車削" }] : []),
+        ...(knurl ? [{ label: "滾花", min: opMin(db, "knurl"), group: "車削" }] : []),
+        { label: `端面/切斷/調頭 ×${p.faces}`, min: 2 * p.faces / 2 + 1.5, group: "車削", detail: `${p.faces} 面 × 1 分 + 切斷 1.5 分` },
+      ];
+      const offAxis = p.holes + p.taps + p.ptTaps + p.slots + p.pockets + p.crossHoles + (p.reamHoles || 0);
+      const millParts = offAxis ? [...featureParts(p, Math.sqrt(mc), db, { noTurn: true }), { label: "分度/裝夾校正", min: 4, group: "銑削" }] : [];
       const base = [materialCost(p, g, db)];
       add("R1", "CNC 車削" + (offAxis ? " + 三軸銑 (二次加工)" : ""), "標準路線：CNC 車床完成外徑/內徑/端面，偏心孔、槽、攻牙移至綜合加工機。",
-        [...base, hr(db, "cnc_lathe", turnMin), ...(offAxis ? [hr(db, "vmc3", millMin + 3, 40, "三軸銑：孔/槽/攻牙")] : []), ...grind, ...edmOps, deburr]);
+        [...base, ...machineSteps(db, "cnc_lathe", turnParts), ...(offAxis ? machineSteps(db, "vmc3", [...millParts, { label: "上下料", min: 3, group: "銑削" }], 40, 1, "三軸銑（二次加工）") : []), ...grind, ...edmOps, deburr]);
       if (offAxis) add("R2", "車銑複合一次完成", "一次裝夾完成車、銑、鑽、攻，同心度與位置度佳；適合中量、位置公差嚴。",
-        [...base, hr(db, "millturn", (turnMin + millMin) * 0.85), ...grind, ...edmOps, deburr]);
+        [...base, ...machineSteps(db, "millturn", [...turnParts, ...millParts], null, 0.85), ...grind, ...edmOps, deburr]);
       if (p.OD <= 32 && p.L <= 200) add("R3", "走心機/自動車床 (量產)", "小徑長軸件量產路線，架機時間長，適合 ≥500 件。",
-        [...base, hr(db, "swiss", (turnMin + millMin) * 0.45), ...grind, deburr], { minQty: 200 });
+        [...base, ...machineSteps(db, "swiss", [...turnParts, ...millParts], null, 0.45), ...grind, deburr], { minQty: 200 });
       if (p.tolerance === "一般" && !offAxis && p.extThreads === 0 && p.OD >= 20)
         add("R4", "傳統車床 (少量簡單件)", "少量、無嚴公差的簡單車件可交由傳統車床，免程式費。",
-          [...base, hr(db, "lathe_conv", turnMin * 1.8), deburr], { maxQty: 20 });
+          [...base, ...machineSteps(db, "lathe_conv", turnParts, null, 1.8), deburr], { maxQty: 20 });
     }
 
     if (p.shape === "block" || p.shape === "plate") {
       const H = p.H || p.T;
       const roughMin = g.removeVol / (db.mrr.millRough * mat.machinability);
-      const finMin = g.finishMillCm2 / db.mrr.finishMillCm2PerMin * tol * ra / Math.sqrt(mat.machinability);
-      const holeMin = feat;
+      // 大平面以面銑刀加工，效率隨面積提高：× √(最大面 cm² ÷ 100)，1～8 倍
+      const faceBoost = Math.min(8, Math.max(1, Math.sqrt(p.L * p.W / 100 / 100)));
+      const finMin = g.finishMillCm2 / (db.mrr.finishMillCm2PerMin * faceBoost) * tol * ra / Math.sqrt(mat.machinability);
       const setups3 = Math.max(1, p.faces);
-      const handling = setups3 * 6;
+      const handling = setups3 * opMin(db, "fixturePerSetup");
+      const fixP = { label: `裝夾/校正 ×${setups3} 次`, min: handling, group: "銑削", detail: `${setups3} 次 × ${opMin(db, "fixturePerSetup")} 分` };
+      const roughP = { label: `銑六面/粗銑（移除 ${round(g.removeVol, 1)} cm³）`, min: roughMin, group: "銑削", detail: `${round(g.removeVol, 1)} cm³ ÷ (${db.mrr.millRough} cm³/min × 切削性 ${mat.machinability})` };
+      const finP = { label: `精銑（${round(g.finishMillCm2)} cm²）`, min: finMin, group: "銑削", detail: `${round(g.finishMillCm2)} cm² ÷ (${db.mrr.finishMillCm2PerMin}${faceBoost > 1 ? ` × 面銑效率 ${round(faceBoost, 2)}` : ""}) × 公差 ${tol} × 粗糙度 ${ra}` };
+      const featP = featureParts(p, Math.sqrt(mc), db);
+      // 大件（任一邊 > 800mm）改用龍門加工機
+      const vmc = Math.max(p.L, p.W) > 800 ? "vmc_big" : "vmc3";
       const base = [materialCost(p, g, db)];
-      add("M1", `CNC 三軸銑削 (${setups3} 次裝夾)`, "整塊胚料三軸加工，每個加工方向一次裝夾、一次校正。",
-        [...base, hr(db, "vmc3", roughMin + finMin + holeMin + handling, 45 + (setups3 - 1) * 25), ...grind, ...edmOps, deburr]);
+      add("M1", `${vmc === "vmc_big" ? "龍門" : "CNC 三軸"}銑削 (${setups3} 次裝夾)`, "整塊胚料三軸加工，每個加工方向一次裝夾、一次校正。",
+        [...base, ...machineSteps(db, vmc, [fixP, roughP, finP, ...featP], (vmc === "vmc_big" ? 90 : 45) + (setups3 - 1) * 25), ...grind, ...edmOps, deburr]);
       if (p.faces >= 4) add("M2", "CNC 五軸 (一次裝夾)", "多面加工一次完成，減少裝夾誤差；機台費率高，適合位置公差嚴的多面件。",
-        [...base, hr(db, "vmc5", (roughMin + finMin + holeMin) * 0.75 + 4, 120), ...grind, ...edmOps, deburr]);
+        [...base, ...machineSteps(db, "vmc5", [{ label: "裝夾/校正 ×1 次", min: 4 / 0.75, group: "銑削" }, roughP, finP, ...featP], 120, 0.75), ...grind, ...edmOps, deburr]);
       // 雷射/水刀下料 → 銑面鑽孔
       const grp = mat.group;
       const flat = p.shape === "plate" || H <= 0.3 * Math.min(p.L, p.W); // 板狀件才適合切割下料
@@ -292,24 +348,30 @@
         const cutM = (g.cutMm + p.pockets * 200) / 1000;
         const laserRun = cutM * laserPerM(db, H) * db.laser.matFactor[grp] + (1 + p.holes + p.pockets) * db.laser.pierce;
         const plateKg = p.L * p.W * H / 1e6 * mat.density / 0.85;
-        const mill = (p.faces > 1 || tol > 1 ? (2 * p.L * p.W / 100) / db.mrr.finishMillCm2PerMin * tol * ra / Math.sqrt(mat.machinability) : 0)
-          + (p.taps + p.ptTaps + p.slots) * 1.5 * Math.sqrt(mc) + p.deepHoles * 6 + p.crossHoles * 5 + p.faces * 4;
+        const faceMin = p.faces > 1 || tol > 1 ? (2 * p.L * p.W / 100) / (db.mrr.finishMillCm2PerMin * faceBoost) * tol * ra / Math.sqrt(mat.machinability) : 0;
+        const tps = p.taps + p.ptTaps + p.slots;
+        const millP = [
+          { label: `裝夾/校正 ×${p.faces} 面`, min: p.faces * 4 + 3, group: "銑削" },
+          { label: `銑基準面（${round(2 * p.L * p.W / 100)} cm²）`, min: faceMin, group: "銑削" },
+          ...(tps ? [{ label: `攻牙/管牙/銑槽 ×${tps}`, min: tps * 1.5 * Math.sqrt(mc), group: "鑽孔攻牙" }] : []),
+          ...featureParts({ ...p, holes: 0, pockets: 0, taps: 0, ptTaps: 0, slots: 0 }, 1, db, { noTurn: true }),
+        ];
         add("M3", "雷射切割下料 + CNC 銑面/鑽孔攻牙", "外形與通孔由雷射切出，CNC 只做基準面、螺牙與精度孔，大幅減少切削移除量。",
-          [materialCost(p, g, db, { kg: plateKg, cuts: 0 }), lot("雷射切割", laserRun, db.laser.setup, `${round(cutM, 2)} m × t${H}`),
-            hr(db, "vmc3", mill + 3, 40, "CNC 銑面/鑽攻"), ...grind, ...edmOps, deburr]);
+          [materialCost(p, g, db, { kg: plateKg, cuts: 0 }), lot("雷射切割", laserRun, db.laser.setup, `${round(cutM, 2)} m × t${H}，穿孔 ${1 + p.holes + p.pockets} 處`),
+            ...machineSteps(db, "vmc3", millP, 40, 1, "CNC 銑面/鑽攻"), ...grind, ...edmOps, deburr]);
       } else if (flat && H <= 150) {
         const cutM = g.cutMm / 1000;
         const plateKg = p.L * p.W * H / 1e6 * mat.density / 0.85;
         add("M3W", "水刀切割下料 + CNC 銑削", "厚板以水刀下料（無熱影響），再 CNC 精修。",
           [materialCost(p, g, db, { kg: plateKg, cuts: 0 }), lot("水刀切割", cutM * db.waterjet.perM_per10mm * H / 10, db.waterjet.setup, `${round(cutM, 2)} m × t${H}`),
-            hr(db, "vmc3", (roughMin * 0.4 + finMin + holeMin + handling), 45, "CNC 精修"), ...grind, deburr]);
+            ...machineSteps(db, "vmc3", [fixP, { ...roughP, label: "修邊/粗銑（水刀後餘量）", min: roughMin * 0.4 }, finP, ...featP], 45, 1, "CNC 精修"), ...grind, deburr]);
       }
       // 線切割：高精度輪廓 / 銳角內槽
-      if (p.tolerance !== "一般" || p.sharpCorners > 0 || p.material.startsWith("SKD")) {
+      if (p.tolerance === "嚴" || p.sharpCorners > 0 || /^SKD|^SKH|^NAK/.test(p.material)) { // 中等公差以 CNC 精銑即可，不必線割
         const area = g.cutMm * H;
         const w = p.tolerance === "嚴" ? db.wireEdm.slow : db.wireEdm.fast;
         add("M4", `CNC 銑削 + ${w.name}輪廓`, "外形或內角以線切割完成，可得清角與高輪廓精度；適合模具鋼、嚴公差輪廓。",
-          [...base, hr(db, "vmc3", roughMin * 0.6 + holeMin + handling, 45, "CNC 粗加工/孔"),
+          [...base, ...machineSteps(db, "vmc3", [fixP, { ...roughP, label: "粗銑（留線割餘量）", min: roughMin * 0.6 }, ...featP], 45, 1, "CNC 粗加工/孔"),
             lot(w.name, area * w.perMm2 * (p.tolerance === "嚴" ? 1.6 : 1), w.setup, `${round(area)} mm² × ${w.perMm2}`), ...grind, deburr]);
       }
       // 實體率低：改焊接或組合件
@@ -319,7 +381,7 @@
         const wp = db.welding[mat.group] || db.welding.steel;
         add("M5", "改板件焊接/鎖附組合 + 後加工", "移除量大（實體率低），改以板材雷切組焊或螺絲組合，再後加工基準面。需確認剛性與變形。",
           [materialCost(p, g, db, { kg: plateKg, cuts: 4 }), lot("雷射下料", weldM * 2 * laserPerM(db, 10) * (db.laser.matFactor[mat.group] || 1), db.laser.setup, "板件下料"),
-            lot("焊接/組裝", weldM * wp, 600, `${round(weldM, 2)} m 焊道`), hr(db, "vmc3", 25 + holeMin, 60, "焊後基準面加工"), deburr]);
+            lot("焊接/組裝", weldM * wp, 600, `${round(weldM, 2)} m 焊道`), hr(db, "vmc3", 25 + feat, 60, "焊後基準面加工"), deburr]);
       }
     }
 
@@ -346,7 +408,7 @@
           { minQty: st.minQty });
       }
       if (p.bends === 0 && t >= 2) add("S4", "CNC 銑削外形 (少量/試作)", "不開雷切程式，以 CNC 直接銑外形；僅 1~5 件試作時考慮。",
-        [materialCost(p, g, db, { kg: g.stockKg * 1.2 }), hr(db, "vmc3", g.cutMm / 400 / mat.machinability + feat + 5, 40), deburr], { maxQty: 5 });
+        [materialCost(p, g, db, { kg: g.stockKg * 1.2 }), ...machineSteps(db, "vmc3", [{ label: "裝夾", min: 5, group: "銑削" }, { label: `銑外形（${round(g.cutMm / 1000, 2)} m）`, min: g.cutMm / 400 / mat.machinability, group: "銑削" }, ...featureParts(p, Math.sqrt(mc), db)], 40), deburr], { maxQty: 5 });
     }
 
     if (p.shape === "frame") {
@@ -546,7 +608,7 @@
 
   // ───────────────────────── CSV ─────────────────────────
   const CSV_HEADERS = ["圖號", "CAD NO", "零件名稱", "圖名說明", "材料", "數量", "外形", "長L", "寬W", "高H", "外徑OD", "內徑ID", "板厚T",
-    "實體率%", "淨重kg", "孔數", "攻牙數", "PT牙數", "槽數", "口袋數", "深孔數", "交叉孔數", "內直角數", "外螺紋數", "退刀槽數",
+    "實體率%", "淨重kg", "孔數", "攻牙數", "PT牙數", "槽數", "口袋數", "深孔數", "交叉孔數", "內直角數", "外螺紋數", "退刀槽數", "精度孔數",
     "加工面數", "折彎數", "焊道長mm", "雷切周長mm", "公差", "粗糙度", "表面處理", "熱處理", "備註", "估價比例%", "辨識來源", "尺寸驗證"];
 
   function parseCSV(text) {
