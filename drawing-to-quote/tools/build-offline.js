@@ -11,6 +11,9 @@ const INCLUDE = ["index.html", "README.md", "使用說明.txt", "START-Windows.b
 function walk(p, list) {
   const st = fs.statSync(p);
   if (path.basename(p) === "private") return; // 客戶真實圖面基準（test/private）不打包，避免 ZIP 轉傳外洩
+  // 縮小 ZIP：字型對照表已內嵌於 cmaps-inline.js；非 SIMD 的 OCR 核心只供 2021 年前的舊瀏覽器
+  const rel = path.relative(root, p).split(path.sep).join("/");
+  if (rel === "vendor/pdfjs/cmaps" || rel === "vendor/ocr-inline/core.js") return;
   if (st.isDirectory()) fs.readdirSync(p).sort().forEach((f) => walk(path.join(p, f), list)); else list.push(p);
 }
 const files = []; INCLUDE.forEach((i) => { const p = path.join(root, i); if (fs.existsSync(p)) walk(p, files); });

@@ -29,7 +29,7 @@
    * 改由 vendor/pdfjs/cmaps-inline.js（<script> 載入）從記憶體提供字型對照表。
    */
   async function cmapOptions() {
-    if (!isFileProtocol()) return {};
+    // 一律優先用內嵌對照表（離線 ZIP 不再另附 cmaps/ 資料夾以縮小檔案）；載入失敗才退回 cMapUrl
     try { await loadScript(VENDOR.cmapsInline); } catch (e) { return {}; }
     const M = root.__D2Q_CMAPS || {};
     class InlineCMapReaderFactory {
@@ -55,7 +55,8 @@
     if (workerURL) return workerURL;
     const simd = typeof WebAssembly === "object" && WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
     const core = simd ? "core-simd" : "core";
-    await Promise.all([core, "worker", "lang-eng", "lang-chi_tra"].map((n) => loadScript(VENDOR.inline + n + ".js")));
+    try { await Promise.all([core, "worker", "lang-eng", "lang-chi_tra"].map((n) => loadScript(VENDOR.inline + n + ".js"))); }
+    catch (e) { throw new Error(simd ? e.message : "瀏覽器版本過舊（不支援 WebAssembly SIMD），無法執行 OCR；請更新 Edge 或 Chrome。有文字層的 CAD PDF 與 DXF 仍可辨識。"); }
     const O = root.__D2Q_OCR;
     const prelude = `self.__LANGS={eng:${JSON.stringify(O["lang-eng"])},chi_tra:${JSON.stringify(O["lang-chi_tra"])}};
 (function(){var of=self.fetch;self.fetch=function(u,o){var m=String(u).match(/([A-Za-z_]+)\.traineddata(\.gz)?$/);
