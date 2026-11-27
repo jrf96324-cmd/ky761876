@@ -10,6 +10,7 @@ const INCLUDE = ["index.html", "README.md", "使用說明.txt", "START-Windows.b
 
 function walk(p, list) {
   const st = fs.statSync(p);
+  if (path.basename(p) === "private") return; // 客戶真實圖面基準（test/private）不打包，避免 ZIP 轉傳外洩
   if (st.isDirectory()) fs.readdirSync(p).sort().forEach((f) => walk(path.join(p, f), list)); else list.push(p);
 }
 const files = []; INCLUDE.forEach((i) => { const p = path.join(root, i); if (fs.existsSync(p)) walk(p, files); });

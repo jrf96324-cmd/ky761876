@@ -35,6 +35,15 @@ const CASES = [
   { name: "彈片（薄片 t=1.0 註記）", input: () => fx("thin_spring_pdftext.json"), truth: { 零件名稱: "彈片", 材料: "SUS301", 數量: "10", 外形: "sheet", 長L: 80, 寬W: 20, 板厚T: 1, 孔數: 2 } },
 ];
 
+// 本機私有基準：test/private/*.json（已列入 .gitignore，不上傳）
+// 格式：{ "cases": [ { "name": "...", "input": {辨識器輸入}, "truth": {欄位: 標準答案} } ] }
+// 真實客戶圖面（含公司名稱、圖號）只放這裡，與公開範例一起納入「全對＋兩次相同」的發佈門檻
+const PRIV = path.join(__dirname, "private");
+if (fs.existsSync(PRIV)) for (const f of fs.readdirSync(PRIV).filter((f) => f.endsWith(".json")).sort()) {
+  const j = JSON.parse(fs.readFileSync(path.join(PRIV, f), "utf8"));
+  for (const c of j.cases || []) CASES.push({ name: `[私有] ${c.name}`, input: () => c.input, truth: c.truth });
+}
+
 function runOnce() {
   return CASES.map((c) => {
     const rec = DP.recognize(c.input());
@@ -53,9 +62,11 @@ CASES.forEach((c, i) => {
   const f = run1[i].fields, miss = [];
   let k = 0, n = 0;
   for (const [key, want] of Object.entries(c.truth)) {
-    const got = key === "寬W/高H" ? [f["寬W"], f["高H"]].map(Number).sort((a, b) => a - b).join("/") : f[key];
+    // 寬W/高H：不分順序；厚板（plate）的高度記在板厚T
+    const got = key === "寬W/高H" ? [f["寬W"], f["高H"] || f["板厚T"]].map(Number).sort((a, b) => a - b).join("/") : f[key];
     n++; tot++;
-    if (String(got ?? "") === String(want)) { k++; ok++; } else miss.push(`${key}=${got ?? "∅"}（應為 ${want}）`);
+    // 標準答案可用「|」列出等價寫法（例：block|plate，厚板與方塊皆可接受）
+    if (String(want).split("|").includes(String(got ?? ""))) { k++; ok++; } else miss.push(`${key}=${got ?? "∅"}（應為 ${want}）`);
   }
   rows.push(`${k === n ? "✔" : "✘"} ${c.name.padEnd(22)} ${k}/${n}  估價 NT$${Math.round(run1[i].price).toLocaleString().padStart(7)}  ${run1[i].stock}${miss.length ? "\n     未中：" + miss.join("、") : ""}`);
 });

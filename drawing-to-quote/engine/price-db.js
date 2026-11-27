@@ -67,6 +67,8 @@
       "SGCC":    { name: "SGCC 鍍鋅鋼板",      density: 7.85, pricePerKg: 44,   machinability: 0.50, cutFee: 0,  group: "steel" },
       "A1050":   { name: "A1050 純鋁板",       density: 2.71, pricePerKg: 195,  machinability: 0.90, cutFee: 0,  group: "al" },
       "C5191":   { name: "C5191 磷青銅",       density: 8.80, pricePerKg: 480,  machinability: 0.50, cutFee: 0,  group: "cu" },
+      "PMMA":    { name: "壓克力 PMMA",        density: 1.19, pricePerKg: 220,  machinability: 1.20, cutFee: 0,  group: "plastic" },
+      "PTFE":    { name: "鐵氟龍 PTFE",        density: 2.20, pricePerKg: 750,  machinability: 1.10, cutFee: 10, group: "plastic" },
     },
 
     // 常用材料別名（圖面上常見寫法）
@@ -74,7 +76,8 @@
       "AL5052": "A5052", "AL6061": "A6061", "6061": "A6061", "5052": "A5052", "7075": "A7075", "6063": "A6063",
       "SUS-304": "SUS304", "304": "SUS304", "316": "SUS316", "S45": "S45C", "45#": "S45C", "S50": "S50C",
       "SKD-11": "SKD11", "DC53": "SKD11", "黃銅": "C3604", "BRASS": "C3604", "銅": "C1100", "塑鋼": "POM",
-"SK5": "SK85", "SK-5": "SK85", "磷青銅": "C5191", "PBS": "C5191", "鍍鋅鋼板": "SGCC", "GI": "SGCC", "1050": "A1050", "熱軋": "SPHC", "彈簧鋼": "SK85",
+"壓克力": "PMMA", "ACRYLIC": "PMMA", "鐵氟龍": "PTFE", "TEFLON": "PTFE", "SP": "SPCC", "SS41": "SS400",
+      "SK5": "SK85", "SK-5": "SK85", "磷青銅": "C5191", "PBS": "C5191", "鍍鋅鋼板": "SGCC", "GI": "SGCC", "1050": "A1050", "熱軋": "SPHC", "彈簧鋼": "SK85",
       "鐵": "SS400", "A3": "SS400", "SS41": "SS400", "尼龍": "MC尼龍", "MC": "MC尼龍",
     },
 

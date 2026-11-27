@@ -104,7 +104,7 @@
     }
     p.shape = shape;
     if (shape === "plate" && !p.T) { p.T = p.H || 10; if (!p.H) p.warnings.push("板厚未填，暫以 10mm 估算，請補板厚"); }
-    if (shape === "sheet" && !p.T) { p.T = p.H || 2; if (!p.H) p.warnings.push("板厚未填，暫以 2mm 估算，請補板厚"); }
+    if (shape === "sheet" && !p.T) { if (p.H > 0 && p.H <= 6) p.T = p.H; else { p.T = 2; p.warnings.push("板厚未填，暫以 2mm 估算，請補板厚"); } }
     if ((shape === "plate" || shape === "sheet") && !p.H) p.H = p.T;
     if (shape === "round" && !p.L) p.L = p.H;
     if (!p.solidity) p.solidity = { round: 1.0, block: 0.7, plate: 0.85, sheet: 0.9, frame: 0.25 }[shape];
@@ -145,12 +145,16 @@
       g.stock = `圓棒 Ø${g.stockD} × ${g.stockL}`;
     } else if (p.shape === "sheet") {
       const t = p.T;
-      g.stockVol = p.L * p.W * t / 1000 / 0.8; // 排版利用率 80%
-      g.partVol = p.L * p.W * t / 1000 * p.solidity;
-      g.cutMm = p.cutMm || 2 * (p.L + p.W) + p.holes * Math.PI * 8 + p.slots * 60;
-      g.areaDm2 = 2 * p.L * p.W * p.solidity / 1e4;
-      g.outline = `${p.L}×${p.W}×t${t}`;
-      g.stock = `板材 ${p.L}×${p.W}×t${t}（排版利用率 80%）`;
+      // 折彎成形的盒／罩（高H 遠大於板厚）：以展開尺寸下料 (長+2高)×(寬+2高)
+      const formed = p.H > Math.max(3 * t, 6);
+      const bl = formed ? round(p.L + 2 * p.H, 1) : p.L, bw = formed ? round(p.W + 2 * p.H, 1) : p.W;
+      g.blank = { L: bl, W: bw };
+      g.stockVol = bl * bw * t / 1000 / 0.8; // 排版利用率 80%
+      g.partVol = bl * bw * t / 1000 * p.solidity;
+      g.cutMm = p.cutMm || 2 * (bl + bw) + p.holes * Math.PI * 8 + p.slots * 60;
+      g.areaDm2 = 2 * bl * bw * p.solidity / 1e4;
+      g.outline = formed ? `${p.L}×${p.W}×H${p.H} t${t}` : `${p.L}×${p.W}×t${t}`;
+      g.stock = formed ? `板材展開 ${bl}×${bw}×t${t}（成形 ${p.L}×${p.W}×H${p.H}，排版利用率 80%）` : `板材 ${p.L}×${p.W}×t${t}（排版利用率 80%）`;
     } else if (p.shape === "frame") {
       const env = p.L * p.W * p.H / 1000;
       g.partVol = p.netWeightKg ? p.netWeightKg * 1000 / rho : env * p.solidity * 0.15; // 架構件實際材積遠小於包絡
