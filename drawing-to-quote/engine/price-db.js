@@ -157,6 +157,7 @@
       groove:       { name: "退刀槽/溝槽",       min: 1.5 },
       reamHole:     { name: "精度孔 鉸孔/搪孔",  min: 3 },
       chamferPerM:  { name: "倒角 C 去銳角 (每公尺邊長)", min: 4 },
+      hexFlat:      { name: "銑六角/對邊 (每面)", min: 1.5 },
       fixturePerSetup: { name: "裝夾/校正 (每次)", min: 6 },
       inspectBase:  { name: "首件/尺寸檢驗",     min: 8 },
       keyway:       { name: "鍵槽 (插/銑)",      min: 12 },

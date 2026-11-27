@@ -25,7 +25,7 @@
 
   const SHEET_MAT = /^(SPCC|SPCD|SPCE|SECC|SGCC|SGHC|SPHC|SPTE)$/; // 鈑金板材（冷軋、鍍鋅、熱軋酸洗、馬口鐵）
   // CAD 符號字型（GDT 類）在 PDF 文字層以控制字元包住：\u0001n\u0002＝Ø、\u0001#\u0002＝±、\u0001d\u0002＝°
-  const SYM = { n: "Ø", N: "Ø", "#": "±", d: "°", "%": "°", c: "Ø" };
+  const SYM = { n: "Ø", N: "Ø", "#": "±", d: "°", "%": "°", $: "°", c: "Ø" };
   const norm = (s) => String(s ?? "").replace(/\u0001(.)\u0002/g, (m, c) => SYM[c] ?? "")
     .replace(/[⌀∅φΦøФфϕ]/g, "Ø").replace(/%%[cC]/g, "Ø").replace(/(\d)\s+\.(\d)/g, "$1.$2").replace(/Ø\s+(\d)/g, "Ø$1")
     .replace(/[\u0000-\u001f\uE000-\uF8FF\uFFFD](?=\s*\d)/g, "Ø") // CAD 符號字型未對應 Unicode 時，數字前的亂碼多為 Ø
@@ -438,6 +438,22 @@
         mem.forEach((d) => { if (d.v < mx) d.ordPos = true; else d.ordMax = true; });
       }
     }
+    // 外螺紋（螺桿、調整桿）：單獨的「M30xP1.5」「M12」標在外徑上，沒有孔數前綴、沒有深度
+    // 條件：此 M 不小於圖上所有 Ø；文字方向與最長尺寸（軸長）垂直；且與它同方向沒有比它大很多的直線尺寸（否則是方塊上的螺孔）
+    let extThreadEv = "";
+    {
+      const maxDia = Math.max(0, ...dims.filter((d) => d.kind === "diameter").map((d) => d.v));
+      const linAll = dims.filter((d) => d.kind === "linear" && !d.slanted && !d.ordPos && d.x != null);
+      const longest = [...linAll].sort((a, b) => b.v - a.v)[0];
+      const cand = doc.items.map((it) => ({ it, m: it.s.trim().match(/^M\s*(\d+(?:\.\d+)?)(?:\s*[xX×]\s*P?\s*\d+(?:\.\d+)?)?(?:\s*-?\s*\d[a-hA-H])?$/) }))
+        .filter(({ it, m }) => m && it.slanted == null && +m[1] >= 3).map(({ it, m }) => ({ it, v: +m[1] })).sort((a, b) => b.v - a.v);
+      const c = cand[0];
+      if (c && longest && c.v >= maxDia && longest.v >= c.v * 1.5 && !!longest.vertical !== !!c.it.vertical
+        && !linAll.some((d) => !!d.vertical === !!c.it.vertical && d.v > c.v * 1.6)) {
+        dims.push({ kind: "diameter", v: c.v, text: `${c.it.s.trim()}（外螺紋外徑）`, x: c.it.x, y: c.it.y, h: c.it.h, vertical: !!c.it.vertical, conf: 90, extThread: true });
+        extThreadEv = c.it.s.trim();
+      }
+    }
     // 軸類判斷（Ø 符號未被讀成文字時）：長件 + 多個遠小於全長的直書尺寸，或帶軸用配合公差（k6、h6、g6…）
     // → 這些尺寸其實是直徑
     let shaftEv = "";
@@ -555,7 +571,7 @@
     set("外形", shape, (shaftEv && shape === "round") || shapeNote ? "mid" : "low", shapeNote && (shape !== "round" || !shaftEv) ? shapeNote : { round: shaftEv || "直徑標註為主", sheet: "板厚/折彎註記", frame: section ? "型鋼規格註記（角鐵/方管）" : fields["焊道長mm"] !== undefined ? "焊接註記 + 大尺寸" : "三向尺寸皆 > 250mm，判為架構/焊接件", plate: "厚度遠小於長寬", block: "三向尺寸相近" }[shape]);
 
     if (shape === "round") {
-      set("外徑OD", maxD, dimConf, "最大直徑 Ø" + maxD);
+      set("外徑OD", maxD, dimConf, extThreadEv && dims.some((d) => d.extThread && d.v === maxD) ? `外螺紋 ${extThreadEv} 的外徑 Ø${maxD}` : "最大直徑 Ø" + maxD);
       set("長L", overall[0] || "", dimConf, "最大長度 " + (overall[0] || "?"));
       const holeDias = new Set(holeEv.map((h) => +(h.match(/Ø\s*(\d+(?:\.\d+)?)/) || [])[1]));
       const named = dims.find((d) => d.kind === "diameter" && d.v < maxD * 0.9 && /H\d|內|孔|ID/i.test(d.text));
@@ -659,6 +675,29 @@
         if (verify.round.id) set("內徑ID", verify.round.id, "mid", `同心圓量測 Ø${verify.round.id}`);
         set("長L", verify.round.len || fields["長L"], "mid", "軸向尺寸");
         delete fields["寬W"]; delete fields["高H"];
+      }
+    }
+
+    // 8.5) 六角（軸端銑六角、六角桿）：圖上一個由 6 條等長粗實線圍成的正六邊形 → 對邊 = 2 × 中心到邊距離 × 比例
+    if (input.geom && (input.geom.lines || []).length) {
+      const fH = (outline && outline.f) || (verify && verify.f) || 1, PTMM = 25.4 / 72;
+      const TL = input.geom.lines.filter((l) => !l[5] && l[4] >= 0.5).map(([x1, y1, x2, y2]) => ({ x1, y1, x2, y2, len: Math.hypot(x2 - x1, y2 - y1), mx: (x1 + x2) / 2, my: (y1 + y2) / 2 })).filter((l) => l.len > 3);
+      let hex = null;
+      for (const a of TL) {
+        const same = TL.filter((b) => Math.abs(b.len - a.len) <= a.len * 0.04 && Math.hypot(b.mx - a.mx, b.my - a.my) <= a.len * 2.1);
+        if (same.length < 6) continue;
+        const cx = same.reduce((t, b) => t + b.mx, 0) / same.length, cy = same.reduce((t, b) => t + b.my, 0) / same.length;
+        const ring = same.filter((b) => Math.abs(Math.hypot(b.mx - cx, b.my - cy) - a.len * 0.866) <= a.len * 0.06);
+        if (ring.length !== 6) continue;
+        const key = (x, y) => `${Math.round(x * 2)},${Math.round(y * 2)}`, cnt = {};
+        ring.forEach((b) => { cnt[key(b.x1, b.y1)] = (cnt[key(b.x1, b.y1)] || 0) + 1; cnt[key(b.x2, b.y2)] = (cnt[key(b.x2, b.y2)] || 0) + 1; });
+        if (Object.keys(cnt).length === 6 && Object.values(cnt).every((n) => n === 2)) { hex = { af: 2 * a.len * 0.866 * PTMM * fH }; break; }
+      }
+      if (hex) {
+        const sl = dims.filter((d) => d.kind === "linear" && Math.abs(d.v - hex.af) <= Math.max(0.5, hex.af * 0.04)).map((d) => d.v)[0];
+        const af = sl || Math.round(hex.af * 2) / 2;
+        const note = `六角 對邊 ${af}${sl ? "" : "（量測值）"}`;
+        set("備註", [fields["備註"], note].filter(Boolean).join("；"), "mid", (ev["備註"] ? ev["備註"] + "；" : "") + "圖形：正六邊形");
       }
     }
 

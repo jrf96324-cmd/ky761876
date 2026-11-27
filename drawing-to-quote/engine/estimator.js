@@ -81,6 +81,7 @@
       ratio: (num(raw.ratio ?? raw["估價比例%"], 100) || 100) / 100,
       warnings: [],
     };
+    p.hexFlats = /六角|HEX/i.test(p.notes) && !/六角(螺栓|螺帽|孔|扳手)/.test(p.notes) ? 6 : 0; // 備註「六角 對邊 24」→ 銑六角 6 面
     p.qty = parseQty(p.qtyInput);
     p.material = resolveMaterial(db, p.materialInput);
     if (!p.material) { p.warnings.push(`材料「${p.materialInput || "未填"}」無法辨識，暫以 SS400 估算`); p.material = "SS400"; p.materialMissing = true; }
@@ -208,7 +209,7 @@
 
   // 特徵標準工時（分鐘／個）：優先取單價資料庫 ops，缺項用內建值
   const OPS_DEF = { drill: 0.8, tap: 1.2, pt: 2.5, slot: 4, pocket: 8, deepHole: 6, crossHole: 5, extThread: 3, groove: 1.5, reamHole: 3,
-    chamferPerM: 4, fixturePerSetup: 6, inspectBase: 8, keyway: 12, knurl: 3, marking: 1.5, gearPerTooth: 0.6 };
+    chamferPerM: 4, hexFlat: 1.5, fixturePerSetup: 6, inspectBase: 8, keyway: 12, knurl: 3, marking: 1.5, gearPerTooth: 0.6 };
   const opMin = (db, k) => (db.ops && db.ops[k] && Number.isFinite(db.ops[k].min) ? db.ops[k].min : OPS_DEF[k]);
   /** 每個特徵一列（鑽孔、攻牙、銑槽…），乘以材料難切係數 k；group＝工序比對欄位 */
   function featureParts(p, k, db, opts = {}) {
@@ -222,6 +223,7 @@
     f(p.crossHoles, "crossHole", "交叉孔", "鑽孔攻牙");
     f(p.slots, "slot", "銑槽", "銑削");
     f(p.pockets, "pocket", "口袋/凹槽", "銑削");
+    f(p.hexFlats, "hexFlat", "銑六角（面）", "銑削");
     if (!opts.noTurn) { f(p.extThreads, "extThread", "車外牙", "車削"); f(p.grooves, "groove", "退刀槽/溝槽", "車削"); }
     return P;
   }
@@ -308,7 +310,7 @@
         ...(knurl ? [{ label: "滾花", min: opMin(db, "knurl"), group: "車削" }] : []),
         { label: `端面/切斷/調頭 ×${p.faces}`, min: 2 * p.faces / 2 + 1.5, group: "車削", detail: `${p.faces} 面 × 1 分 + 切斷 1.5 分` },
       ];
-      const offAxis = p.holes + p.taps + p.ptTaps + p.slots + p.pockets + p.crossHoles + (p.reamHoles || 0);
+      const offAxis = p.holes + p.taps + p.ptTaps + p.slots + p.pockets + p.crossHoles + (p.reamHoles || 0) + (p.hexFlats || 0);
       const millParts = offAxis ? [...featureParts(p, Math.sqrt(mc), db, { noTurn: true }), { label: "分度/裝夾校正", min: 4, group: "銑削" }] : [];
       const base = [materialCost(p, g, db)];
       add("R1", "CNC 車削" + (offAxis ? " + 三軸銑 (二次加工)" : ""), "標準路線：CNC 車床完成外徑/內徑/端面，偏心孔、槽、攻牙移至綜合加工機。",
