@@ -5,7 +5,7 @@
 (function (root) {
   const base = (p) => new URL(p, location.href).href;
   const VENDOR = {
-    pdf: "vendor/pdfjs/pdf.min.js", pdfWorker: "vendor/pdfjs/pdf.worker.min.js", cmaps: "vendor/pdfjs/cmaps/",
+    pdf: "vendor/pdfjs/pdf.min.js", pdfWorker: "vendor/pdfjs/pdf.worker.min.js", cmaps: "vendor/pdfjs/cmaps/", cmapsInline: "vendor/pdfjs/cmaps-inline.js",
     tess: "vendor/tesseract/tesseract.min.js", inline: "vendor/ocr-inline/",
   };
   const loaded = {};
@@ -21,6 +21,28 @@
     lib.GlobalWorkerOptions.workerSrc = base(VENDOR.pdfWorker);
     if (isFileProtocol()) await loadScript(VENDOR.pdfWorker); // file:// 無法開 Worker，改主執行緒
     return lib;
+  }
+
+  /**
+   * 直接雙擊 index.html（file://）時，瀏覽器禁止 pdf.js 以 XHR 讀本機 cmaps/ →
+   * 中文字型（Big5／UniCNS…）的 CAD 圖讀不到文字層，只能走很慢的 OCR。
+   * 改由 vendor/pdfjs/cmaps-inline.js（<script> 載入）從記憶體提供字型對照表。
+   */
+  async function cmapOptions() {
+    if (!isFileProtocol()) return {};
+    try { await loadScript(VENDOR.cmapsInline); } catch (e) { return {}; }
+    const M = root.__D2Q_CMAPS || {};
+    class InlineCMapReaderFactory {
+      constructor() {}
+      async fetch({ name }) {
+        const b64 = M[name];
+        if (!b64) throw new Error(`字型對照表 ${name} 不存在`);
+        const bin = atob(b64), a = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+        return { cMapData: a, compressionType: 1 }; // 1 = BINARY（.bcmap）
+      }
+    }
+    return { CMapReaderFactory: InlineCMapReaderFactory, useWorkerFetch: false };
   }
 
   let ocrWorker = null, ocrLangs = null;
@@ -531,7 +553,7 @@ return of(u,o);};})();\n`;
     if (ext === "pdf") {
       onStep("讀取 PDF");
       const lib = await getPdfjs();
-      const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), cMapUrl: base(VENDOR.cmaps), cMapPacked: true }).promise;
+      const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), cMapUrl: base(VENDOR.cmaps), cMapPacked: true, ...(await cmapOptions()) }).promise;
       const out = [];
       for (let n = 1; n <= pdf.numPages; n++) {
         onStep(`PDF 第 ${n}/${pdf.numPages} 頁`);

@@ -6,6 +6,8 @@ Drawing-to-Quote 製作圖製程審查與多元估價（離線單機版）
   macOS / Linux：執行 ./start-mac-linux.sh（需 Node.js 或 Python 3）
   瀏覽器會自動開啟 http://localhost:8765/index.html
   ※ 也可以直接雙擊 index.html，所有功能（含掃描圖 / 照片 OCR）都能用；第一次 OCR 需載入約 10 MB 字庫，稍等數秒
+  ※ 直接雙擊 index.html 時，中文字型的 CAD PDF 也能讀文字層（字型對照表已內嵌於 vendor/pdfjs/cmaps-inline.js）
+  ※ 本程式不會修改 Windows 的 PDF 預設開啟程式；若在檔案總管雙擊 PDF 打不開，請右鍵 → 開啟檔案 → 選擇其他應用程式 → 勾選「一律使用此應用程式」
 
 【操作流程】
   1. 「圖面辨識」頁：一次拖曳多張製作圖（DXF / PDF / PNG / JPG）
