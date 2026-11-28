@@ -1,0 +1,7 @@
+# Obsidian 個人介面狀態，不同電腦各自保存
+.obsidian/workspace*.json
+.obsidian/cache
+.trash/
+# 3D 大檔不進 git（STEP/IGES/SLDPRT 請放 NAS 或雲端，筆記內放連結）
+99_附件 Attachments/3D_STEP/*
+!99_附件 Attachments/3D_STEP/README.md
